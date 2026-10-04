@@ -66,7 +66,7 @@ jobs:
           if-no-files-found: error
 
       - name: Pindahkan tag "terbaru" ke commit ini
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         run: |
           git tag -f terbaru
           git push -f origin refs/tags/terbaru
@@ -74,7 +74,7 @@ jobs:
       # Catatan: GitHub mengganti spasi di nama file Release menjadi titik
       # (Pengingat.Absen.UDINUS.apk); di artifact namanya tetap persis.
       - name: Perbarui Release "terbaru" (unduhan publik)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: terbaru
