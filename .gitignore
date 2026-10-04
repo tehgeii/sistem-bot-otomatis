@@ -1,0 +1,32 @@
+# Gradle / build
+.gradle/
+build/
+*/build/
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+local.properties
+
+# Output
+*.apk
+*.aab
+*.ap_
+*.dex
+output-metadata.json
+
+# Keystore & secret — JANGAN pernah di-commit
+*.jks
+*.keystore
+keystore.properties
+secrets.properties
+*.env
+.env*
+
+# OS
+.DS_Store
+Thumbs.db

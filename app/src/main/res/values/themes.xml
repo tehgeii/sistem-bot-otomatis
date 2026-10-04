@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.PengingatAbsen" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Activity tanpa tampilan (buka Dinusverse, terima share). -->
+    <style name="Theme.PengingatAbsen.Transparent" parent="android:Theme.Translucent.NoTitleBar">
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>
