@@ -111,6 +111,19 @@ di dalam aplikasi:
 - Jika login otomatis gagal 2 kali (password berubah, ada captcha, atau tampilan login kampus
   berubah), browser mini berhenti dan menampilkan pesan; login manual seperti biasa.
 
+**Bantuan presensi di browser mini** (tombol presensi tetap kamu yang tekan):
+
+1. **Menunggu sesi dibuka:** selama halaman menampilkan "Belum Ada Presensi Hari Ini!", halaman
+   dimuat ulang otomatis tiap ±20 detik (maks. 90 menit). Begitu berubah, HP bergetar dengan
+   notifikasi **"Presensi sudah dibuka!"**.
+2. **Tombol disorot:** tombol presensi diberi bingkai kuning dan layar digulir ke tombol itu.
+3. **Bukti otomatis:** setelah **kamu** menekan tombol yang disorot, ±4 detik kemudian screenshot
+   halaman dikirim ke Telegram, absen ditandai selesai, pengingat berhenti, dan browser tertutup.
+
+Tombol presensi dikenali dari tulisannya (`presensi`, `hadir`, `absen`). Jika tidak tersorot,
+tekan tombolnya seperti biasa lalu pakai **📷 Kirim screenshot**. Aplikasi **tidak pernah menekan
+tombol presensi** — itu sengaja tidak dibuat, karena presensi adalah pernyataan kehadiranmu sendiri.
+
 **Atau aplikasi Dinusverse:** aplikasi yang dibuka oleh tombol **Absen sekarang**. Jika Dinusverse/SiAdin terpasang, aplikasi
 memilihnya otomatis; kalau tidak, tekan **Pilih aplikasi** dan pilih dari daftar.
 Nama package tidak di-hardcode.

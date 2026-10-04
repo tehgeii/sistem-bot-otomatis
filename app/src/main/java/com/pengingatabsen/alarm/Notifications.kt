@@ -19,6 +19,7 @@ import com.pengingatabsen.R
 import com.pengingatabsen.data.AttendanceRecord
 import com.pengingatabsen.data.Course
 import com.pengingatabsen.launch.LaunchTargetActivity
+import com.pengingatabsen.launch.WebBrowserActivity
 import com.pengingatabsen.logic.Formatters
 import com.pengingatabsen.ui.MainActivity
 import kotlinx.coroutines.runBlocking
@@ -104,6 +105,23 @@ object Notifications {
         val sample = Course(id = TEST_COURSE_ID, name = "Contoh Matkul", dayOfWeek = 1, openMinute = 7 * 60, closeMinute = 8 * 60 + 40, room = "H.3.4")
         showReminder(context, sample, null, final = false)
     }
+
+    /** Heads-up saat browser mini mendeteksi sesi presensi sudah dibuka dosen. */
+    fun showPresensiOpen(context: Context, courseId: Long, epochDay: Long, url: String) {
+        val open = PendingIntent.getActivity(
+            context, 2, WebBrowserActivity.intent(context, url, courseId, epochDay),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val builder = base(context, absenChannel(), silent = false)
+            .setOngoing(false)
+            .setAutoCancel(true)
+            .setContentTitle("Presensi sudah dibuka!")
+            .setContentText("Tap lalu tekan tombol presensi yang disorot kuning.")
+            .setContentIntent(open)
+        notify(context, PRESENSI_OPEN_ID, builder)
+    }
+
+    private const val PRESENSI_OPEN_ID = 777
 
     /** Info non-heads-up, mis. gagal mengirim bukti. */
     fun showInfo(context: Context, id: Int, title: String, text: String, action: Pair<String, PendingIntent>? = null) {

@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
+import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -56,6 +57,7 @@ import androidx.core.view.drawToBitmap
 import androidx.lifecycle.lifecycleScope
 import com.pengingatabsen.Graph
 import com.pengingatabsen.alarm.AlarmScheduler
+import com.pengingatabsen.alarm.Notifications
 import com.pengingatabsen.ui.theme.PengingatTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -91,6 +93,12 @@ class WebBrowserActivity : ComponentActivity() {
     private var autoLogin = true
     private var settingsLoaded = false
     private var started = false
+
+    // Bantuan presensi: tunggu sesi dibuka, sorot tombol, bukti otomatis setelah pengguna menekan
+    private var waitingSince = 0L
+    private var wasWaiting = false
+    private var autoProofScheduled = false
+    private val reloadWhileWaiting = Runnable { webView?.reload() }
 
     // Izin & upload yang diminta halaman web
     private var pendingFileCallback: ValueCallback<Array<Uri>>? = null
@@ -190,6 +198,7 @@ class WebBrowserActivity : ComponentActivity() {
             .replace(Regex("Version/\\d+(\\.\\d+)* "), "")
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+        addJavascriptInterface(PresensiBridge(), "PengingatAbsen")
 
         webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
@@ -306,11 +315,74 @@ class WebBrowserActivity : ComponentActivity() {
                     if (status?.startsWith("Login otomatis") == true || status?.startsWith("Silakan login") == true) status = null
                     if (redirectAfterLogin) {
                         redirectAfterLogin = false
-                        if (!url.startsWith(targetUrl)) view.loadUrl(targetUrl)
+                        if (!url.startsWith(targetUrl)) {
+                            view.loadUrl(targetUrl)
+                            return@evaluateJavascript
+                        }
+                    }
+                    if (url.startsWith(targetUrl)) checkPresensi(view)
+                }
+            }
+        }
+    }
+
+    /**
+     * Di halaman presensi: tunggu sesi dibuka (muat ulang berkala), lalu sorot tombol presensi.
+     * Tombol presensi TIDAK pernah ditekan oleh aplikasi; pengguna yang menekannya.
+     */
+    private fun checkPresensi(view: WebView) {
+        view.evaluateJavascript(CHECK_PRESENSI_SCRIPT) { raw ->
+            view.removeCallbacks(reloadWhileWaiting)
+            when (raw?.trim('"')) {
+                "WAITING" -> {
+                    val now = System.currentTimeMillis()
+                    if (waitingSince == 0L) waitingSince = now
+                    wasWaiting = true
+                    if (now - waitingSince < MAX_WAIT_MS) {
+                        status = "Menunggu dosen membuka presensi… dicek otomatis tiap 20 detik."
+                        view.postDelayed(reloadWhileWaiting, RELOAD_INTERVAL_MS)
+                    } else {
+                        status = "Berhenti menunggu (90 menit). Tekan ⟳ untuk cek lagi."
+                    }
+                }
+                "OPEN" -> {
+                    status = "Tombol presensi sudah muncul — tekan tombol yang disorot kuning. Bukti dikirim otomatis setelahnya."
+                    onSessionOpened()
+                }
+                else -> {
+                    if (wasWaiting) {
+                        status = "Halaman presensi berubah — cek apakah presensi sudah dibuka."
+                        onSessionOpened()
                     }
                 }
             }
         }
+    }
+
+    private fun onSessionOpened() {
+        waitingSince = 0L
+        if (wasWaiting) {
+            wasWaiting = false
+            Notifications.showPresensiOpen(applicationContext, courseId, epochDay, targetUrl)
+        }
+    }
+
+    /** Dipanggil dari listener klik pada tombol yang disorot — hanya terpicu oleh tap pengguna. */
+    private inner class PresensiBridge {
+        @JavascriptInterface
+        fun onPresensiClicked() {
+            runOnUiThread { onPresensiClickedByUser() }
+        }
+    }
+
+    private fun onPresensiClickedByUser() {
+        val wv = webView ?: return
+        val url = wv.url ?: return
+        if (autoProofScheduled || !isTrustedUrl(url)) return
+        autoProofScheduled = true
+        status = "Presensi ditekan — mengambil bukti dalam 4 detik…"
+        // Beri waktu halaman menampilkan hasil presensi sebelum di-screenshot.
+        wv.postDelayed({ if (!isFinishing) sendScreenshot() }, AUTO_PROOF_DELAY_MS)
     }
 
     /** Kredensial hanya diisikan ke halaman HTTPS di domain yang sama dengan URL tujuan. */
@@ -389,6 +461,9 @@ class WebBrowserActivity : ComponentActivity() {
         loginAttempts = 0
         redirectAfterLogin = false
         status = null
+        webView?.removeCallbacks(reloadWhileWaiting)
+        waitingSince = 0L
+        autoProofScheduled = false
         if (started) webView?.loadUrl(targetUrl)
     }
 
@@ -398,6 +473,7 @@ class WebBrowserActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        webView?.removeCallbacks(reloadWhileWaiting)
         webView?.destroy()
         webView = null
         super.onDestroy()
@@ -406,6 +482,48 @@ class WebBrowserActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_URL = "url"
         private const val MAX_LOGIN_ATTEMPTS = 2
+        private const val RELOAD_INTERVAL_MS = 20_000L
+        private const val MAX_WAIT_MS = 90 * 60_000L
+        private const val AUTO_PROOF_DELAY_MS = 4_000L
+
+        /**
+         * Status halaman presensi: WAITING ("Belum Ada Presensi"), OPEN (tombol presensi ditemukan →
+         * diberi sorotan kuning, digulir ke tengah, dan dipasangi listener klik), atau UNKNOWN.
+         * Script ini TIDAK menekan tombol; listener hanya memberi tahu aplikasi saat pengguna menekannya.
+         */
+        private val CHECK_PRESENSI_SCRIPT = """
+            (function(){
+              var text = document.body ? document.body.innerText : '';
+              if (/belum ada presensi/i.test(text)) return 'WAITING';
+              function shown(e){
+                var r = e.getBoundingClientRect(), s = window.getComputedStyle(e);
+                return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
+              }
+              var cands = Array.prototype.slice.call(
+                document.querySelectorAll('button,a,input[type=button],input[type=submit]')
+              ).filter(function(b){
+                if (!shown(b)) return false;
+                if (b.closest && b.closest('nav,header,.navbar,.sidebar')) return false;
+                if (/presensiOnline/i.test(b.getAttribute('href') || '')) return false;
+                var t = (b.innerText || b.value || '').trim();
+                if (/^presensi\s*online$/i.test(t)) return false;
+                return t.length > 0 && t.length < 40 && /presensi|hadir|absen/i.test(t);
+              });
+              var b = cands[0];
+              if (!b) return 'UNKNOWN';
+              if (!b.__pengingat) {
+                b.__pengingat = true;
+                b.style.outline = '4px solid #F2B705';
+                b.style.outlineOffset = '3px';
+                b.style.boxShadow = '0 0 0 8px rgba(242,183,5,.35)';
+                b.addEventListener('click', function(){
+                  try { PengingatAbsen.onPresensiClicked(); } catch (e) {}
+                }, true);
+              }
+              b.scrollIntoView({block: 'center', behavior: 'smooth'});
+              return 'OPEN';
+            })();
+        """
 
         fun intent(context: Context, url: String, courseId: Long = 0L, epochDay: Long = 0L): Intent =
             Intent(context, WebBrowserActivity::class.java).apply {
