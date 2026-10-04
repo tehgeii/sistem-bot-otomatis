@@ -183,6 +183,11 @@ class WebBrowserActivity : ComponentActivity() {
         settings.setGeolocationEnabled(true)
         settings.loadWithOverviewMode = true
         settings.useWideViewPort = true
+        settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+        // Tampil sebagai Chrome biasa (tanpa penanda "wv") supaya website memperlakukannya sama.
+        settings.userAgentString = settings.userAgentString
+            .replace("; wv", "")
+            .replace(Regex("Version/\\d+(\\.\\d+)* "), "")
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
@@ -247,7 +252,19 @@ class WebBrowserActivity : ComponentActivity() {
         val wv = webView ?: return
         if (!settingsLoaded || started) return
         started = true
-        wv.loadUrl(targetUrl)
+        if (autoLogin && credentials != null) {
+            // Website tidak selalu mengarahkan ke login bila sesi habis (halaman tampil kosong),
+            // jadi masuk lewat halaman depan dulu: login bila perlu, lalu lanjut ke halaman tujuan.
+            redirectAfterLogin = true
+            wv.loadUrl(siteRoot())
+        } else {
+            wv.loadUrl(targetUrl)
+        }
+    }
+
+    private fun siteRoot(): String {
+        val uri = Uri.parse(targetUrl)
+        return "${uri.scheme}://${uri.host}/"
     }
 
     /** Dipanggil tiap halaman selesai dimuat: login otomatis atau kembali ke halaman tujuan. */
@@ -263,14 +280,18 @@ class WebBrowserActivity : ComponentActivity() {
                     redirectAfterLogin = true
                     status = "Login otomatis…"
                 }
-                "LOGIN_PAGE", "NO_USER" -> status = when {
-                    !autoLogin -> "Login otomatis nonaktif. Silakan login."
-                    credentials == null -> "Silakan login. Simpan NIM & password di Pengaturan agar login otomatis."
-                    else -> "Login otomatis gagal. Cek NIM/password di Pengaturan, atau login manual."
+                "LOGIN_PAGE", "NO_USER" -> {
+                    // Setelah login (otomatis atau manual) langsung lanjut ke halaman tujuan.
+                    redirectAfterLogin = true
+                    status = when {
+                        !autoLogin -> "Login otomatis nonaktif. Silakan login."
+                        credentials == null -> "Silakan login. Simpan NIM & password di Pengaturan agar login otomatis."
+                        else -> "Login otomatis gagal. Cek NIM/password di Pengaturan, atau login manual."
+                    }
                 }
                 "NO_FORM" -> {
                     // Halaman SPA kadang baru merender form setelah onPageFinished.
-                    if (canFill && retriesLeft > 0 && !redirectAfterLogin) {
+                    if (canFill && retriesLeft > 0 && loginAttempts == 0) {
                         view.postDelayed({ onPageReady(view, url, retriesLeft - 1) }, 700)
                         return@evaluateJavascript
                     }
