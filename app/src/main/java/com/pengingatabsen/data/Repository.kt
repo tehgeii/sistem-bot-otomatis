@@ -113,6 +113,22 @@ class Repository(private val db: AppDatabase) {
         SendWorker.enqueue(Graph.appContext, record.id, SendWorker.KIND_PROOF)
     }
 
+    /**
+     * "Sudah, kirim bukti" dari browser mini. Pakai kemunculan [courseId]/[epochDay] bila ada,
+     * kalau tidak absen yang sedang dibuka. Null bila tidak ada absen yang bisa dikonfirmasi.
+     */
+    suspend fun confirmFromBrowser(courseId: Long, epochDay: Long, pressedAt: LocalDateTime): AttendanceRecord? {
+        val record = (if (courseId > 0) recordDao.find(courseId, epochDay) else null)
+            ?.takeIf { it.status == RecordStatus.ACTIVE }
+            ?: recordDao.active().firstOrNull()
+            ?: return null
+        confirmDone(record, pressedAt)
+        Notifications.cancel(Graph.appContext, record.courseId)
+        AlarmScheduler.reschedule(Graph.appContext, record.courseId)
+        NextCourseWidget.updateAll(Graph.appContext)
+        return record
+    }
+
     /** Kirim ulang bukti yang gagal (dari Riwayat atau notifikasi gagal). */
     suspend fun resend(recordId: Long) {
         val record = recordDao.get(recordId) ?: return

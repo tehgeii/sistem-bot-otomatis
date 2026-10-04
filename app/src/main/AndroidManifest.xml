@@ -16,6 +16,17 @@
     <!-- Telegram Bot API -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Hanya jika halaman presensi SiAdin web meminta lokasi / kamera (lokasi asli, tidak dipalsukan) -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.location"
+        android:required="false" />
 
     <!-- Supaya daftar aplikasi terpasang (untuk memilih Dinusverse) terlihat di Android 11+ -->
     <queries>
@@ -56,6 +67,14 @@
             android:noHistory="true"
             android:taskAffinity=""
             android:theme="@style/Theme.PengingatAbsen.Transparent" />
+
+        <!-- Browser mini SiAdin web: sesi login tersimpan, login otomatis, tombol kirim bukti -->
+        <activity
+            android:name=".launch.WebBrowserActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="com.pengingatabsen.siadin" />
 
         <!-- Share target: screenshot bukti absen -->
         <activity

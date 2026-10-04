@@ -27,6 +27,9 @@ data class AppSettings(
     val remindIntervalMinutes: Int = ScheduleMath.DEFAULT_REMIND_INTERVAL,
     /** Default getar saja supaya tidak berbunyi di kelas. */
     val vibrateOnly: Boolean = true,
+    /** NIM & password SiAdin tersimpan (terenkripsi) untuk login otomatis di browser mini. */
+    val hasSiadinLogin: Boolean = false,
+    val autoLogin: Boolean = true,
 ) {
     val telegramReady: Boolean get() = hasBotToken && !chatId.isNullOrBlank()
 }
@@ -42,6 +45,9 @@ class SettingsStore(private val context: Context) {
         val BOT_USERNAME = stringPreferencesKey("bot_username")
         val REMIND_INTERVAL = intPreferencesKey("remind_interval")
         val VIBRATE_ONLY = booleanPreferencesKey("vibrate_only")
+        val SIADIN_NIM_ENC = stringPreferencesKey("siadin_nim_enc")
+        val SIADIN_PASSWORD_ENC = stringPreferencesKey("siadin_password_enc")
+        val AUTO_LOGIN = booleanPreferencesKey("auto_login")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -58,6 +64,8 @@ class SettingsStore(private val context: Context) {
         botUsername = this[Keys.BOT_USERNAME],
         remindIntervalMinutes = this[Keys.REMIND_INTERVAL] ?: ScheduleMath.DEFAULT_REMIND_INTERVAL,
         vibrateOnly = this[Keys.VIBRATE_ONLY] ?: true,
+        hasSiadinLogin = this[Keys.SIADIN_NIM_ENC] != null && this[Keys.SIADIN_PASSWORD_ENC] != null,
+        autoLogin = this[Keys.AUTO_LOGIN] ?: true,
     )
 
     /** Bot token dalam bentuk asli; hanya dipakai saat memanggil Telegram, jangan di-log. */
@@ -87,6 +95,26 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun setChatId(chatId: String) = context.dataStore.edit { it[Keys.CHAT_ID] = chatId }
+
+    /** NIM & password SiAdin (didekripsi). Hanya untuk mengisi form login; jangan di-log. */
+    suspend fun siadinLogin(): Pair<String, String>? {
+        val prefs = context.dataStore.data.first()
+        val nim = prefs[Keys.SIADIN_NIM_ENC]?.let(TokenCipher::decrypt) ?: return null
+        val password = prefs[Keys.SIADIN_PASSWORD_ENC]?.let(TokenCipher::decrypt) ?: return null
+        return nim to password
+    }
+
+    suspend fun setSiadinLogin(nim: String, password: String) = context.dataStore.edit {
+        it[Keys.SIADIN_NIM_ENC] = TokenCipher.encrypt(nim.trim())
+        it[Keys.SIADIN_PASSWORD_ENC] = TokenCipher.encrypt(password)
+    }
+
+    suspend fun clearSiadinLogin() = context.dataStore.edit {
+        it.remove(Keys.SIADIN_NIM_ENC)
+        it.remove(Keys.SIADIN_PASSWORD_ENC)
+    }
+
+    suspend fun setAutoLogin(enabled: Boolean) = context.dataStore.edit { it[Keys.AUTO_LOGIN] = enabled }
 
     suspend fun setVibrateOnly(enabled: Boolean) = context.dataStore.edit { it[Keys.VIBRATE_ONLY] = enabled }
 

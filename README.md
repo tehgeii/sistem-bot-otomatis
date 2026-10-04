@@ -5,8 +5,9 @@ Aplikasi Android pribadi untuk mengingatkan absen kuliah di **Dinusverse (SiAdin
 Saat jam absen dibuka, muncul notifikasi berisi nama mata kuliah dan tombol untuk membuka Dinusverse.
 Kamu absen sendiri di sana, lalu aplikasi ini mengirim bukti ke Telegram kamu.
 
-> **Yang TIDAK dilakukan aplikasi ini:** mengirim absen otomatis, memakai API Dinusverse,
-> Accessibility Service, otomatisasi layar, memalsukan lokasi, atau menyimpan NIM/password.
+> **Yang TIDAK dilakukan aplikasi ini:** menekan tombol presensi / mengirim absen otomatis,
+> memakai API Dinusverse, Accessibility Service, memalsukan lokasi.
+> Tombol presensi selalu ditekan sendiri oleh pemilik HP.
 > Aplikasi ini hanya **mengingatkan, membuka Dinusverse, mencatat, dan mengirim bukti ke Telegram**.
 
 ---
@@ -74,9 +75,26 @@ Buka *Pengaturan → Aplikasi → Pengingat Absen* lalu:
 - set **Baterai** ke *Tidak dibatasi* / *Tanpa batasan*,
 - (Samsung) keluarkan dari *Aplikasi tidur*.
 
-### Langkah 2 — Aplikasi tujuan
+### Langkah 2 — SiAdin web atau aplikasi tujuan
 
-Aplikasi yang dibuka oleh tombol **Absen sekarang**. Jika Dinusverse/SiAdin terpasang, aplikasi
+**Paling cepat (disarankan): Presensi Online SiAdin web.** Tekan **Pakai Presensi Online SiAdin**,
+isi **NIM** dan **password SiAdin** sekali, lalu **Simpan login**. Mulai sekarang
+**Absen sekarang** membuka `https://mhs.dinus.ac.id/akademik/presensiOnline` di **browser mini**
+di dalam aplikasi:
+
+- Jika diminta login, NIM & password diisi dan tombol Login ditekan otomatis, lalu langsung
+  kembali ke halaman Presensi Online.
+- Tombol **presensi di website tetap kamu yang tekan.**
+- Di bawah halaman ada **✅ Sudah, kirim bukti** dan **📷 Kirim screenshot** (gambar halaman yang
+  sedang tampil langsung dikirim ke Telegram), jadi tidak perlu kembali ke notifikasi.
+- Tombol **Chrome** di atas membuka halaman yang sama di Chrome bila perlu.
+- Jika halaman presensi meminta lokasi atau kamera, Android akan meminta izin sekali
+  (lokasi asli, tidak dipalsukan).
+- Login otomatis bisa dimatikan, dan data login bisa dihapus kapan saja di Pengaturan → SiAdin web.
+- Jika login otomatis gagal 2 kali (password berubah, ada captcha, atau tampilan login kampus
+  berubah), browser mini berhenti dan menampilkan pesan; login manual seperti biasa.
+
+**Atau aplikasi Dinusverse:** aplikasi yang dibuka oleh tombol **Absen sekarang**. Jika Dinusverse/SiAdin terpasang, aplikasi
 memilihnya otomatis; kalau tidak, tekan **Pilih aplikasi** dan pilih dari daftar.
 Nama package tidak di-hardcode.
 
@@ -136,8 +154,8 @@ Tab **Riwayat** menampilkan setiap absen: matkul, waktu, dan status
 
 ## Login ulang Dinusverse cukup satu tap (Autofill Google Password Manager)
 
-Aplikasi ini **tidak** menyimpan NIM/password. Supaya login ulang di Dinusverse cepat, pakai
-fitur Autofill bawaan Android:
+Jika memakai SiAdin web, login sudah otomatis (lihat Langkah 2). Untuk aplikasi Dinusverse,
+supaya login ulang cepat, pakai fitur Autofill bawaan Android:
 
 1. Buka **Setelan → Sistem → Bahasa & input → Layanan isi otomatis** (di beberapa HP:
    **Setelan → Google → Isi otomatis**, atau cari "isi otomatis" / "autofill" di Setelan).
@@ -186,6 +204,10 @@ Bila spesifikasi ambigu, dipilih opsi paling sederhana:
   semua APK dari CI bertanda tangan sama dan bisa saling menimpa tanpa uninstall. Ini bukan
   rahasia; APK ini hanya untuk pemakaian pribadi.
 - **targetSdk/compileSdk 36** (Android 16).
+- **Aturan awal "jangan simpan/isi NIM/password" dicabut oleh pemilik** demi login otomatis SiAdin
+  web. Pengisian hanya ke form login (kolom NIM ditebak dari nama/id/placeholder `nim`, `user`,
+  `login`, `email`, atau kolom teks pertama); maksimal 2 percobaan per pembukaan; aplikasi tidak
+  pernah menekan tombol presensi.
 
 ---
 
@@ -222,7 +244,10 @@ setiap push, lalu mengunggahnya sebagai artifact **pengingat-absen-debug**.
 ## Privasi
 
 - Tidak ada secret di repo. Bot token hanya ada di HP, terenkripsi.
-- Tidak ada NIM/password Dinusverse yang diminta atau disimpan.
+- NIM & password SiAdin **hanya** disimpan jika kamu mengisinya (untuk login otomatis), terenkripsi
+  AES-GCM dengan kunci Android Keystore, tidak masuk log/backup, dan hanya diisikan ke halaman
+  HTTPS di domain `*.dinus.ac.id`. Bisa dihapus kapan saja (Pengaturan → SiAdin web →
+  Hapus data login).
 - Data jadwal & riwayat hanya di perangkat; yang keluar hanya pesan bukti ke bot Telegram milikmu.
 
 ## Kontributor

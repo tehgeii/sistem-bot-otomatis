@@ -44,9 +44,12 @@ fun OnboardingScreen(vm: SetupViewModel, modifier: Modifier = Modifier) {
                     PermissionsSection(autoRequest = true)
                 }
                 1 -> {
-                    Text("Aplikasi yang dibuka saat menekan \"Absen sekarang\". Dinusverse dipilih otomatis bila terpasang.")
+                    Text("Yang dibuka saat menekan \"Absen sekarang\". Paling cepat: Presensi Online SiAdin dengan login otomatis.")
                     Spacer(Modifier.padding(4.dp))
-                    TargetAppSection(vm)
+                    SiadinWebSection(vm)
+                    Spacer(Modifier.padding(8.dp))
+                    Text("Atau buka aplikasi Dinusverse:", style = MaterialTheme.typography.titleSmall)
+                    TargetAppSection(vm, showDeepLink = false)
                 }
                 else -> TelegramSection(vm)
             }

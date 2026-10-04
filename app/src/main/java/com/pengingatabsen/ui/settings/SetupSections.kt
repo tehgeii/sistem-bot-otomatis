@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pengingatabsen.alarm.Notifications
 import com.pengingatabsen.alarm.Permissions
 import com.pengingatabsen.launch.InstalledApp
+import com.pengingatabsen.launch.TargetApps
 
 /** Angka yang bertambah setiap layar kembali tampil (untuk cek ulang izin). */
 @Composable
@@ -234,6 +235,71 @@ fun TelegramSection(vm: SetupViewModel) {
             }
             vm.testStatus?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
+    }
+}
+
+/**
+ * SiAdin web: pakai halaman Presensi Online di browser mini + login otomatis.
+ * NIM & password disimpan terenkripsi (Android Keystore) dan hanya diisikan ke *.dinus.ac.id via HTTPS.
+ */
+@Composable
+fun SiadinWebSection(vm: SetupViewModel) {
+    val settings by vm.settings.collectAsState()
+    var nim by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    LaunchedEffect(settings?.hasSiadinLogin) { vm.loadSavedNim() }
+    val usingWeb = settings?.deepLink == TargetApps.SIADIN_PRESENSI_URL
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (usingWeb) {
+            Text("✅ \"Absen sekarang\" membuka Presensi Online SiAdin di browser mini.", style = MaterialTheme.typography.bodyMedium)
+        } else {
+            Text(
+                "Buka halaman Presensi Online SiAdin langsung dari notifikasi, lengkap dengan login otomatis.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Button(onClick = { vm.useSiadinWeb() }) { Text("Pakai Presensi Online SiAdin") }
+        }
+
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Login otomatis")
+                Text("Isi NIM & password lalu tekan Login sendiri. Tombol presensi tetap kamu yang tekan.", style = MaterialTheme.typography.bodySmall)
+            }
+            Switch(checked = settings?.autoLogin ?: true, onCheckedChange = { vm.setAutoLogin(it) })
+        }
+
+        vm.savedNim?.let { Text("Tersimpan: $it", style = MaterialTheme.typography.bodyMedium) }
+        OutlinedTextField(
+            value = nim,
+            onValueChange = { nim = it },
+            label = { Text(if (vm.savedNim == null) "NIM" else "NIM baru") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password SiAdin") },
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                enabled = nim.isNotBlank() && password.isNotEmpty(),
+                onClick = { vm.saveSiadinLogin(nim, password); nim = ""; password = "" },
+            ) { Text("Simpan login") }
+            if (vm.savedNim != null) {
+                OutlinedButton(onClick = { vm.clearSiadinLogin() }) { Text("Hapus data login") }
+            }
+        }
+        vm.loginStatus?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        Text(
+            "Disimpan terenkripsi di HP ini saja dan hanya diisikan ke halaman https://*.dinus.ac.id.",
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 

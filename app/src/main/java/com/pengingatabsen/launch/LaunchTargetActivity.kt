@@ -24,7 +24,7 @@ import java.time.LocalDateTime
 /**
  * Activity tanpa tampilan untuk tombol "Absen sekarang" & widget.
  * (Android 12+ melarang membuka activity dari BroadcastReceiver notifikasi.)
- * Membuka Dinusverse, lalu menampilkan notifikasi lanjutan "Sudah absen?".
+ * Membuka Dinusverse (atau browser mini untuk URL web), lalu menampilkan notifikasi lanjutan "Sudah absen?".
  */
 class LaunchTargetActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,7 +34,7 @@ class LaunchTargetActivity : Activity() {
 
         // Baca DataStore sebentar; cepat karena datanya kecil dan sudah di-cache.
         val settings = runBlocking { Graph.settings.current() }
-        val target = TargetApps.launchIntent(this, settings)
+        val target = TargetApps.launchIntent(this, settings, courseId, epochDay)
         val opened = target != null && try {
             startActivity(target)
             true

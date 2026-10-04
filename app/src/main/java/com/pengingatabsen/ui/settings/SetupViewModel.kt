@@ -138,6 +138,36 @@ class SetupViewModel : ViewModel() {
         AlarmScheduler.rescheduleAll(context.applicationContext)
     }
 
+    // ---------- SiAdin web & login otomatis ----------
+
+    /** NIM tersimpan (untuk ditampilkan); password tidak pernah ditampilkan. */
+    var savedNim by mutableStateOf<String?>(null)
+        private set
+    var loginStatus by mutableStateOf<String?>(null)
+        private set
+
+    fun loadSavedNim() = viewModelScope.launch { savedNim = store.siadinLogin()?.first }
+
+    fun useSiadinWeb() = viewModelScope.launch { store.setDeepLink(TargetApps.SIADIN_PRESENSI_URL) }
+
+    fun saveSiadinLogin(nim: String, password: String) = viewModelScope.launch {
+        if (nim.isBlank() || password.isEmpty()) {
+            loginStatus = "NIM dan password wajib diisi"
+            return@launch
+        }
+        store.setSiadinLogin(nim, password)
+        savedNim = nim.trim()
+        loginStatus = "Tersimpan terenkripsi di HP ini."
+    }
+
+    fun clearSiadinLogin() = viewModelScope.launch {
+        store.clearSiadinLogin()
+        savedNim = null
+        loginStatus = "Data login dihapus."
+    }
+
+    fun setAutoLogin(enabled: Boolean) = viewModelScope.launch { store.setAutoLogin(enabled) }
+
     fun setVibrateOnly(enabled: Boolean) = viewModelScope.launch { store.setVibrateOnly(enabled) }
 
     fun finishOnboarding(context: Context) = viewModelScope.launch {

@@ -12,6 +12,13 @@ data class InstalledApp(val packageName: String, val label: String)
 object TargetApps {
     private val HINTS = listOf("dinus", "siadin", "udinus")
 
+    /** Halaman Presensi Online SiAdin web (alamat publik portal mahasiswa). */
+    const val SIADIN_PRESENSI_URL = "https://mhs.dinus.ac.id/akademik/presensiOnline"
+
+    /** URL web dibuka di browser mini dalam aplikasi (sesi login tersimpan, login otomatis). */
+    fun isWebUrl(url: String?): Boolean =
+        url != null && (url.startsWith("https://", ignoreCase = true) || url.startsWith("http://", ignoreCase = true))
+
     /** Semua aplikasi yang punya ikon launcher; yang mirip Dinusverse ditaruh paling atas. */
     fun installed(context: Context): List<InstalledApp> {
         val pm = context.packageManager
@@ -36,7 +43,10 @@ object TargetApps {
      * Intent untuk tombol "Absen sekarang": URL deep link bila diisi,
      * kalau tidak launch intent aplikasi yang dipilih.
      */
-    fun launchIntent(context: Context, settings: AppSettings): Intent? {
+    fun launchIntent(context: Context, settings: AppSettings, courseId: Long = 0L, epochDay: Long = 0L): Intent? {
+        settings.deepLink?.takeIf(::isWebUrl)?.let { url ->
+            return WebBrowserActivity.intent(context, url, courseId, epochDay)
+        }
         settings.deepLink?.let { url ->
             return Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
