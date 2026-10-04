@@ -13,23 +13,28 @@ android {
         applicationId = "com.pengingatabsen"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
+    // Kunci rilis RAHASIA: hanya dari environment (GitHub Secrets di CI), tidak pernah di repo.
+    val releaseKeystore = System.getenv("SIGNING_KEYSTORE_FILE")?.let { file(it) }?.takeIf { it.exists() }
     signingConfigs {
-        getByName("debug") {
-            // Keystore debug tetap (bukan rahasia) supaya APK hasil CI bisa saling menimpa.
-            storeFile = file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            }
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Tanpa secret (build lokal) APK release tetap dibuat, tapi belum ditandatangani.
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 

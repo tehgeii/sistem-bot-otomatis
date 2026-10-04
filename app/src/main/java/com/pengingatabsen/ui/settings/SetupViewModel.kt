@@ -123,7 +123,7 @@ class SetupViewModel : ViewModel() {
         }
         busy = true
         testStatus = "Mengirim…"
-        val text = "🔔 Tes dari Pengingat Absen — ${Formatters.dateTime(LocalDateTime.now())}"
+        val text = "🔔 Tes dari NgiBsen UDINUS — ${Formatters.dateTime(LocalDateTime.now())}"
         testStatus = when (val r = TelegramClient.sendMessage(token, chat, text)) {
             is TgResult.Ok -> "Terkirim! Cek Telegram kamu."
             is TgResult.Error -> "Gagal: ${r.message}"

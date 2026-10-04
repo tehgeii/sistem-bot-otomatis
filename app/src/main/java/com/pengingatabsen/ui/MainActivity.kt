@@ -49,14 +49,14 @@ class MainActivity : ComponentActivity() {
                 val titles = listOf("Jadwal", "Riwayat", "Pengaturan")
 
                 if (!current.onboardingDone) {
-                    Scaffold(topBar = { TopAppBar(title = { Text("Selamat datang di Pengingat Absen") }) }) { padding ->
+                    Scaffold(topBar = { TopAppBar(title = { Text("Selamat datang di NgiBsen UDINUS") }) }) { padding ->
                         OnboardingScreen(setupVm, Modifier.padding(padding))
                     }
                     return@PengingatTheme
                 }
 
                 Scaffold(
-                    topBar = { TopAppBar(title = { Text(if (tab == 0) "Pengingat Absen" else titles[tab]) }) },
+                    topBar = { TopAppBar(title = { Text(if (tab == 0) "NgiBsen UDINUS" else titles[tab]) }) },
                     bottomBar = {
                         NavigationBar {
                             val icons = listOf(Icons.Filled.DateRange, Icons.Filled.List, Icons.Filled.Settings)

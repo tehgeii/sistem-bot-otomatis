@@ -30,6 +30,3 @@ secrets.properties
 # OS
 .DS_Store
 Thumbs.db
-# Pengecualian: keystore DEBUG (password publik "android") supaya APK dari CI
-# selalu bertanda tangan sama dan bisa di-update tanpa uninstall.
-!app/debug.keystore

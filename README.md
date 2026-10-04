@@ -1,4 +1,6 @@
-# Pengingat Absen
+# NgiBsen UDINUS
+
+**NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -56,12 +58,18 @@ Ini notifikasi biasa, bukan nada dering alarm; AlarmManager hanya dipakai sebaga
 
 ## Cara install APK
 
-1. Buka tab **Actions** di repo GitHub ini → pilih run **Build APK** terbaru yang hijau.
-2. Di bagian **Artifacts**, unduh **pengingat-absen-debug** (file `.zip`), lalu ekstrak →
-   dapat `app-debug.apk`. (Bisa langsung dari browser HP, lalu buka dengan aplikasi Files.)
+1. Buka **[Releases → terbaru](https://github.com/tehgeii/sistem-bot-otomatis/releases/latest)** di repo ini (tidak perlu login GitHub).
+2. Unduh **Pengingat Absen UDINUS.apk** (GitHub menampilkannya sebagai
+   `Pengingat.Absen.UDINUS.apk` — sama saja).
 3. Buka file APK. Jika diminta, izinkan **Instal aplikasi tak dikenal** untuk browser/Files.
-4. Selesai. Versi baru cukup diinstal di atas versi lama — data jadwal & riwayat tetap ada
-   (semua build memakai keystore debug yang sama, lihat bagian *Catatan keputusan*).
+   Jika Play Protect memperingatkan "aplikasi tidak dikenal", pilih **Tetap instal**.
+4. Selesai. Versi baru cukup diinstal di atas versi lama — data jadwal & riwayat tetap ada.
+
+### Pindah dari versi lama (nama "Pengingat Absen", sebelum versi 1.1)
+
+Versi lama ditandatangani dengan kunci berbeda, jadi **sekali ini** harus:
+**uninstall aplikasi lama → instal NgiBsen UDINUS → jalankan setup lagi** (jadwal, bot Telegram,
+login SiAdin). Setelah itu, update berikutnya cukup instal di atasnya.
 
 ---
 
@@ -83,7 +91,7 @@ tes hanya menutupnya (tidak mengirim apa pun ke Telegram), kecuali **Absen sekar
 halaman presensi untuk dicoba.
 
 **HP Xiaomi / Oppo / Vivo / Realme / Samsung:** pengaturan baterai pabrikan sering lebih agresif.
-Buka *Pengaturan → Aplikasi → Pengingat Absen* lalu:
+Buka *Pengaturan → Aplikasi → NgiBsen UDINUS* lalu:
 - aktifkan **Mulai otomatis / Autostart**,
 - set **Baterai** ke *Tidak dibatasi* / *Tanpa batasan*,
 - (Samsung) keluarkan dari *Aplikasi tidur*.
@@ -171,7 +179,7 @@ ruang (opsional). Jadwal berulang tiap minggu dan dikelompokkan per hari.
 
 ## Widget
 
-Tahan layar utama → **Widget** → **Pengingat Absen**. Widget menampilkan matkul berikutnya dan jam
+Tahan layar utama → **Widget** → **NgiBsen UDINUS**. Widget menampilkan matkul berikutnya dan jam
 absennya. Tap widget = buka halaman presensi (SiAdin web) atau Dinusverse, sesuai pengaturan.
 
 ## Riwayat
@@ -186,18 +194,17 @@ Tab **Riwayat** menampilkan setiap absen: matkul, waktu, dan status
 
 Boleh. Setiap orang memakai datanya sendiri — tidak ada yang tercampur:
 
-1. Kirim file **app-debug.apk** ke teman (lewat WhatsApp/Telegram/Drive), atau minta mereka
-   mengunduh dari tab **Actions** repo ini (perlu login akun GitHub untuk mengunduh artifact).
+1. Kirim link **[Releases → terbaru](https://github.com/tehgeii/sistem-bot-otomatis/releases/latest)** atau file
+   **Pengingat Absen UDINUS.apk** ke teman (lewat WhatsApp/Telegram/Drive).
 2. Teman menginstal APK, lalu menjalankan wizard dengan **NIM, password, jadwal, dan bot Telegram
    milik mereka sendiri** (setiap orang membuat bot sendiri di @BotFather).
 3. Semua data (jadwal, riwayat, token bot, NIM & password) tersimpan di HP masing-masing saja.
 
 Yang perlu diketahui teman:
-- Ini APK **debug** di luar Play Store: Android/Play Protect akan memberi peringatan
+- APK ini di luar Play Store: Android/Play Protect akan memberi peringatan
   "aplikasi tidak dikenal" → pilih **Tetap instal**.
-- **Instal hanya APK dari repo ini atau dari kamu langsung.** Keystore debug repo ini publik, jadi
-  APK lain yang ditandatangani dengan kunci yang sama bisa menimpa aplikasi ini beserta datanya
-  (termasuk password yang tersimpan). Jangan instal "update" dari sumber tak dikenal.
+- APK ditandatangani dengan kunci rahasia pengelola repo, jadi APK palsu dari orang lain tidak bisa
+  menimpa aplikasi yang sudah terpasang. Tetap unduh hanya dari Releases repo ini.
 - Tetap tekan tombol presensi sendiri; aplikasi tidak pernah absen otomatis.
 
 ## Login ulang Dinusverse cukup satu tap (Autofill Google Password Manager)
@@ -248,10 +255,8 @@ Bila spesifikasi ambigu, dipilih opsi paling sederhana:
   Menonaktifkan/menghapus matkul saat jendelanya sedang berlangsung mencatatnya sebagai "libur".
 - **Gagal** = token/chat salah atau ditolak Telegram, atau 10 kali percobaan gagal. Saat offline
   status tetap **antre** sampai ada internet.
-- **Keystore debug** (`app/debug.keystore`, password publik `android`) sengaja di-commit supaya
-  semua APK dari CI bertanda tangan sama dan bisa saling menimpa tanpa uninstall. Konsekuensinya:
-  siapa pun bisa menandatangani APK dengan kunci ini, jadi instal hanya APK dari repo ini
-  (lihat *Bagikan ke teman*).
+- **Penandatanganan:** APK release ditandatangani dengan kunci rahasia dari GitHub Secrets (tidak
+  pernah ada di repo). Keystore debug publik versi lama sudah dihapus sejak versi 1.1.
 - **targetSdk/compileSdk 36** (Android 16).
 - **Aturan awal "jangan simpan/isi NIM/password" dicabut oleh pemilik** demi login otomatis SiAdin
   web. Pengisian hanya ke form login asli: tepat satu kolom password yang tampil di layar, kolom
@@ -288,11 +293,28 @@ Butuh JDK 17 dan Android SDK.
 
 ```bash
 ./gradlew testDebugUnitTest   # unit test
-./gradlew assembleDebug       # APK: app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleDebug       # APK debug untuk uji coba sendiri
+./gradlew assembleRelease     # APK release (tanpa secret: belum ditandatangani)
 ```
 
-GitHub Actions (`.github/workflows/build.yml`) menjalankan unit test dan membangun APK debug di
-setiap push, lalu mengunggahnya sebagai artifact **pengingat-absen-debug**.
+GitHub Actions (`.github/workflows/build.yml`) menjalankan unit test, membangun APK **release**
+bertanda tangan, memeriksa tanda tangannya, mengunggahnya sebagai artifact **NgiBsen-UDINUS**, dan
+(untuk push ke `main`) memperbarui Release **terbaru**.
+
+## Untuk pengelola repo: kunci tanda tangan
+
+Build `main` **gagal dengan sengaja** sampai 4 secret ini diisi di
+*Settings → Secrets and variables → Actions → New repository secret*:
+
+| Name | Isi |
+|---|---|
+| `SIGNING_KEYSTORE_BASE64` | isi keystore `.jks` dalam base64 (satu baris) |
+| `SIGNING_KEYSTORE_PASSWORD` | password keystore |
+| `SIGNING_KEY_ALIAS` | alias kunci |
+| `SIGNING_KEY_PASSWORD` | password kunci |
+
+**Simpan keystore & password di tempat aman (mis. Google Drive pribadi), jangan di repo.** Jika
+hilang, APK berikutnya tidak bisa menimpa versi terpasang — semua pengguna harus uninstall dulu.
 
 ## Privasi
 

@@ -5,9 +5,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      APK_NAME: Pengingat Absen UDINUS.apk
     steps:
       - uses: actions/checkout@v4
 
@@ -21,12 +26,61 @@ jobs:
       - name: Unit test
         run: ./gradlew --no-daemon testDebugUnitTest
 
-      - name: Build APK debug
-        run: ./gradlew --no-daemon assembleDebug
+      # Pull request (mis. dari fork) tidak punya akses ke secret: cukup unit test.
+      - name: Siapkan kunci rilis rahasia
+        if: github.event_name != 'pull_request'
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "::error::Isi GitHub Secrets dulu (SIGNING_KEYSTORE_BASE64, SIGNING_KEYSTORE_PASSWORD, SIGNING_KEY_ALIAS, SIGNING_KEY_PASSWORD). Lihat README bagian 'Untuk pengelola repo'."
+            exit 1
+          fi
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "SIGNING_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
-      - name: Unggah APK
+      - name: Build APK release
+        if: github.event_name != 'pull_request'
+        env:
+          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Periksa tanda tangan & beri nama file
+        if: github.event_name != 'pull_request'
+        run: |
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -n1)
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n1)
+          "$APKSIGNER" verify --print-certs "$APK" | grep -i "certificate DN"
+          mkdir -p dist
+          cp "$APK" "dist/$APK_NAME"
+          rm -f "$RUNNER_TEMP/release.jks"
+
+      - name: Unggah APK (artifact)
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: pengingat-absen-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: NgiBsen-UDINUS
+          path: dist/${{ env.APK_NAME }}
           if-no-files-found: error
+
+      - name: Pindahkan tag "terbaru" ke commit ini
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git tag -f terbaru
+          git push -f origin refs/tags/terbaru
+
+      # Catatan: GitHub mengganti spasi di nama file Release menjadi titik
+      # (Pengingat.Absen.UDINUS.apk); di artifact namanya tetap persis.
+      - name: Perbarui Release "terbaru" (unduhan publik)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: terbaru
+          name: NgiBsen UDINUS (terbaru)
+          make_latest: true
+          body: |
+            Unduh **Pengingat Absen UDINUS.apk** di bawah, lalu instal.
+            Dibangun otomatis dari commit ${{ github.sha }}.
+          files: dist/${{ env.APK_NAME }}

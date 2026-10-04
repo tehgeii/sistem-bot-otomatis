@@ -90,7 +90,7 @@ object Notifications {
 
     /** Notifikasi lanjutan setelah membuka Dinusverse: "Sudah absen <matkul>?" */
     fun showConfirm(context: Context, course: Course, record: AttendanceRecord, silent: Boolean) {
-        val text = "Tekan \"Sudah\" setelah absen berhasil. Bisa juga bagikan screenshot ke Pengingat Absen."
+        val text = "Tekan \"Sudah\" setelah absen berhasil. Bisa juga bagikan screenshot ke NgiBsen."
         val builder = base(context, absenChannel(), silent)
             .setContentTitle("Sudah absen ${course.name}?")
             .setContentText(text)
