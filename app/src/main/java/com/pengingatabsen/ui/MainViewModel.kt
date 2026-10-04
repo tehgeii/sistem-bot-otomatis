@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pengingatabsen.Graph
 import com.pengingatabsen.data.AppSettings
+import com.pengingatabsen.data.AttendanceRecord
 import com.pengingatabsen.data.Course
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +18,9 @@ class MainViewModel : ViewModel() {
     val courses: StateFlow<List<Course>?> =
         repo.courses.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    val history: StateFlow<List<AttendanceRecord>?> =
+        repo.history.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     val settings: StateFlow<AppSettings?> =
         store.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -26,4 +30,5 @@ class MainViewModel : ViewModel() {
     fun holidayToday(course: Course) = viewModelScope.launch { repo.holidayToday(course) }
     fun skipThisWeek(course: Course) = viewModelScope.launch { repo.skipThisWeek(course) }
     fun clearSkip(course: Course) = viewModelScope.launch { repo.clearSkip(course) }
+    fun resend(record: AttendanceRecord) = viewModelScope.launch { repo.resend(record.id) }
 }
