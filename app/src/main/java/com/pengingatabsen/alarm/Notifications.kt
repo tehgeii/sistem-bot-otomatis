@@ -14,16 +14,20 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.pengingatabsen.Graph
 import com.pengingatabsen.R
 import com.pengingatabsen.data.AttendanceRecord
 import com.pengingatabsen.data.Course
 import com.pengingatabsen.launch.LaunchTargetActivity
 import com.pengingatabsen.logic.Formatters
 import com.pengingatabsen.ui.MainActivity
+import kotlinx.coroutines.runBlocking
 
 object Notifications {
     /** Channel heads-up untuk absen (suara + getar). */
     const val CHANNEL_ABSEN = "absen_dibuka"
+    /** Channel heads-up untuk absen, getar saja (dipakai saat "Getar saja" aktif). */
+    const val CHANNEL_ABSEN_VIBRATE = "absen_dibuka_getar"
     /** Channel biasa untuk info (gagal kirim, dll.). */
     const val CHANNEL_INFO = "info"
 
@@ -45,10 +49,19 @@ object Notifications {
             )
             lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
         }
+        val absenVibrate = NotificationChannel(
+            CHANNEL_ABSEN_VIBRATE, "Absen dibuka (getar saja)", NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = "Pengingat absen tanpa suara, hanya getar"
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 400, 200, 400, 200, 800)
+            setSound(null, null)
+            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+        }
         val info = NotificationChannel(CHANNEL_INFO, "Info", NotificationManager.IMPORTANCE_DEFAULT).apply {
             description = "Status pengiriman bukti ke Telegram"
         }
-        nm.createNotificationChannels(listOf(absen, info))
+        nm.createNotificationChannels(listOf(absen, absenVibrate, info))
     }
 
     fun idFor(courseId: Long): Int = 1000 + (courseId % 1_000_000).toInt()
@@ -63,7 +76,7 @@ object Notifications {
         val title = if (final) "⚠️ 5 menit lagi ditutup: ${course.name}" else "Absen dibuka: ${course.name}"
         val text = if (final) "Segera absen sekarang! $detail" else detail
         val absen = launchIntent(context, course.id, epochDay)
-        val builder = base(context, CHANNEL_ABSEN, silent)
+        val builder = base(context, absenChannel(), silent)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(absen)
@@ -77,7 +90,7 @@ object Notifications {
     /** Notifikasi lanjutan setelah membuka Dinusverse: "Sudah absen <matkul>?" */
     fun showConfirm(context: Context, course: Course, record: AttendanceRecord, silent: Boolean) {
         val text = "Tekan \"Sudah\" setelah absen berhasil. Bisa juga bagikan screenshot ke Pengingat Absen."
-        val builder = base(context, CHANNEL_ABSEN, silent)
+        val builder = base(context, absenChannel(), silent)
             .setContentTitle("Sudah absen ${course.name}?")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
@@ -113,6 +126,12 @@ object Notifications {
         NotificationManagerCompat.from(context).cancel(id)
     }
 
+    /** Channel absen sesuai pengaturan "Getar saja". */
+    private fun absenChannel(): String {
+        val vibrateOnly = runBlocking { Graph.settings.current().vibrateOnly }
+        return if (vibrateOnly) CHANNEL_ABSEN_VIBRATE else CHANNEL_ABSEN
+    }
+
     private fun base(context: Context, channel: String, silent: Boolean) =
         NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_notification)
@@ -123,7 +142,6 @@ object Notifications {
             .setAutoCancel(false)
             .setOnlyAlertOnce(false)
             .setSilent(silent)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
 
     private fun notify(context: Context, id: Int, builder: NotificationCompat.Builder) {
         val granted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||

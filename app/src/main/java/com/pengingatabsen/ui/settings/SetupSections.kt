@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -233,6 +234,22 @@ fun TelegramSection(vm: SetupViewModel) {
             }
             vm.testStatus?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
+    }
+}
+
+/** Getar saja (tanpa suara), default aktif supaya aman di kelas. */
+@Composable
+fun VibrateOnlySection(vm: SetupViewModel) {
+    val settings by vm.settings.collectAsState()
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Getar saja (tanpa suara)")
+            Text(
+                "Notifikasi tetap muncul di layar dan HP bergetar, tanpa bunyi.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Switch(checked = settings?.vibrateOnly ?: true, onCheckedChange = { vm.setVibrateOnly(it) })
     }
 }
 

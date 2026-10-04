@@ -31,6 +31,15 @@ Jika jam tutup kosong, pengingat berhenti 30 menit setelah dibuka.
 
 Kalau sedang offline, bukti masuk antrean dan otomatis terkirim saat ada internet.
 
+**Kapan pengingat berhenti?** Begitu kamu menekan **Sudah, kirim bukti** (atau **Libur**), atau
+membagikan screenshot bukti. Menekan **Absen sekarang** saja belum menghentikannya: setelah satu
+interval, muncul lagi "Sudah absen?" sampai kamu konfirmasi.
+
+**Getar saja (default):** di *Pengaturan → Pengingat*, opsi **Getar saja (tanpa suara)** aktif
+sejak awal supaya tidak berbunyi di kelas. Matikan jika ingin pakai suara notifikasi.
+Ini notifikasi biasa, bukan nada dering alarm; AlarmManager hanya dipakai sebagai pewaktu
+(karena itu ikon jam alarm tampil di status bar).
+
 ---
 
 ## Cara install APK

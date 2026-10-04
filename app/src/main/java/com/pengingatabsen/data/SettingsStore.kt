@@ -25,6 +25,8 @@ data class AppSettings(
     val chatId: String? = null,
     val botUsername: String? = null,
     val remindIntervalMinutes: Int = ScheduleMath.DEFAULT_REMIND_INTERVAL,
+    /** Default getar saja supaya tidak berbunyi di kelas. */
+    val vibrateOnly: Boolean = true,
 ) {
     val telegramReady: Boolean get() = hasBotToken && !chatId.isNullOrBlank()
 }
@@ -39,6 +41,7 @@ class SettingsStore(private val context: Context) {
         val CHAT_ID = stringPreferencesKey("chat_id")
         val BOT_USERNAME = stringPreferencesKey("bot_username")
         val REMIND_INTERVAL = intPreferencesKey("remind_interval")
+        val VIBRATE_ONLY = booleanPreferencesKey("vibrate_only")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -54,6 +57,7 @@ class SettingsStore(private val context: Context) {
         chatId = this[Keys.CHAT_ID],
         botUsername = this[Keys.BOT_USERNAME],
         remindIntervalMinutes = this[Keys.REMIND_INTERVAL] ?: ScheduleMath.DEFAULT_REMIND_INTERVAL,
+        vibrateOnly = this[Keys.VIBRATE_ONLY] ?: true,
     )
 
     /** Bot token dalam bentuk asli; hanya dipakai saat memanggil Telegram, jangan di-log. */
@@ -83,6 +87,8 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun setChatId(chatId: String) = context.dataStore.edit { it[Keys.CHAT_ID] = chatId }
+
+    suspend fun setVibrateOnly(enabled: Boolean) = context.dataStore.edit { it[Keys.VIBRATE_ONLY] = enabled }
 
     suspend fun setRemindInterval(minutes: Int) = context.dataStore.edit {
         it[Keys.REMIND_INTERVAL] = minutes.coerceIn(1, 30)

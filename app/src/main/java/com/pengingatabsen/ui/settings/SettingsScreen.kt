@@ -26,10 +26,12 @@ fun SettingsScreen(vm: SetupViewModel, contentPadding: PaddingValues) {
         SectionTitle("Aplikasi tujuan")
         TargetAppSection(vm)
         HorizontalDivider()
-        SectionTitle("Pengingat ulang")
+        SectionTitle("Pengingat")
+        VibrateOnlySection(vm)
         IntervalSection(vm)
         Text(
-            "Berhenti saat absen ditutup, atau 30 menit setelah dibuka bila jam tutup kosong. " +
+            "Pengingat berhenti begitu kamu menekan \"Sudah, kirim bukti\" atau \"Libur\". " +
+                "Jika tidak, berhenti saat absen ditutup (atau 30 menit setelah dibuka bila jam tutup kosong). " +
                 "Notifikasi terakhir muncul 5 menit sebelum ditutup.",
             style = MaterialTheme.typography.bodySmall,
         )

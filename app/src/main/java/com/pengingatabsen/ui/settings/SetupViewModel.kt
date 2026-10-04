@@ -138,6 +138,8 @@ class SetupViewModel : ViewModel() {
         AlarmScheduler.rescheduleAll(context.applicationContext)
     }
 
+    fun setVibrateOnly(enabled: Boolean) = viewModelScope.launch { store.setVibrateOnly(enabled) }
+
     fun finishOnboarding(context: Context) = viewModelScope.launch {
         store.setOnboardingDone(true)
         AlarmScheduler.rescheduleAll(context.applicationContext)
