@@ -86,6 +86,7 @@ class WebBrowserActivity : ComponentActivity() {
     // State login otomatis
     private var loginAttempts = 0
     private var redirectAfterLogin = false
+    private var loginPageUrl: String? = null
     private var credentials: Pair<String, String>? = null
     private var autoLogin = true
     private var settingsLoaded = false
@@ -181,7 +182,6 @@ class WebBrowserActivity : ComponentActivity() {
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
         settings.setGeolocationEnabled(true)
-        settings.loadWithOverviewMode = true
         settings.useWideViewPort = true
         settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
         // Tampil sebagai Chrome biasa (tanpa penanda "wv") supaya website memperlakukannya sama.
@@ -194,6 +194,13 @@ class WebBrowserActivity : ComponentActivity() {
         webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                 loadProgress = 1
+            }
+
+            /** Login berbasis JS kadang pindah halaman tanpa onPageFinished. */
+            override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
+                if (url != null && redirectAfterLogin && loginAttempts > 0 && url != loginPageUrl) {
+                    view.postDelayed({ onPageReady(view, url, retriesLeft = 0) }, 800)
+                }
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
@@ -267,7 +274,7 @@ class WebBrowserActivity : ComponentActivity() {
         return "${uri.scheme}://${uri.host}/"
     }
 
-    /** Dipanggil tiap halaman selesai dimuat: login otomatis atau kembali ke halaman tujuan. */
+    /** Dipanggil tiap halaman selesai dimuat: login otomatis atau lanjut ke halaman tujuan. */
     private fun onPageReady(view: WebView, url: String, retriesLeft: Int) {
         if (!isTrustedUrl(url)) return
         val creds = credentials
@@ -277,10 +284,11 @@ class WebBrowserActivity : ComponentActivity() {
             when (raw?.trim('"')) {
                 "SUBMITTED" -> {
                     loginAttempts++
+                    loginPageUrl = url
                     redirectAfterLogin = true
                     status = "Login otomatis…"
                 }
-                "LOGIN_PAGE", "NO_USER" -> {
+                "LOGIN_PAGE" -> {
                     // Setelah login (otomatis atau manual) langsung lanjut ke halaman tujuan.
                     redirectAfterLogin = true
                     status = when {
@@ -289,18 +297,16 @@ class WebBrowserActivity : ComponentActivity() {
                         else -> "Login otomatis gagal. Cek NIM/password di Pengaturan, atau login manual."
                     }
                 }
-                "NO_FORM" -> {
-                    // Halaman SPA kadang baru merender form setelah onPageFinished.
+                else -> {
+                    // Bukan halaman login. Halaman SPA kadang baru merender form setelah onPageFinished.
                     if (canFill && retriesLeft > 0 && loginAttempts == 0) {
                         view.postDelayed({ onPageReady(view, url, retriesLeft - 1) }, 700)
                         return@evaluateJavascript
                     }
+                    if (status?.startsWith("Login otomatis") == true || status?.startsWith("Silakan login") == true) status = null
                     if (redirectAfterLogin) {
                         redirectAfterLogin = false
-                        status = null
                         if (!url.startsWith(targetUrl)) view.loadUrl(targetUrl)
-                    } else if (status?.startsWith("Login otomatis…") == true) {
-                        status = null
                     }
                 }
             }
@@ -409,33 +415,53 @@ class WebBrowserActivity : ComponentActivity() {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
 
-        /** Hanya mendeteksi apakah ada form login yang tampil. */
-        private const val DETECT_LOGIN_SCRIPT = """
+        /**
+         * Kode JS bersama: mencari form login yang BENAR-BENAR tampil di layar.
+         * Syarat: tepat satu kolom password terlihat (form ganti password / menu tersembunyi diabaikan),
+         * ada kolom NIM/username, dan tombol Masuk/Login. Hasil: objek {pw, user, btn, form} atau string status.
+         */
+        private const val FIND_LOGIN_JS = """
+            function __shown(e){
+              var r = e.getBoundingClientRect(), s = window.getComputedStyle(e);
+              return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' &&
+                r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < Math.max(window.innerHeight, document.documentElement.scrollHeight);
+            }
+            function __findLogin(){
+              var pws = Array.prototype.slice.call(document.querySelectorAll('input[type=password]')).filter(__shown);
+              if (pws.length === 0) return 'NO_FORM';
+              if (pws.length !== 1) return 'NOT_LOGIN';
+              var pw = pws[0], scope = pw.form || document;
+              var texts = Array.prototype.slice.call(scope.querySelectorAll('input')).filter(function(e){
+                var t = (e.getAttribute('type') || 'text').toLowerCase();
+                return __shown(e) && ['text','email','number','tel'].indexOf(t) >= 0;
+              });
+              var user = texts.filter(function(e){
+                return /nim|user|login|email|npm|induk/i.test((e.name||'') + ' ' + (e.id||'') + ' ' + (e.placeholder||'') + ' ' + (e.getAttribute('aria-label')||''));
+              })[0] || (texts.length === 1 ? texts[0] : null);
+              if (!user) return 'NOT_LOGIN';
+              var btns = Array.prototype.slice.call(scope.querySelectorAll('button,input[type=submit],input[type=button],a')).filter(__shown);
+              var btn = btns.filter(function(b){ return /masuk|login|log in|sign\s*in/i.test(b.innerText || b.value || ''); })[0] ||
+                btns.filter(function(b){ return (b.getAttribute('type') || '').toLowerCase() === 'submit'; })[0];
+              if (!btn) return 'NOT_LOGIN';
+              return { pw: pw, user: user, btn: btn };
+            }
+        """
+
+        /** Hanya mendeteksi apakah halaman login sedang tampil. */
+        private val DETECT_LOGIN_SCRIPT = """
             (function(){
-              var p = Array.prototype.slice.call(document.querySelectorAll('input[type=password]'))
-                .filter(function(e){ return e.offsetParent !== null; })[0];
-              return p ? 'LOGIN_PAGE' : 'NO_FORM';
+              $FIND_LOGIN_JS
+              var f = __findLogin();
+              return typeof f === 'string' ? f : 'LOGIN_PAGE';
             })();
         """
 
-        /**
-         * Isi kolom NIM & password pada form login yang tampil, lalu tekan tombol Login.
-         * Kolom NIM ditebak dari nama/id/placeholder (nim, user, login, email), atau kolom teks pertama.
-         */
+        /** Isi NIM & password pada form login yang tampil, lalu tekan tombol Masuk/Login. */
         private fun fillLoginScript(nim: String, password: String): String = """
             (function(nim, pw){
-              function visible(e){ return e.offsetParent !== null; }
-              var p = Array.prototype.slice.call(document.querySelectorAll('input[type=password]')).filter(visible)[0];
-              if (!p) return 'NO_FORM';
-              var scope = p.form || document;
-              var inputs = Array.prototype.slice.call(scope.querySelectorAll('input')).filter(function(e){
-                var t = (e.getAttribute('type') || 'text').toLowerCase();
-                return visible(e) && ['text','email','number','tel'].indexOf(t) >= 0;
-              });
-              var u = inputs.filter(function(e){
-                return /nim|user|login|email|npm|nomor/i.test((e.name||'') + ' ' + (e.id||'') + ' ' + (e.placeholder||''));
-              })[0] || inputs[0];
-              if (!u) return 'NO_USER';
+              $FIND_LOGIN_JS
+              var f = __findLogin();
+              if (typeof f === 'string') return f;
               var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
               function put(el, v){
                 el.focus();
@@ -444,16 +470,9 @@ class WebBrowserActivity : ComponentActivity() {
                 el.dispatchEvent(new Event('change', {bubbles:true}));
                 el.blur();
               }
-              put(u, nim);
-              put(p, pw);
-              var btn = scope.querySelector('button[type=submit],input[type=submit]') ||
-                Array.prototype.slice.call(scope.querySelectorAll('button,input[type=button],a')).filter(function(b){
-                  return /login|masuk|sign\s*in/i.test(b.innerText || b.value || '');
-                })[0];
-              setTimeout(function(){
-                if (btn) { btn.click(); }
-                else if (p.form) { if (p.form.requestSubmit) p.form.requestSubmit(); else p.form.submit(); }
-              }, 300);
+              put(f.user, nim);
+              put(f.pw, pw);
+              setTimeout(function(){ f.btn.click(); }, 300);
               return 'SUBMITTED';
             })(${JSONObject.quote(nim)}, ${JSONObject.quote(password)});
         """
