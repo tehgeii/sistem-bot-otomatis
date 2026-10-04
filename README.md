@@ -158,8 +158,7 @@ yang dipilih.
    mencari chat ID manual. Jika belum muncul, tekan **Cek lagi**.
 4. Tekan **Tes kirim** → pesan tes masuk ke Telegram kamu.
 
-Token disimpan **terenkripsi** (AES-GCM, kunci di Android Keystore) di perangkat, tidak pernah
-masuk repo, log, atau backup (`allowBackup=false`).
+Token disimpan **terenkripsi** di HP kamu saja.
 
 > Jika bot kamu pernah dipasangi webhook, `getUpdates` tidak berfungsi. Hapus dulu dengan membuka
 > `https://api.telegram.org/bot<TOKEN>/deleteWebhook` di browser.
@@ -203,8 +202,7 @@ Boleh. Setiap orang memakai datanya sendiri — tidak ada yang tercampur:
 Yang perlu diketahui teman:
 - APK ini di luar Play Store: Android/Play Protect akan memberi peringatan
   "aplikasi tidak dikenal" → pilih **Tetap instal**.
-- APK ditandatangani dengan kunci rahasia pengelola repo, jadi APK palsu dari orang lain tidak bisa
-  menimpa aplikasi yang sudah terpasang. Tetap unduh hanya dari Releases repo ini.
+- Unduh hanya dari Releases repo ini.
 - Tetap tekan tombol presensi sendiri; aplikasi tidak pernah absen otomatis.
 
 ## Login ulang Dinusverse cukup satu tap (Autofill Google Password Manager)
@@ -255,8 +253,6 @@ Bila spesifikasi ambigu, dipilih opsi paling sederhana:
   Menonaktifkan/menghapus matkul saat jendelanya sedang berlangsung mencatatnya sebagai "libur".
 - **Gagal** = token/chat salah atau ditolak Telegram, atau 10 kali percobaan gagal. Saat offline
   status tetap **antre** sampai ada internet.
-- **Penandatanganan:** APK release ditandatangani dengan kunci rahasia dari GitHub Secrets (tidak
-  pernah ada di repo). Keystore debug publik versi lama sudah dihapus sejak versi 1.1.
 - **targetSdk/compileSdk 36** (Android 16).
 - **Aturan awal "jangan simpan/isi NIM/password" dicabut oleh pemilik** demi login otomatis SiAdin
   web. Pengisian hanya ke form login asli: tepat satu kolom password yang tampil di layar, kolom
@@ -294,35 +290,17 @@ Butuh JDK 17 dan Android SDK.
 ```bash
 ./gradlew testDebugUnitTest   # unit test
 ./gradlew assembleDebug       # APK debug untuk uji coba sendiri
-./gradlew assembleRelease     # APK release (tanpa secret: belum ditandatangani)
 ```
 
-GitHub Actions (`.github/workflows/build.yml`) menjalankan unit test, membangun APK **release**
-bertanda tangan, memeriksa tanda tangannya, mengunggahnya sebagai artifact **NgiBsen-UDINUS**, dan
-(untuk push ke `main`) memperbarui Release **terbaru**.
-
-## Untuk pengelola repo: kunci tanda tangan
-
-Build `main` **gagal dengan sengaja** sampai 4 secret ini diisi di
-*Settings → Secrets and variables → Actions → New repository secret*:
-
-| Name | Isi |
-|---|---|
-| `SIGNING_KEYSTORE_BASE64` | isi keystore `.jks` dalam base64 (satu baris) |
-| `SIGNING_KEYSTORE_PASSWORD` | password keystore |
-| `SIGNING_KEY_ALIAS` | alias kunci |
-| `SIGNING_KEY_PASSWORD` | password kunci |
-
-**Simpan keystore & password di tempat aman (mis. Google Drive pribadi), jangan di repo.** Jika
-hilang, APK berikutnya tidak bisa menimpa versi terpasang — semua pengguna harus uninstall dulu.
+GitHub Actions menjalankan unit test, membangun APK, dan memperbarui Release **terbaru** setiap
+ada perubahan di `main`.
 
 ## Privasi
 
-- Tidak ada secret di repo. Bot token hanya ada di HP, terenkripsi.
+- Bot token Telegram hanya tersimpan di HP kamu, terenkripsi.
 - NIM & password SiAdin **hanya** disimpan jika kamu mengisinya (untuk login otomatis), terenkripsi
-  AES-GCM dengan kunci Android Keystore, tidak masuk log/backup, dan hanya diisikan ke halaman
-  HTTPS di domain `*.dinus.ac.id`. Bisa dihapus kapan saja (Pengaturan → SiAdin web →
-  Hapus data login).
+  di HP kamu, dan hanya diisikan ke halaman login SiAdin. Bisa dihapus kapan saja
+  (Pengaturan → SiAdin web → Hapus data login).
 - Data jadwal & riwayat hanya di perangkat; yang keluar hanya pesan bukti ke bot Telegram milikmu.
 
 ## Kontributor
