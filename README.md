@@ -215,3 +215,8 @@ setiap push, lalu mengunggahnya sebagai artifact **pengingat-absen-debug**.
 - Tidak ada secret di repo. Bot token hanya ada di HP, terenkripsi.
 - Tidak ada NIM/password Dinusverse yang diminta atau disimpan.
 - Data jadwal & riwayat hanya di perangkat; yang keluar hanya pesan bukti ke bot Telegram milikmu.
+
+## Kontributor
+
+- [@tehgeii](https://github.com/tehgeii) — ide, kebutuhan, dan arah desain aplikasi
+- Claude (Claude Code) — implementasi kode
