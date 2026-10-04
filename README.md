@@ -1,39 +1,50 @@
 # Pengingat Absen
 
-Aplikasi Android pribadi untuk mengingatkan absen kuliah di **Dinusverse (SiAdin Mobile, UDINUS)**.
+Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
+(disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
 
-Saat jam absen dibuka, muncul notifikasi berisi nama mata kuliah dan tombol untuk membuka Dinusverse.
-Kamu absen sendiri di sana, lalu aplikasi ini mengirim bukti ke Telegram kamu.
+Saat jam absen dibuka, HP bergetar dan muncul notifikasi berisi nama mata kuliah. Satu tap membuka
+halaman presensi, kamu menekan tombol presensi sendiri, lalu aplikasi ini mengirim bukti ke Telegram kamu.
 
 > **Yang TIDAK dilakukan aplikasi ini:** menekan tombol presensi / mengirim absen otomatis,
 > memakai API Dinusverse, Accessibility Service, memalsukan lokasi.
 > Tombol presensi selalu ditekan sendiri oleh pemilik HP.
-> Aplikasi ini hanya **mengingatkan, membuka Dinusverse, mencatat, dan mengirim bukti ke Telegram**.
+> Aplikasi ini hanya **mengingatkan, membuka halaman presensi (dan login otomatis bila diaktifkan),
+> mencatat, dan mengirim bukti ke Telegram**.
+
+**Kompatibel:** Android **8.0 (Oreo) sampai Android 16** dan yang lebih baru (minSdk 26, targetSdk 36).
+Tidak tersedia untuk iPhone.
 
 ---
 
 ## Cara kerja harian (setelah setup sekali)
 
-1. Jam absen dibuka → notifikasi heads-up berbunyi: **"Absen dibuka: Basis Data"**
+1. Jam absen dibuka → notifikasi heads-up (getar): **"Absen dibuka: Basis Data"**
    (jam buka–tutup dan ruang). Tombol: **Absen sekarang** · **Tunda 5 menit** · **Libur**.
-2. Tap **Absen sekarang** (atau tap notifikasinya) → Dinusverse terbuka, notifikasi berubah
-   menjadi **"Sudah absen Basis Data?"**.
-3. Setelah absen berhasil, tap **Sudah, kirim bukti** → Telegram menerima:
-   `✅ Absen Basis Data — Senin, 5 Oktober 2026 07:03:09`
-   (waktunya adalah saat tombol ditekan, bukan saat pesan terkirim).
-4. Mau bukti lebih kuat? Screenshot halaman sukses → **Bagikan** → **Kirim bukti absen**
-   (Pengingat Absen). Screenshot dikirim lewat `sendPhoto` dengan caption yang sama dan otomatis
-   dikaitkan ke matkul yang sedang aktif.
+2. Tap **Absen sekarang** (atau tap notifikasinya):
+   - **Mode SiAdin web (disarankan):** halaman **Presensi Online** terbuka di browser mini di dalam
+     aplikasi. Jika sesi habis, aplikasi login otomatis lalu langsung ke halaman presensi.
+   - **Mode Dinusverse:** aplikasi Dinusverse terbuka; buka menu **Kehadiran**.
+3. **Tekan tombol presensi sendiri** di halaman tersebut.
+4. Kirim bukti (pilih salah satu):
+   - **📷 Kirim screenshot** di bawah browser mini → gambar halaman yang tampil dikirim ke Telegram
+     sebagai foto. **Paling praktis: satu tap, bukti foto terkirim dan pengingat langsung berhenti.**
+   - **✅ Sudah, kirim bukti** (di browser mini atau di notifikasi "Sudah absen Basis Data?") →
+     Telegram menerima pesan teks `✅ Absen Basis Data — Senin, 5 Oktober 2026 07:03:09`.
+   - Mode Dinusverse: screenshot halaman sukses → **Bagikan** → **Kirim bukti absen**.
 
-Kalau kamu belum menandai selesai, notifikasi berbunyi lagi **tiap 3 menit** (bisa diubah) sampai
+Waktu di pesan adalah saat tombol ditekan / screenshot diambil, bukan saat pesan terkirim. Bukti
+otomatis dikaitkan ke matkul yang sedang dibuka absennya.
+
+Kalau kamu belum menandai selesai, notifikasi muncul lagi **tiap 3 menit** (bisa diubah) sampai
 absen ditutup. **5 menit sebelum ditutup** muncul peringatan terakhir yang lebih tegas. Kalau tetap
 terlewat, riwayat mencatat **terlewat** dan Telegram menerima `❌ Terlewat absen …`.
 Jika jam tutup kosong, pengingat berhenti 30 menit setelah dibuka.
 
 Kalau sedang offline, bukti masuk antrean dan otomatis terkirim saat ada internet.
 
-**Kapan pengingat berhenti?** Begitu kamu menekan **Sudah, kirim bukti** (atau **Libur**), atau
-membagikan screenshot bukti. Menekan **Absen sekarang** saja belum menghentikannya: setelah satu
+**Kapan pengingat berhenti?** Begitu kamu menekan **Sudah, kirim bukti**, **Kirim screenshot**,
+atau **Libur**, atau membagikan screenshot bukti. Menekan **Absen sekarang** saja belum menghentikannya: setelah satu
 interval, muncul lagi "Sudah absen?" sampai kamu konfirmasi.
 
 **Getar saja (default):** di *Pengaturan → Pengingat*, opsi **Getar saja (tanpa suara)** aktif
@@ -67,7 +78,9 @@ lagi di tab **Pengaturan**.
 | **Alarm & pengingat** (exact alarm) | Supaya berbunyi tepat di jam absen | Android 13+ biasanya otomatis aktif. Jika tidak: *Buka* → aktifkan *Izinkan setel alarm dan pengingat* |
 | **Tanpa optimasi baterai** | Supaya alarm tidak ditahan sistem saat HP tidur | *Izinkan* → pilih *Izinkan* di dialog |
 
-Tekan **Tes notifikasi** untuk memastikan notifikasi muncul dengan suara.
+Tekan **Tes notifikasi** untuk memastikan notifikasi muncul dan HP bergetar. Tombol pada notifikasi
+tes hanya menutupnya (tidak mengirim apa pun ke Telegram), kecuali **Absen sekarang** yang membuka
+halaman presensi untuk dicoba.
 
 **HP Xiaomi / Oppo / Vivo / Realme / Samsung:** pengaturan baterai pabrikan sering lebih agresif.
 Buka *Pengaturan → Aplikasi → Pengingat Absen* lalu:
@@ -82,12 +95,16 @@ isi **NIM** dan **password SiAdin** sekali, lalu **Simpan login**. Mulai sekaran
 **Absen sekarang** membuka `https://mhs.dinus.ac.id/akademik/presensiOnline` di **browser mini**
 di dalam aplikasi:
 
-- Jika diminta login, NIM & password diisi dan tombol Login ditekan otomatis, lalu langsung
-  kembali ke halaman Presensi Online.
+- Browser mini masuk lewat halaman depan `mhs.dinus.ac.id` dulu. Jika form login muncul, NIM &
+  password diisi dan tombol **Masuk ke SiAdin** ditekan otomatis, lalu langsung ke halaman
+  Presensi Online. Saat dibuka, layar bisa "loncat" 2–3 kali — itu normal.
+- Halaman yang tampil adalah website SiAdin asli dari server UDINUS (real-time, sama seperti di
+  Chrome). Tombol ⟳ di atas untuk memuat ulang bila dosen baru membuka presensi.
 - Tombol **presensi di website tetap kamu yang tekan.**
 - Di bawah halaman ada **✅ Sudah, kirim bukti** dan **📷 Kirim screenshot** (gambar halaman yang
   sedang tampil langsung dikirim ke Telegram), jadi tidak perlu kembali ke notifikasi.
-- Tombol **Chrome** di atas membuka halaman yang sama di Chrome bila perlu.
+- Tombol **Chrome** di atas membuka halaman yang sama di Chrome bila perlu (mis. untuk menu lain
+  seperti KRS/KHS — menu samping SiAdin kadang tampil kosong di browser mini).
 - Jika halaman presensi meminta lokasi atau kamera, Android akan meminta izin sekali
   (lokasi asli, tidak dipalsukan).
 - Login otomatis bisa dimatikan, dan data login bisa dihapus kapan saja di Pengaturan → SiAdin web.
@@ -142,7 +159,7 @@ ruang (opsional). Jadwal berulang tiap minggu dan dikelompokkan per hari.
 ## Widget
 
 Tahan layar utama → **Widget** → **Pengingat Absen**. Widget menampilkan matkul berikutnya dan jam
-absennya. Tap widget = buka Dinusverse.
+absennya. Tap widget = buka halaman presensi (SiAdin web) atau Dinusverse, sesuai pengaturan.
 
 ## Riwayat
 
@@ -151,6 +168,24 @@ Tab **Riwayat** menampilkan setiap absen: matkul, waktu, dan status
 (juga tersedia sebagai tombol di notifikasi "Gagal kirim bukti").
 
 ---
+
+## Bagikan ke teman
+
+Boleh. Setiap orang memakai datanya sendiri — tidak ada yang tercampur:
+
+1. Kirim file **app-debug.apk** ke teman (lewat WhatsApp/Telegram/Drive), atau minta mereka
+   mengunduh dari tab **Actions** repo ini (perlu login akun GitHub untuk mengunduh artifact).
+2. Teman menginstal APK, lalu menjalankan wizard dengan **NIM, password, jadwal, dan bot Telegram
+   milik mereka sendiri** (setiap orang membuat bot sendiri di @BotFather).
+3. Semua data (jadwal, riwayat, token bot, NIM & password) tersimpan di HP masing-masing saja.
+
+Yang perlu diketahui teman:
+- Ini APK **debug** di luar Play Store: Android/Play Protect akan memberi peringatan
+  "aplikasi tidak dikenal" → pilih **Tetap instal**.
+- **Instal hanya APK dari repo ini atau dari kamu langsung.** Keystore debug repo ini publik, jadi
+  APK lain yang ditandatangani dengan kunci yang sama bisa menimpa aplikasi ini beserta datanya
+  (termasuk password yang tersimpan). Jangan instal "update" dari sumber tak dikenal.
+- Tetap tekan tombol presensi sendiri; aplikasi tidak pernah absen otomatis.
 
 ## Login ulang Dinusverse cukup satu tap (Autofill Google Password Manager)
 
@@ -201,13 +236,17 @@ Bila spesifikasi ambigu, dipilih opsi paling sederhana:
 - **Gagal** = token/chat salah atau ditolak Telegram, atau 10 kali percobaan gagal. Saat offline
   status tetap **antre** sampai ada internet.
 - **Keystore debug** (`app/debug.keystore`, password publik `android`) sengaja di-commit supaya
-  semua APK dari CI bertanda tangan sama dan bisa saling menimpa tanpa uninstall. Ini bukan
-  rahasia; APK ini hanya untuk pemakaian pribadi.
+  semua APK dari CI bertanda tangan sama dan bisa saling menimpa tanpa uninstall. Konsekuensinya:
+  siapa pun bisa menandatangani APK dengan kunci ini, jadi instal hanya APK dari repo ini
+  (lihat *Bagikan ke teman*).
 - **targetSdk/compileSdk 36** (Android 16).
 - **Aturan awal "jangan simpan/isi NIM/password" dicabut oleh pemilik** demi login otomatis SiAdin
-  web. Pengisian hanya ke form login (kolom NIM ditebak dari nama/id/placeholder `nim`, `user`,
-  `login`, `email`, atau kolom teks pertama); maksimal 2 percobaan per pembukaan; aplikasi tidak
-  pernah menekan tombol presensi.
+  web. Pengisian hanya ke form login asli: tepat satu kolom password yang tampil di layar, kolom
+  NIM (nama/id/placeholder berisi `nim`, `user`, `login`, `email`, `induk`), dan tombol
+  **Masuk/Login** — form tersembunyi seperti di menu dashboard diabaikan. Maksimal 2 percobaan per
+  pembukaan; aplikasi tidak pernah menekan tombol presensi.
+- **Browser mini** tampil sebagai Chrome biasa (penanda WebView dihapus dari user agent) supaya
+  website memperlakukannya sama. Cookie sesi disimpan selama website mengizinkan.
 
 ---
 
@@ -222,7 +261,8 @@ app/src/main/java/com/pengingatabsen/
 ├── data/                   Room (Course, AttendanceRecord), DataStore, enkripsi token, Repository
 ├── logic/                  ScheduleMath (hitung alarm & pengingat ulang), Formatters (teks Indonesia)
 ├── alarm/                  AlarmScheduler, receiver alarm/aksi/boot, notifikasi, izin
-├── launch/                 Buka Dinusverse (LaunchTargetActivity), share target screenshot
+├── launch/                 Buka target (LaunchTargetActivity), browser mini SiAdin + login otomatis
+│                           (WebBrowserActivity), share target screenshot
 ├── telegram/               Bot API client (OkHttp) + SendWorker (WorkManager, retry offline)
 ├── widget/                 Widget layar utama
 └── ui/                     Compose: jadwal, riwayat, pengaturan, wizard
