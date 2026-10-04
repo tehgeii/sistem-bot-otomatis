@@ -108,7 +108,7 @@ fun CourseEditorDialog(
                         Text("Buka ${Formatters.hm(open)}")
                     }
                     OutlinedButton(
-                        onClick = { pickTime(close ?: (open + 30)) { close = it } },
+                        onClick = { pickTime(close ?: (open + 30).coerceAtMost(23 * 60 + 59)) { close = it } },
                         modifier = Modifier.weight(1f),
                     ) {
                         Text(close?.let { "Tutup ${Formatters.hm(it)}" } ?: "Tutup (opsional)")

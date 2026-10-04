@@ -21,7 +21,8 @@ data class Course(
     /** Libur: kemunculan sampai tanggal ini (epoch day) dilewati. */
     val skipUntilEpochDay: Long? = null,
 ) {
-    val skipUntil: LocalDate? get() = skipUntilEpochDay?.let(LocalDate::ofEpochDay)
-
     fun toSlot() = Slot(dayOfWeek, openMinute, closeMinute, skipUntil)
 }
+
+/** Di luar entity supaya Room tidak menganggapnya kolom. */
+val Course.skipUntil: LocalDate? get() = skipUntilEpochDay?.let(LocalDate::ofEpochDay)

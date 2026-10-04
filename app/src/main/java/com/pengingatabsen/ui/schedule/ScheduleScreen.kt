@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pengingatabsen.data.Course
+import com.pengingatabsen.data.skipUntil
 import com.pengingatabsen.logic.Formatters
 import com.pengingatabsen.ui.MainViewModel
 import java.time.LocalDate

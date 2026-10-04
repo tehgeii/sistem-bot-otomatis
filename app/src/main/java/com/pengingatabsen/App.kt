@@ -2,6 +2,7 @@ package com.pengingatabsen
 
 import android.app.Application
 import android.content.Context
+import com.pengingatabsen.alarm.Notifications
 import com.pengingatabsen.data.AppDatabase
 import com.pengingatabsen.data.Repository
 import com.pengingatabsen.data.SettingsStore
@@ -10,6 +11,7 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         Graph.init(this)
+        Notifications.createChannels(this)
     }
 }
 
