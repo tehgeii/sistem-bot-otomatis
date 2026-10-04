@@ -79,7 +79,7 @@ class WebBrowserActivity : ComponentActivity() {
 
     // State UI
     private var pageTitle by mutableStateOf("SiAdin")
-    private var progress by mutableIntStateOf(0)
+    private var loadProgress by mutableIntStateOf(0)
     private var status by mutableStateOf<String?>(null)
     private var busy by mutableStateOf(false)
 
@@ -159,7 +159,7 @@ class WebBrowserActivity : ComponentActivity() {
                     },
                 ) { padding ->
                     Column(Modifier.fillMaxSize().padding(padding)) {
-                        if (progress in 1..99) LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth())
+                        if (loadProgress in 1..99) LinearProgressIndicator(progress = { loadProgress / 100f }, modifier = Modifier.fillMaxWidth())
                         AndroidView(factory = { ctx -> createWebView(ctx) }, modifier = Modifier.fillMaxSize())
                     }
                 }
@@ -188,11 +188,11 @@ class WebBrowserActivity : ComponentActivity() {
 
         webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
-                progress = 1
+                loadProgress = 1
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
-                progress = 100
+                loadProgress = 100
                 view.title?.takeIf { it.isNotBlank() }?.let { pageTitle = it }
                 CookieManager.getInstance().flush()
                 if (url != null) onPageReady(view, url, retriesLeft = 3)
@@ -200,7 +200,7 @@ class WebBrowserActivity : ComponentActivity() {
         }
         webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView, newProgress: Int) {
-                progress = newProgress
+                loadProgress = newProgress
             }
 
             override fun onShowFileChooser(
