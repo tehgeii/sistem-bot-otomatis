@@ -1,6 +1,11 @@
 package com.pengingatabsen.data
 
+import com.pengingatabsen.Graph
+import com.pengingatabsen.alarm.AlarmScheduler
+import com.pengingatabsen.alarm.Notifications
 import com.pengingatabsen.logic.ScheduleMath
+import com.pengingatabsen.telegram.SendWorker
+import com.pengingatabsen.widget.NextCourseWidget
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -33,7 +38,7 @@ class Repository(private val db: AppDatabase) {
     suspend fun holidayToday(course: Course, now: LocalDateTime = LocalDateTime.now()) {
         val today = now.toLocalDate()
         if (course.dayOfWeek != today.dayOfWeek.value) return
-        skipUntil(course, today, listOf(today))
+        applySkip(course, today, listOf(today))
     }
 
     /** Lewati kemunculan minggu ini (Senin–Minggu) yang belum lewat. */
@@ -42,7 +47,7 @@ class Repository(private val db: AppDatabase) {
         val monday = today.minusDays((today.dayOfWeek.value - 1).toLong())
         val sunday = monday.plusDays(6)
         val date = monday.plusDays((course.dayOfWeek - 1).toLong())
-        skipUntil(course, sunday, if (date.isBefore(today)) emptyList() else listOf(date))
+        applySkip(course, sunday, if (date.isBefore(today)) emptyList() else listOf(date))
     }
 
     suspend fun clearSkip(course: Course) {
@@ -57,7 +62,7 @@ class Repository(private val db: AppDatabase) {
         saveCourse(course.copy(skipUntilEpochDay = null))
     }
 
-    private suspend fun skipUntil(course: Course, until: LocalDate, holidayDates: List<LocalDate>) {
+    private suspend fun applySkip(course: Course, until: LocalDate, holidayDates: List<LocalDate>) {
         val newUntil = maxOf(until, course.skipUntil ?: until)
         for (date in holidayDates) markOccurrence(course, date, RecordStatus.HOLIDAY)
         saveCourse(course.copy(skipUntilEpochDay = newUntil.toEpochDay()))
@@ -70,7 +75,7 @@ class Repository(private val db: AppDatabase) {
     suspend fun markOccurrence(course: Course, date: LocalDate, status: RecordStatus): AttendanceRecord {
         val existing = recordDao.find(course.id, date.toEpochDay())
         if (existing != null) {
-            if (existing.status != RecordStatus.ACTIVE) return existing
+            if (existing.status != RecordStatus.ACTIVE || status == RecordStatus.ACTIVE) return existing
             val updated = existing.copy(status = status, awaitingConfirm = false)
             recordDao.update(updated)
             return updated
@@ -87,8 +92,94 @@ class Repository(private val db: AppDatabase) {
         return record.copy(id = recordDao.insert(record))
     }
 
+    /** Jendela berakhir tanpa konfirmasi: catat terlewat dan kabari Telegram. */
+    suspend fun markMissed(record: AttendanceRecord) {
+        if (record.status != RecordStatus.ACTIVE) return
+        recordDao.update(record.copy(status = RecordStatus.MISSED, awaitingConfirm = false))
+        SendWorker.enqueue(Graph.appContext, record.id, SendWorker.KIND_MISSED)
+    }
+
+    /** "Sudah, kirim bukti": waktu bukti = [pressedAt], lalu antre ke Telegram. */
+    suspend fun confirmDone(record: AttendanceRecord, pressedAt: LocalDateTime) {
+        if (record.status == RecordStatus.SENT || record.status == RecordStatus.QUEUED) return
+        recordDao.update(
+            record.copy(
+                status = RecordStatus.QUEUED,
+                doneAtMillis = pressedAt.toMillis(),
+                awaitingConfirm = false,
+                error = null,
+            ),
+        )
+        SendWorker.enqueue(Graph.appContext, record.id, SendWorker.KIND_PROOF)
+    }
+
+    /** Kirim ulang bukti yang gagal (dari Riwayat atau notifikasi gagal). */
+    suspend fun resend(recordId: Long) {
+        val record = recordDao.get(recordId) ?: return
+        if (record.doneAtMillis == null) return
+        Notifications.cancelId(Graph.appContext, SendWorker.failureNotificationId(recordId))
+        recordDao.update(record.copy(status = RecordStatus.QUEUED, error = null))
+        SendWorker.enqueue(Graph.appContext, record.id, SendWorker.KIND_PROOF)
+    }
+
+    /**
+     * Screenshot dibagikan ke aplikasi: kaitkan ke matkul yang sedang aktif,
+     * atau ke absen yang baru saja dikonfirmasi (maks. 2 jam lalu).
+     * Mengembalikan baris riwayat yang akan dikirim.
+     */
+    suspend fun attachPhoto(photoPath: String, now: LocalDateTime): AttendanceRecord {
+        val nowMillis = now.toMillis()
+        val active = recordDao.active()
+        val target = active.firstOrNull { nowMillis in it.openAtMillis until it.endAtMillis }
+            ?: active.firstOrNull()
+        val record = when {
+            target != null -> target.copy(doneAtMillis = nowMillis, awaitingConfirm = false)
+            else -> recordDao.lastDone()?.takeIf { nowMillis - (it.doneAtMillis ?: 0) <= 2 * 60 * 60 * 1000L }
+                ?: nearestCourseToday(now)?.let { markOccurrence(it, now.toLocalDate(), RecordStatus.QUEUED) }
+                    ?.copy(doneAtMillis = nowMillis)
+                ?: AttendanceRecord(
+                    courseId = 0,
+                    courseName = "Tanpa matkul",
+                    // Tidak terkait jadwal: pakai nilai negatif unik supaya tidak bentrok.
+                    epochDay = -nowMillis,
+                    openAtMillis = nowMillis,
+                    endAtMillis = nowMillis,
+                    status = RecordStatus.QUEUED,
+                    doneAtMillis = nowMillis,
+                ).let { it.copy(id = recordDao.insert(it)) }
+        }
+        val updated = record.copy(status = RecordStatus.QUEUED, photoPath = photoPath, error = null)
+        recordDao.update(updated)
+        if (target != null) {
+            Notifications.cancel(Graph.appContext, target.courseId)
+            AlarmScheduler.reschedule(Graph.appContext, target.courseId)
+        }
+        SendWorker.enqueue(Graph.appContext, updated.id, SendWorker.KIND_PROOF)
+        return updated
+    }
+
+    /** Matkul aktif hari ini yang jam bukanya paling dekat dengan [now]. */
+    private suspend fun nearestCourseToday(now: LocalDateTime): Course? {
+        val minute = now.hour * 60 + now.minute
+        return courseDao.getAll()
+            .filter { it.active && it.dayOfWeek == now.dayOfWeek.value }
+            .minByOrNull { kotlin.math.abs(it.openMinute - minute) }
+    }
+
     /** Dipanggil setiap jadwal berubah. */
     private suspend fun onScheduleChanged(courseId: Long) {
+        val context = Graph.appContext
+        AlarmScheduler.reschedule(context, courseId)
+        // Notifikasi yang sedang tampil untuk kemunculan yang kini libur/nonaktif dibersihkan.
+        val course = courseDao.get(courseId)
+        val today = LocalDate.now()
+        if (course == null || !course.active || ScheduleMath.isSkipped(course.toSlot(), today)) {
+            recordDao.active().filter { it.courseId == courseId }.forEach {
+                if (course == null || !course.active) recordDao.update(it.copy(status = RecordStatus.HOLIDAY))
+            }
+            Notifications.cancel(context, courseId)
+        }
+        NextCourseWidget.updateAll(context)
     }
 }
 
