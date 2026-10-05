@@ -36,11 +36,83 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import android.content.Intent
+import android.widget.Toast
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.TextFieldValue
 import com.pengingatabsen.data.Course
 import com.pengingatabsen.data.skipUntil
 import com.pengingatabsen.logic.Formatters
 import com.pengingatabsen.ui.MainViewModel
 import java.time.LocalDate
+
+/** Menu bagikan/impor jadwal, dipasang di action TopAppBar untuk tab Jadwal. */
+@Composable
+fun ScheduleMenu(vm: MainViewModel) {
+    val context = LocalContext.current
+    var menu by remember { mutableStateOf(false) }
+    var importing by remember { mutableStateOf(false) }
+
+    Box {
+        IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Menu jadwal") }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(text = { Text("Bagikan jadwal") }, onClick = {
+                menu = false
+                vm.exportSchedule { text ->
+                    runCatching {
+                        context.startActivity(
+                            Intent.createChooser(
+                                Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text),
+                                "Bagikan jadwal NgiBsen",
+                            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                }
+            })
+            DropdownMenuItem(text = { Text("Impor jadwal") }, onClick = { menu = false; importing = true })
+        }
+    }
+
+    if (importing) ImportDialog(vm) { importing = false }
+}
+
+@Composable
+private fun ImportDialog(vm: MainViewModel, onClose: () -> Unit) {
+    val context = LocalContext.current
+    var field by remember { mutableStateOf(TextFieldValue("")) }
+    var preview by remember { mutableStateOf<Int?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("Impor jadwal") },
+        text = {
+            Column {
+                Text("Tempel teks jadwal dari NgiBsen (hasil \"Bagikan jadwal\").", style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = field,
+                    onValueChange = { field = it; vm.previewImport(it.text) { n -> preview = n } },
+                    label = { Text("Teks jadwal") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                )
+                preview?.let { Text("$it matkul baru akan ditambahkan (yang sudah ada dilewati).", style = MaterialTheme.typography.bodySmall) }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = (preview ?: 0) > 0,
+                onClick = {
+                    vm.importSchedule(field.text) { n ->
+                        Toast.makeText(context, "$n matkul ditambahkan", Toast.LENGTH_LONG).show()
+                    }
+                    onClose()
+                },
+            ) { Text("Impor") }
+        },
+        dismissButton = { TextButton(onClick = onClose) { Text("Batal") } },
+    )
+}
 
 @Composable
 fun ScheduleScreen(vm: MainViewModel, contentPadding: PaddingValues) {

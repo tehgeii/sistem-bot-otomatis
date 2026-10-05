@@ -3,6 +3,8 @@ package com.pengingatabsen.data
 import com.pengingatabsen.Graph
 import com.pengingatabsen.alarm.AlarmScheduler
 import com.pengingatabsen.alarm.Notifications
+import com.pengingatabsen.logic.CourseData
+import com.pengingatabsen.logic.ScheduleCodec
 import com.pengingatabsen.logic.ScheduleMath
 import com.pengingatabsen.telegram.SendWorker
 import com.pengingatabsen.widget.NextCourseWidget
@@ -33,6 +35,41 @@ class Repository(private val db: AppDatabase) {
     }
 
     suspend fun setActive(course: Course, active: Boolean) = saveCourse(course.copy(active = active))
+
+    /** Jadwal sebagai teks untuk dibagikan/cadangan. */
+    suspend fun exportSchedule(): String =
+        ScheduleCodec.encode(
+            courseDao.getAll().map {
+                CourseData(it.name, it.dayOfWeek, it.openMinute, it.closeMinute, it.room, it.active)
+            },
+        )
+
+    /**
+     * Impor jadwal dari teks. Entri yang sama persis (nama+hari+jam buka) dengan yang sudah ada
+     * dilewati, supaya impor berulang tidak menduplikasi. Mengembalikan jumlah matkul yang ditambah.
+     */
+    suspend fun importSchedule(text: String): Int {
+        val incoming = ScheduleCodec.decode(text)
+        if (incoming.isEmpty()) return 0
+        val existing = courseDao.getAll()
+            .map { Triple(it.name.trim().lowercase(), it.dayOfWeek, it.openMinute) }.toHashSet()
+        var added = 0
+        for (c in incoming) {
+            val key = Triple(c.name.trim().lowercase(), c.dayOfWeek, c.openMinute)
+            if (!existing.add(key)) continue
+            saveCourse(Course(name = c.name, dayOfWeek = c.dayOfWeek, openMinute = c.openMinute, closeMinute = c.closeMinute, room = c.room, active = c.active))
+            added++
+        }
+        return added
+    }
+
+    /** Berapa matkul yang akan ditambah bila teks ini diimpor (untuk pratinjau). */
+    suspend fun previewImport(text: String): Int {
+        val incoming = ScheduleCodec.decode(text)
+        val existing = courseDao.getAll()
+            .map { Triple(it.name.trim().lowercase(), it.dayOfWeek, it.openMinute) }.toHashSet()
+        return incoming.count { existing.add(Triple(it.name.trim().lowercase(), it.dayOfWeek, it.openMinute)) }
+    }
 
     /** Liburkan kemunculan hari ini (hanya bila matkul memang ada hari ini). */
     suspend fun holidayToday(course: Course, now: LocalDateTime = LocalDateTime.now()) {

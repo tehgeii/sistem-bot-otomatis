@@ -31,4 +31,8 @@ class MainViewModel : ViewModel() {
     fun skipThisWeek(course: Course) = viewModelScope.launch { repo.skipThisWeek(course) }
     fun clearSkip(course: Course) = viewModelScope.launch { repo.clearSkip(course) }
     fun resend(record: AttendanceRecord) = viewModelScope.launch { repo.resend(record.id) }
+
+    fun exportSchedule(onReady: (String) -> Unit) = viewModelScope.launch { onReady(repo.exportSchedule()) }
+    fun previewImport(text: String, onResult: (Int) -> Unit) = viewModelScope.launch { onResult(repo.previewImport(text)) }
+    fun importSchedule(text: String, onDone: (Int) -> Unit) = viewModelScope.launch { onDone(repo.importSchedule(text)) }
 }

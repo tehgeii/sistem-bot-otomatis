@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.lifecycle.lifecycleScope
 import com.pengingatabsen.alarm.AlarmScheduler
 import com.pengingatabsen.ui.history.HistoryScreen
+import com.pengingatabsen.ui.schedule.ScheduleMenu
 import com.pengingatabsen.ui.schedule.ScheduleScreen
 import com.pengingatabsen.ui.settings.OnboardingScreen
 import com.pengingatabsen.ui.settings.SettingsScreen
@@ -56,7 +57,12 @@ class MainActivity : ComponentActivity() {
                 }
 
                 Scaffold(
-                    topBar = { TopAppBar(title = { Text(if (tab == 0) "NgiBsen UDINUS" else titles[tab]) }) },
+                    topBar = {
+                        TopAppBar(
+                            title = { Text(if (tab == 0) "NgiBsen UDINUS" else titles[tab]) },
+                            actions = { if (tab == 0) ScheduleMenu(vm) },
+                        )
+                    },
                     bottomBar = {
                         NavigationBar {
                             val icons = listOf(Icons.Filled.DateRange, Icons.Filled.List, Icons.Filled.Settings)

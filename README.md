@@ -208,6 +208,11 @@ ruang (opsional). Jadwal berulang tiap minggu dan dikelompokkan per hari.
   **Batalkan libur**, **Hapus**.
 - Saklar di kanan: aktif/nonaktif.
 
+**Bagikan / impor jadwal:** menu ⋮ di kanan atas tab Jadwal → **Bagikan jadwal** (kirim teks ke
+teman lewat WhatsApp/Telegram, sekalian jadi cadangan) dan **Impor jadwal** (tempel teks → pratinjau
+jumlah matkul baru → Impor). Matkul yang sudah ada (nama + hari + jam sama) dilewati, jadi aman
+diimpor berulang. Teman sekelas cukup impor satu kali, tidak perlu mengetik ulang.
+
 ## Widget
 
 Tahan layar utama → **Widget** → **NgiBsen UDINUS**. Widget menampilkan matkul berikutnya dan jam
