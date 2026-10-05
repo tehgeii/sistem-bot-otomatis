@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 2.0** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -48,6 +48,9 @@ Kalau sedang offline, bukti masuk antrean dan otomatis terkirim saat ada interne
 **Kapan pengingat berhenti?** Begitu kamu menekan **Sudah, kirim bukti**, **Kirim screenshot**,
 atau **Libur**, atau membagikan screenshot bukti. Menekan **Absen sekarang** saja belum menghentikannya: setelah satu
 interval, muncul lagi "Sudah absen?" sampai kamu konfirmasi.
+**Mode pintar** tidak menanyakan "Sudah absen?": setiap pengingat mengecek SiAdin dulu, dan begitu kartu
+matkul berubah jadi **Berhasil Presensi** (lewat browser mini, Chrome, atau Dinusverse) pengingat
+berhenti sendiri dan bukti terkirim.
 
 **Getar saja (default):** di *Pengaturan → Pengingat*, opsi **Getar saja (tanpa suara)** aktif
 sejak awal supaya tidak berbunyi di kelas. Matikan jika ingin pakai suara notifikasi.
@@ -91,7 +94,8 @@ tes hanya menutupnya (tidak mengirim apa pun ke Telegram), kecuali **Absen sekar
 halaman presensi untuk dicoba.
 
 **Penting agar pengecekan & layar penuh tetap jalan saat HP terkunci** — pabrikan sering mematikan
-aplikasi di latar belakang. Buka *Pengaturan → Aplikasi → NgiBsen UDINUS*, set **Baterai** ke
+aplikasi di latar belakang. Tombol **Buka Autostart** di *Pengaturan → Izin HP* langsung membuka
+layar Autostart merek HP-mu bila tersedia. Atau buka *Pengaturan → Aplikasi → NgiBsen UDINUS*, set **Baterai** ke
 *Tidak dibatasi*, lalu per merek:
 
 | Merek | Yang perlu diaktifkan |

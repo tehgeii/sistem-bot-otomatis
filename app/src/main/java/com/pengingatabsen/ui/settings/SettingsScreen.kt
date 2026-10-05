@@ -12,6 +12,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
@@ -20,27 +22,36 @@ fun SettingsScreen(vm: SetupViewModel, contentPadding: PaddingValues) {
     Column(
         Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
     ) {
-        SectionTitle("Izin")
-        PermissionsSection()
-        HorizontalDivider()
+        val settings by vm.settings.collectAsState()
+        val smart = settings?.smartModeActive == true
+        // Urutan: yang paling sering dipakai di atas, izin & opsi lanjutan di bawah.
         SectionTitle("SiAdin web")
         SiadinWebSection(vm)
         HorizontalDivider(Modifier.padding(top = 8.dp))
-        SectionTitle("Aplikasi tujuan")
-        TargetAppSection(vm)
-        HorizontalDivider()
         SectionTitle("Pengingat")
         VibrateOnlySection(vm)
         IntervalSection(vm)
         Text(
-            "Pengingat berhenti begitu kamu menekan \"Sudah, kirim bukti\" atau \"Libur\". " +
-                "Jika tidak, berhenti saat absen ditutup (atau 30 menit setelah dibuka bila jam tutup kosong). " +
-                "Notifikasi terakhir muncul 5 menit sebelum ditutup.",
+            if (smart) {
+                "Mode pintar: SiAdin dicek otomatis dan HP baru bergetar saat presensi dibuka dosen. " +
+                    "Pengingat berhenti sendiri begitu SiAdin menampilkan \"Berhasil Presensi\", " +
+                    "atau saat kamu menekan \"Libur\"."
+            } else {
+                "Pengingat berhenti begitu kamu menekan \"Sudah, kirim bukti\" atau \"Libur\". " +
+                    "Jika tidak, berhenti saat absen ditutup (atau 30 menit setelah dibuka bila jam tutup kosong). " +
+                    "Notifikasi terakhir muncul 5 menit sebelum ditutup."
+            },
             style = MaterialTheme.typography.bodySmall,
         )
         HorizontalDivider(Modifier.padding(top = 8.dp))
-        SectionTitle("Telegram")
+        SectionTitle("Telegram (bukti absen)")
         TelegramSection(vm)
+        HorizontalDivider(Modifier.padding(top = 8.dp))
+        SectionTitle("Izin HP")
+        PermissionsSection()
+        HorizontalDivider()
+        SectionTitle("Lanjutan: aplikasi tujuan")
+        TargetAppSection(vm)
         Spacer(Modifier.height(32.dp))
     }
 }

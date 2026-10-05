@@ -126,7 +126,16 @@ fun PermissionsSection(autoRequest: Boolean = false) {
             runCatching { context.startActivity(Permissions.batteryIntent(context)) }
                 .onFailure { context.startActivity(Permissions.appDetailsIntent(context)) }
         }
-        TextButton(onClick = { Notifications.showTest(context) }) { Text("Tes notifikasi") }
+        Text(
+            "HP Xiaomi, Oppo/Realme, Vivo/iQOO, Infinix, Samsung: aktifkan juga \"Mulai otomatis/Autostart\" " +
+                "untuk NgiBsen, supaya pengingat tetap jalan setelah aplikasi ditutup.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Row {
+            TextButton(onClick = { Permissions.openAutostart(context) }) { Text("Buka Autostart") }
+            TextButton(onClick = { Notifications.showTest(context) }) { Text("Tes notifikasi") }
+        }
     }
 }
 
@@ -365,8 +374,11 @@ fun IntervalSection(vm: SetupViewModel) {
     val context = LocalContext.current
     val settings by vm.settings.collectAsState()
     val interval = settings?.remindIntervalMinutes ?: 3
+    // Mode pintar: sebelum dibuka, SiAdin dicek otomatis (1–2 menit); interval ini hanya berlaku setelah dibuka.
+    val label = if (settings?.smartModeActive == true) "Setelah presensi dibuka, ulangi tiap $interval menit"
+    else "Ulangi pengingat tiap $interval menit"
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Ulangi pengingat tiap $interval menit", modifier = Modifier.weight(1f))
+        Text(label, modifier = Modifier.weight(1f))
         OutlinedButton(enabled = interval > 1, onClick = { vm.setInterval(interval - 1, context) }) { Text("−") }
         Spacer(Modifier.width(8.dp))
         OutlinedButton(enabled = interval < 30, onClick = { vm.setInterval(interval + 1, context) }) { Text("+") }

@@ -24,7 +24,8 @@ import java.time.LocalDateTime
 /**
  * Activity tanpa tampilan untuk tombol "Absen sekarang" & widget.
  * (Android 12+ melarang membuka activity dari BroadcastReceiver notifikasi.)
- * Membuka Dinusverse (atau browser mini untuk URL web), lalu menampilkan notifikasi lanjutan "Sudah absen?".
+ * Membuka Dinusverse (atau browser mini untuk URL web), lalu menampilkan notifikasi lanjutan "Sudah absen?"
+ * (kecuali mode pintar, yang mendeteksi "Berhasil Presensi" sendiri).
  */
 class LaunchTargetActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,15 +68,19 @@ class LaunchTargetActivity : Activity() {
         }
         // Beri waktu untuk absen sebelum pengingat berikutnya berbunyi — kecuali mode pintar masih
         // menunggu presensi dibuka: pengecekan tiap menit harus tetap jalan.
-        val smartWaiting = Graph.settings.current().smartModeActive &&
-            !Graph.settings.isPresensiOpen(courseId, epochDay)
-        val updated = record.copy(
-            awaitingConfirm = true,
-            snoozeUntilMillis = if (smartWaiting) record.snoozeUntilMillis
-            else LocalDateTime.now().plusMinutes(interval.toLong()).toMillis(),
-        )
-        dao.update(updated)
-        Notifications.showConfirm(context, course, updated, silent = true)
+        val smart = Graph.settings.current().smartModeActive
+        val smartWaiting = smart && !Graph.settings.isPresensiOpen(courseId, epochDay)
+        val snooze = if (smartWaiting) record.snoozeUntilMillis
+        else LocalDateTime.now().plusMinutes(interval.toLong()).toMillis()
+        if (smart) {
+            // Mode pintar tidak perlu "Sudah absen?": pengingat berikutnya mengecek SiAdin dan berhenti
+            // sendiri begitu terlihat "Berhasil Presensi".
+            dao.update(record.copy(snoozeUntilMillis = snooze))
+        } else {
+            val updated = record.copy(awaitingConfirm = true, snoozeUntilMillis = snooze)
+            dao.update(updated)
+            Notifications.showConfirm(context, course, updated, silent = true)
+        }
         AlarmScheduler.reschedule(context, courseId)
     }
 

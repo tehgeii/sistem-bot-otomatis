@@ -43,10 +43,12 @@ class AlarmReceiver : BroadcastReceiver() {
         val record = existing ?: repo.markOccurrence(course, date, RecordStatus.ACTIVE)
 
         // Mode pintar (SiAdin web + login tersimpan): bergetar hanya bila presensi sudah dibuka dosen.
+        // Setelah dibuka pun tetap cek SiAdin, supaya "Berhasil Presensi" (lewat Chrome/Dinusverse)
+        // langsung menghentikan pengingat tanpa perlu menjawab "Sudah absen?".
         val store = Graph.settings
         val smart = smartActive
         val seenOpen = store.isPresensiOpen(courseId, date.toEpochDay())
-        if (smart && !seenOpen && type != EventType.EXPIRE) {
+        if (smart && type != EventType.EXPIRE && !record.awaitingConfirm) {
             PresensiCheckWorker.enqueue(context, courseId, date.toEpochDay(), type)
             return
         }

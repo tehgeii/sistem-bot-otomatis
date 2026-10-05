@@ -55,6 +55,30 @@ object Permissions {
             appDetailsIntent(context)
         }
 
+    /** Layar "Mulai otomatis/Autostart" buatan pabrikan HP (tiap merek beda, tidak resmi). */
+    private val autostartComponents = listOf(
+        "com.miui.securitycenter" to "com.miui.permcenter.autostart.AutoStartManagementActivity", // Xiaomi/Redmi/POCO
+        "com.coloros.safecenter" to "com.coloros.safecenter.permission.startup.StartupAppListActivity", // Oppo/Realme
+        "com.coloros.safecenter" to "com.coloros.safecenter.startupapp.StartupAppListActivity",
+        "com.oplus.safecenter" to "com.oplus.safecenter.permission.startup.StartupAppListActivity", // OnePlus/Oppo baru
+        "com.vivo.permissionmanager" to "com.vivo.permissionmanager.activity.BgStartUpManagerActivity", // Vivo/iQOO
+        "com.iqoo.secure" to "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager",
+        "com.transsion.phonemaster" to "com.cyin.himgr.autostart.AutoStartActivity", // Infinix/Tecno/itel
+        "com.samsung.android.lool" to "com.samsung.android.sm.ui.battery.BatteryActivity", // Samsung
+    )
+
+    /**
+     * Buka pengaturan Autostart pabrikan bila ada; kalau tidak ada yang cocok, buka info aplikasi.
+     * Semua dicoba dalam try/catch karena nama layar ini bisa berubah antar versi sistem.
+     */
+    fun openAutostart(context: Context) {
+        for ((pkg, cls) in autostartComponents) {
+            val intent = Intent().setClassName(pkg, cls).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (runCatching { context.startActivity(intent) }.isSuccess) return
+        }
+        runCatching { context.startActivity(appDetailsIntent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
     fun appDetailsIntent(context: Context): Intent =
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
 }

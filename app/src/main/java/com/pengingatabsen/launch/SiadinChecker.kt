@@ -116,10 +116,18 @@ object SiadinChecker {
                 var buttonStreak = 0
                 var doneStreak = 0
                 var noTextStreak = 0
-                repeat(20) {
+                var relogin = false
+                poll@ for (i in 0 until 20) {
                     when (webView.eval(stateScript)) {
                         "WAITING" -> return PresensiState.WAITING
-                        "LOGIN" -> return PresensiState.UNKNOWN
+                        "LOGIN" -> {
+                            // Cookie lama tapi sesi sudah habis: login ulang lewat halaman depan, lalu cek lagi.
+                            if (credentials == null || loginAttempts >= MAX_LOGIN_ATTEMPTS) return PresensiState.UNKNOWN
+                            loginAttempts++
+                            relogin = true
+                            webView.loadUrl(SiadinScripts.siteRoot(targetUrl))
+                            break@poll
+                        }
                         "BUTTON" -> {
                             doneStreak = 0; noTextStreak = 0
                             if (++buttonStreak >= 3) return PresensiState.OPEN
@@ -138,7 +146,7 @@ object SiadinChecker {
                     }
                     delay(1_000)
                 }
-                return PresensiState.UNKNOWN
+                if (!relogin) return PresensiState.UNKNOWN
             }
             return PresensiState.UNKNOWN
         } finally {

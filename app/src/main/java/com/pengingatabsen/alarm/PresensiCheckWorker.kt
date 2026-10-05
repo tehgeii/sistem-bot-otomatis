@@ -57,6 +57,7 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
         if (record.status.finished) return Result.success()
 
         val ctx = applicationContext
+        val wasOpen = store.isPresensiOpen(courseId, epochDay)
         when (state) {
             PresensiState.WAITING -> {
                 store.setPresensiUnknownStreak(courseId, epochDay, 0)
@@ -76,7 +77,12 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
                 // Hapus dulu notifikasi senyap supaya yang baru diposting ulang & pasti bergetar.
                 Notifications.cancel(ctx, courseId)
                 // Layar penuh hanya di momen ini: kartu baru saja berubah menjadi "Presensi Sekarang".
-                val fullScreenUrl = if (settings.fullScreenAlert) settings.deepLink ?: TargetApps.SIADIN_PRESENSI_URL else null
+                // Pengingat lanjutan (sudah dibuka sebelumnya) cukup notifikasi bergetar.
+                val fullScreenUrl = if (settings.fullScreenAlert && !wasOpen) {
+                    settings.deepLink ?: TargetApps.SIADIN_PRESENSI_URL
+                } else {
+                    null
+                }
                 when {
                     type == EventType.FINAL ->
                         Notifications.showReminder(ctx, course, record, final = true, fullScreenUrl = fullScreenUrl)
@@ -97,6 +103,10 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
                 if (escalate) {
                     Notifications.cancel(ctx, courseId)
                     Notifications.showReminder(ctx, course, record, final = type == EventType.FINAL, checkFailed = true)
+                } else if (wasOpen) {
+                    // Presensi sudah terlihat dibuka: pengingat tetap jalan walau cek kali ini gagal.
+                    Notifications.cancel(ctx, courseId)
+                    Notifications.showReminder(ctx, course, record, final = false, sessionOpen = true)
                 } else if (type == EventType.OPEN) {
                     // Pengecekan pertama gagal: tampilkan status menunggu (senyap) agar notifikasi tetap ada.
                     Notifications.showReminder(ctx, course, record, final = false, waiting = true)
