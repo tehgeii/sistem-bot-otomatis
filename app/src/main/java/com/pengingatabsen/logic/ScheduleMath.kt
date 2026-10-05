@@ -57,6 +57,20 @@ object ScheduleMath {
     const val DEFAULT_REMIND_INTERVAL = 3
     /** Mode pintar: SiAdin tetap dicek sampai sekian menit setelah jam tutup. */
     const val SMART_GRACE_MINUTES = 15
+    /** Menjelang jam tutup, pengecekan dipercepat ke tiap 1 menit walau pakai data seluler. */
+    const val SMART_TIGHT_WINDOW_MINUTES = 20L
+
+    /**
+     * Interval pengecekan SiAdin (menit) saat mode pintar menunggu presensi dibuka.
+     * Wi-Fi (tak berbayar) → selalu 1 menit. Data seluler → 2 menit, dipercepat jadi 1 menit pada
+     * [SMART_TIGHT_WINDOW_MINUTES] menit terakhir sebelum jendela berakhir, agar tetap hemat tapi
+     * tidak telat di akhir kuliah. [minutesToEnd] = menit dari sekarang ke akhir jendela (bisa null).
+     */
+    fun smartCheckInterval(metered: Boolean, minutesToEnd: Long?): Int = when {
+        !metered -> 1
+        minutesToEnd != null && minutesToEnd <= SMART_TIGHT_WINDOW_MINUTES -> 1
+        else -> 2
+    }
 
     fun occurrenceOn(slot: Slot, date: LocalDate): Occurrence {
         val midnight = date.atStartOfDay()

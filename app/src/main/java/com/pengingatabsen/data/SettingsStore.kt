@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -36,6 +37,8 @@ data class AppSettings(
     val smartPresensi: Boolean = true,
     /** Layar penuh seperti alarm saat presensi baru saja dibuka dosen. */
     val fullScreenAlert: Boolean = true,
+    /** Perkiraan data yang dipakai pengecekan SiAdin hari ini (byte). */
+    val checkBytesToday: Long = 0,
 ) {
     /** Mode pintar hanya berlaku untuk SiAdin web dengan login tersimpan. */
     val smartModeActive: Boolean
@@ -62,6 +65,8 @@ class SettingsStore(private val context: Context) {
         val FULL_SCREEN_ALERT = booleanPreferencesKey("full_screen_alert")
         /** Kemunculan ("courseId:epochDay") yang presensinya sudah terlihat dibuka dosen. */
         val PRESENSI_OPEN = stringSetPreferencesKey("presensi_open")
+        val CHECK_BYTES = longPreferencesKey("check_bytes")
+        val CHECK_BYTES_DAY = longPreferencesKey("check_bytes_day")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -82,7 +87,18 @@ class SettingsStore(private val context: Context) {
         autoLogin = this[Keys.AUTO_LOGIN] ?: true,
         smartPresensi = this[Keys.SMART_PRESENSI] ?: true,
         fullScreenAlert = this[Keys.FULL_SCREEN_ALERT] ?: true,
+        checkBytesToday = if (this[Keys.CHECK_BYTES_DAY] == todayEpochDay()) this[Keys.CHECK_BYTES] ?: 0 else 0,
     )
+
+    /** Tambah perkiraan data pengecekan; total di-reset otomatis saat ganti hari. */
+    suspend fun addCheckBytes(bytes: Long) = context.dataStore.edit { prefs ->
+        val today = todayEpochDay()
+        val base = if (prefs[Keys.CHECK_BYTES_DAY] == today) prefs[Keys.CHECK_BYTES] ?: 0 else 0
+        prefs[Keys.CHECK_BYTES_DAY] = today
+        prefs[Keys.CHECK_BYTES] = base + bytes.coerceAtLeast(0)
+    }
+
+    private fun todayEpochDay(): Long = java.time.LocalDate.now().toEpochDay()
 
     /** Bot token dalam bentuk asli; hanya dipakai saat memanggil Telegram, jangan di-log. */
     suspend fun botToken(): String? =

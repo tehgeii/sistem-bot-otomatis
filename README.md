@@ -120,9 +120,11 @@ di dalam aplikasi:
   berubah), browser mini berhenti dan menampilkan pesan; login manual seperti biasa.
 
 **Getar hanya saat presensi sudah dibuka (mode pintar, aktif otomatis):** bila memakai SiAdin web
-dan login tersimpan, mulai jam absen NgiBsen mengecek halaman Presensi Online **diam-diam tiap
-1 menit**. Selama masih "Belum Ada Presensi Hari Ini!", notifikasinya **senyap** ("Menunggu
-presensi…"). NgiBsen membaca kartu **Presensi Kuliah Online** milik matkul tersebut (dicocokkan dari
+dan login tersimpan, mulai jam absen NgiBsen mengecek halaman Presensi Online **diam-diam** di latar
+belakang. Hemat kuota: gambar tidak diunduh, dan di **Wi-Fi** dicek tiap 1 menit sedangkan di **data
+seluler** tiap 2 menit (dipercepat jadi 1 menit menjelang jam tutup). Perkiraan pemakaian data hari
+ini tampil di *Pengaturan → SiAdin web*. Selama masih "Belum Ada Presensi Hari Ini!", notifikasinya
+**senyap** ("Menunggu presensi…"). NgiBsen membaca kartu **Presensi Kuliah Online** milik matkul tersebut (dicocokkan dari
 nama matkul di jadwal):
 
 | Di SiAdin | NgiBsen |

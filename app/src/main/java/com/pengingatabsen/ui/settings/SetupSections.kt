@@ -287,6 +287,16 @@ fun SiadinWebSection(vm: SetupViewModel) {
             Switch(checked = settings?.smartPresensi ?: true, onCheckedChange = { vm.setSmartPresensi(it, context) })
         }
 
+        settings?.takeIf { it.smartPresensi }?.let {
+            val mb = it.checkBytesToday / 1_000_000.0
+            val text = if (it.checkBytesToday < 1_000_000) "${it.checkBytesToday / 1000} KB" else "%.1f MB".format(mb)
+            Text(
+                "Pengecekan SiAdin hari ini: ≈ $text. Hemat kuota: gambar tidak diunduh, dan di data " +
+                    "seluler pengecekan tiap 2 menit (1 menit menjelang jam tutup).",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Layar penuh saat presensi dibuka")

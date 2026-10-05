@@ -65,6 +65,9 @@ object SiadinChecker {
             webView.layout(0, 0, width, height)
             webView.settings.javaScriptEnabled = true
             webView.settings.domStorageEnabled = true
+            // Hemat kuota: deteksi presensi memakai teks, jadi gambar (logo, dsb.) tidak perlu diunduh.
+            webView.settings.loadsImagesAutomatically = false
+            webView.settings.blockNetworkImage = true
             webView.settings.userAgentString = webView.settings.userAgentString
                 .replace("; wv", "")
                 .replace(Regex("Version/\\d+(\\.\\d+)* "), "")
@@ -79,8 +82,10 @@ object SiadinChecker {
                 }
             }
 
-            // Lewat halaman depan dulu bila ada data login: website tidak selalu mengarahkan ke login.
-            webView.loadUrl(if (credentials != null) SiadinScripts.siteRoot(targetUrl) else targetUrl)
+            // Hemat kuota: bila sesi login (cookie) masih ada, langsung ke halaman presensi.
+            // Hanya mampir halaman depan untuk login bila belum ada cookie (sesi habis / pertama kali).
+            val hasCookie = !CookieManager.getInstance().getCookie(targetUrl).isNullOrBlank()
+            webView.loadUrl(if (credentials != null && !hasCookie) SiadinScripts.siteRoot(targetUrl) else targetUrl)
             var loginAttempts = 0
 
             repeat(MAX_PAGES) {

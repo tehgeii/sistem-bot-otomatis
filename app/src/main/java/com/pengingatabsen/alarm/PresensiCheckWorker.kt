@@ -36,12 +36,21 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
 
         val store = Graph.settings
         val settings = store.current()
+        // Ukur perkiraan data yang dipakai pengecekan ini (untuk ditampilkan di Pengaturan).
+        val uid = android.os.Process.myUid()
+        val rxBefore = android.net.TrafficStats.getUidRxBytes(uid)
+        val txBefore = android.net.TrafficStats.getUidTxBytes(uid)
         val state = SiadinChecker.check(
             applicationContext,
             settings.deepLink ?: TargetApps.SIADIN_PRESENSI_URL,
             if (settings.autoLogin) store.siadinLogin() else null,
             course.name,
         )
+        val rxAfter = android.net.TrafficStats.getUidRxBytes(uid)
+        val txAfter = android.net.TrafficStats.getUidTxBytes(uid)
+        if (rxBefore >= 0 && rxAfter >= rxBefore) {
+            store.addCheckBytes((rxAfter - rxBefore) + (txAfter - txBefore).coerceAtLeast(0))
+        }
 
         // Baca ulang: pengguna mungkin sudah menekan tombol selama pengecekan berjalan.
         val record = dao.find(courseId, epochDay) ?: return Result.success()

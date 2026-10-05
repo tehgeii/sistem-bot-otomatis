@@ -214,6 +214,27 @@ class ScheduleMathTest {
         assertEquals(at(monday.plusWeeks(2), 7, 0), p.event.time)
     }
 
+    // ---------- Interval pengecekan adaptif (hemat kuota) ----------
+
+    @Test
+    fun smartCheckInterval_wifiAlwaysOneMinute() {
+        assertEquals(1, ScheduleMath.smartCheckInterval(metered = false, minutesToEnd = 120))
+        assertEquals(1, ScheduleMath.smartCheckInterval(metered = false, minutesToEnd = 5))
+        assertEquals(1, ScheduleMath.smartCheckInterval(metered = false, minutesToEnd = null))
+    }
+
+    @Test
+    fun smartCheckInterval_meteredTwoMinutesThenTightensNearEnd() {
+        assertEquals(2, ScheduleMath.smartCheckInterval(metered = true, minutesToEnd = 120))
+        assertEquals(2, ScheduleMath.smartCheckInterval(metered = true, minutesToEnd = 21))
+        assertEquals(1, ScheduleMath.smartCheckInterval(metered = true, minutesToEnd = 20))
+        assertEquals(1, ScheduleMath.smartCheckInterval(metered = true, minutesToEnd = 0))
+        // minutesToEnd negatif (sudah lewat tutup, masih di masa perpanjangan) tetap 1 menit.
+        assertEquals(1, ScheduleMath.smartCheckInterval(metered = true, minutesToEnd = -5))
+        // Tanpa info waktu, data seluler tetap hemat (2 menit).
+        assertEquals(2, ScheduleMath.smartCheckInterval(metered = true, minutesToEnd = null))
+    }
+
     // ---------- Format pesan ----------
 
     @Test

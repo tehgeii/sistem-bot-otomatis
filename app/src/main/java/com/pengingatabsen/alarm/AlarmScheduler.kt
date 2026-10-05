@@ -25,7 +25,9 @@ object AlarmScheduler {
     const val EXTRA_COURSE_ID = "course_id"
     const val EXTRA_EPOCH_DAY = "epoch_day"
     const val EXTRA_TYPE = "type"
-    private const val SMART_CHECK_INTERVAL_MINUTES = 1
+
+    private fun isMeteredNetwork(context: Context): Boolean =
+        context.getSystemService(android.net.ConnectivityManager::class.java)?.isActiveNetworkMetered ?: true
 
     /** Hitung & pasang alarm berikutnya untuk satu matkul. */
     suspend fun reschedule(context: Context, courseId: Long, now: LocalDateTime = LocalDateTime.now()) {
@@ -42,7 +44,13 @@ object AlarmScheduler {
         val current = ScheduleMath.currentOccurrence(slot, now)
         val waitingForSession = settings.smartModeActive && current != null &&
             !Graph.settings.isPresensiOpen(courseId, current.date.toEpochDay())
-        val interval = if (waitingForSession) SMART_CHECK_INTERVAL_MINUTES else settings.remindIntervalMinutes
+        val interval = if (waitingForSession) {
+            // Hemat kuota: di data seluler cek tiap 2 menit, dipercepat menjelang jam tutup.
+            val minutesToEnd = current?.let { java.time.Duration.between(now, it.end).toMinutes() }
+            ScheduleMath.smartCheckInterval(isMeteredNetwork(context), minutesToEnd)
+        } else {
+            settings.remindIntervalMinutes
+        }
         val records = Graph.db.recordDao()
             .forCourseSince(courseId, now.toLocalDate().minusDays(2).toEpochDay())
             .associateBy { it.epochDay }
