@@ -68,25 +68,51 @@ object Notifications {
     fun idFor(courseId: Long): Int = 1000 + (courseId % 1_000_000).toInt()
 
     /** Notifikasi utama: "Absen dibuka: <matkul>" + tombol Absen sekarang / Tunda 5 menit / Libur. */
-    fun showReminder(context: Context, course: Course, record: AttendanceRecord?, final: Boolean, silent: Boolean = false) {
+    fun showReminder(
+        context: Context,
+        course: Course,
+        record: AttendanceRecord?,
+        final: Boolean,
+        silent: Boolean = false,
+        /** Mode pintar: presensi di SiAdin belum dibuka dosen → notifikasi senyap. */
+        waiting: Boolean = false,
+    ) {
         val epochDay = record?.epochDay ?: 0L
         val detail = buildString {
             append(Formatters.window(course.openMinute, course.closeMinute))
             course.room?.let { append(" · Ruang ").append(it) }
         }
-        val title = if (final) "⚠️ 5 menit lagi ditutup: ${course.name}" else "Absen dibuka: ${course.name}"
-        val text = if (final) "Segera absen sekarang! $detail" else detail
+        val title = when {
+            waiting -> "Menunggu presensi: ${course.name}"
+            final -> "⚠️ 5 menit lagi ditutup: ${course.name}"
+            else -> "Absen dibuka: ${course.name}"
+        }
+        val text = when {
+            waiting -> "Belum dibuka dosen di SiAdin. Dicek otomatis tiap menit — HP bergetar begitu dibuka. $detail"
+            final -> "Segera absen sekarang! $detail"
+            else -> detail
+        }
         val absen = launchIntent(context, course.id, epochDay)
-        val builder = base(context, absenChannel(), silent)
+        val builder = base(context, absenChannel(), silent || waiting)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(absen)
             .addAction(0, "Absen sekarang", absen)
             .addAction(0, "Tunda 5 menit", action(context, NotificationActionReceiver.ACTION_SNOOZE, course.id, epochDay))
             .addAction(0, "Libur", action(context, NotificationActionReceiver.ACTION_HOLIDAY, course.id, epochDay))
-        if (final) builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        if (final || waiting) builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        if (waiting) builder.setPriority(NotificationCompat.PRIORITY_LOW)
         notify(context, idFor(course.id), builder)
     }
+
+    /** Notifikasi senyap untuk pekerjaan "Mengecek presensi SiAdin…" (wajib untuk expedited work Android < 12). */
+    fun checkingNotification(context: Context) =
+        NotificationCompat.Builder(context, CHANNEL_INFO)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Mengecek presensi SiAdin…")
+            .setSilent(true)
+            .setOngoing(true)
+            .build()
 
     /** Notifikasi lanjutan setelah membuka Dinusverse: "Sudah absen <matkul>?" */
     fun showConfirm(context: Context, course: Course, record: AttendanceRecord, silent: Boolean) {

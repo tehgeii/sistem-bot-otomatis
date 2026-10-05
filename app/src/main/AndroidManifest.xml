@@ -16,6 +16,8 @@
     <!-- Telegram Bot API -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Pengecekan presensi di latar (WorkManager expedited; notifikasi singkat di Android < 12) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- Hanya jika halaman presensi SiAdin web meminta lokasi / kamera (lokasi asli, tidak dipalsukan) -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />

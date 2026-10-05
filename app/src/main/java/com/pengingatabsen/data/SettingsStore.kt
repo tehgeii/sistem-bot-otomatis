@@ -6,7 +6,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.pengingatabsen.launch.TargetApps
 import com.pengingatabsen.logic.ScheduleMath
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -30,7 +32,13 @@ data class AppSettings(
     /** NIM & password SiAdin tersimpan (terenkripsi) untuk login otomatis di browser mini. */
     val hasSiadinLogin: Boolean = false,
     val autoLogin: Boolean = true,
+    /** Getar hanya saat presensi SiAdin benar-benar sudah dibuka (dicek tiap menit). */
+    val smartPresensi: Boolean = true,
 ) {
+    /** Mode pintar hanya berlaku untuk SiAdin web dengan login tersimpan. */
+    val smartModeActive: Boolean
+        get() = smartPresensi && hasSiadinLogin && deepLink?.startsWith(TargetApps.SIADIN_ORIGIN) == true
+
     val telegramReady: Boolean get() = hasBotToken && !chatId.isNullOrBlank()
 }
 
@@ -48,6 +56,9 @@ class SettingsStore(private val context: Context) {
         val SIADIN_NIM_ENC = stringPreferencesKey("siadin_nim_enc")
         val SIADIN_PASSWORD_ENC = stringPreferencesKey("siadin_password_enc")
         val AUTO_LOGIN = booleanPreferencesKey("auto_login")
+        val SMART_PRESENSI = booleanPreferencesKey("smart_presensi")
+        /** Kemunculan ("courseId:epochDay") yang presensinya sudah terlihat dibuka dosen. */
+        val PRESENSI_OPEN = stringSetPreferencesKey("presensi_open")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -66,6 +77,7 @@ class SettingsStore(private val context: Context) {
         vibrateOnly = this[Keys.VIBRATE_ONLY] ?: true,
         hasSiadinLogin = this[Keys.SIADIN_NIM_ENC] != null && this[Keys.SIADIN_PASSWORD_ENC] != null,
         autoLogin = this[Keys.AUTO_LOGIN] ?: true,
+        smartPresensi = this[Keys.SMART_PRESENSI] ?: true,
     )
 
     /** Bot token dalam bentuk asli; hanya dipakai saat memanggil Telegram, jangan di-log. */
@@ -112,6 +124,20 @@ class SettingsStore(private val context: Context) {
     suspend fun clearSiadinLogin() = context.dataStore.edit {
         it.remove(Keys.SIADIN_NIM_ENC)
         it.remove(Keys.SIADIN_PASSWORD_ENC)
+    }
+
+    suspend fun setSmartPresensi(enabled: Boolean) = context.dataStore.edit { it[Keys.SMART_PRESENSI] = enabled }
+
+    suspend fun isPresensiOpen(courseId: Long, epochDay: Long): Boolean =
+        context.dataStore.data.first()[Keys.PRESENSI_OPEN]?.contains("$courseId:$epochDay") == true
+
+    /** Tandai presensi sudah dibuka; sekalian buang catatan lebih dari 7 hari. */
+    suspend fun markPresensiOpen(courseId: Long, epochDay: Long) = context.dataStore.edit { prefs ->
+        val fresh = (prefs[Keys.PRESENSI_OPEN] ?: emptySet()).filter { entry ->
+            val day = entry.substringAfter(':').toLongOrNull() ?: return@filter false
+            day >= epochDay - 7
+        }.toSet()
+        prefs[Keys.PRESENSI_OPEN] = fresh + "$courseId:$epochDay"
     }
 
     suspend fun setAutoLogin(enabled: Boolean) = context.dataStore.edit { it[Keys.AUTO_LOGIN] = enabled }

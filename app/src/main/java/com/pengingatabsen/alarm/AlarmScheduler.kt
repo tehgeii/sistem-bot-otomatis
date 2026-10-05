@@ -25,6 +25,7 @@ object AlarmScheduler {
     const val EXTRA_COURSE_ID = "course_id"
     const val EXTRA_EPOCH_DAY = "epoch_day"
     const val EXTRA_TYPE = "type"
+    private const val SMART_CHECK_INTERVAL_MINUTES = 1
 
     /** Hitung & pasang alarm berikutnya untuk satu matkul. */
     suspend fun reschedule(context: Context, courseId: Long, now: LocalDateTime = LocalDateTime.now()) {
@@ -34,7 +35,12 @@ object AlarmScheduler {
             Notifications.cancel(context, courseId)
             return
         }
-        val interval = Graph.settings.current().remindIntervalMinutes
+        val settings = Graph.settings.current()
+        // Mode pintar: selama presensi belum terlihat dibuka, cek SiAdin tiap 1 menit (senyap).
+        val current = ScheduleMath.currentOccurrence(course.toSlot(), now)
+        val waitingForSession = settings.smartModeActive && current != null &&
+            !Graph.settings.isPresensiOpen(courseId, current.date.toEpochDay())
+        val interval = if (waitingForSession) SMART_CHECK_INTERVAL_MINUTES else settings.remindIntervalMinutes
         val records = Graph.db.recordDao()
             .forCourseSince(courseId, now.toLocalDate().minusDays(2).toEpochDay())
             .associateBy { it.epochDay }

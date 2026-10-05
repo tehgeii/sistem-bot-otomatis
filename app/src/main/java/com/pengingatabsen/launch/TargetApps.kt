@@ -13,7 +13,8 @@ object TargetApps {
     private val HINTS = listOf("dinus", "siadin", "udinus")
 
     /** Halaman Presensi Online SiAdin web (alamat publik portal mahasiswa). */
-    const val SIADIN_PRESENSI_URL = "https://mhs.dinus.ac.id/akademik/presensiOnline"
+    const val SIADIN_ORIGIN = "https://mhs.dinus.ac.id"
+    const val SIADIN_PRESENSI_URL = "$SIADIN_ORIGIN/akademik/presensiOnline"
 
     /** URL web dibuka di browser mini dalam aplikasi (sesi login tersimpan, login otomatis). */
     fun isWebUrl(url: String?): Boolean =

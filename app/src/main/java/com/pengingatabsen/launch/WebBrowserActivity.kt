@@ -278,17 +278,14 @@ class WebBrowserActivity : ComponentActivity() {
         }
     }
 
-    private fun siteRoot(): String {
-        val uri = Uri.parse(targetUrl)
-        return "${uri.scheme}://${uri.host}/"
-    }
+    private fun siteRoot(): String = SiadinScripts.siteRoot(targetUrl)
 
     /** Dipanggil tiap halaman selesai dimuat: login otomatis atau lanjut ke halaman tujuan. */
     private fun onPageReady(view: WebView, url: String, retriesLeft: Int) {
         if (!isTrustedUrl(url)) return
         val creds = credentials
         val canFill = autoLogin && creds != null && loginAttempts < MAX_LOGIN_ATTEMPTS
-        val script = if (canFill) fillLoginScript(creds!!.first, creds.second) else DETECT_LOGIN_SCRIPT
+        val script = if (canFill) SiadinScripts.fillLoginScript(creds!!.first, creds.second) else SiadinScripts.DETECT_LOGIN_SCRIPT
         view.evaluateJavascript(script) { raw ->
             when (raw?.trim('"')) {
                 "SUBMITTED" -> {
@@ -386,17 +383,7 @@ class WebBrowserActivity : ComponentActivity() {
     }
 
     /** Kredensial hanya diisikan ke halaman HTTPS di domain yang sama dengan URL tujuan. */
-    private fun isTrustedUrl(url: String): Boolean {
-        val uri = Uri.parse(url)
-        val host = uri.host?.lowercase() ?: return false
-        val targetHost = Uri.parse(targetUrl).host?.lowercase() ?: return false
-        if (!uri.scheme.equals("https", ignoreCase = true)) return false
-        if (host == targetHost) return true
-        val labels = targetHost.split('.')
-        // mhs.dinus.ac.id → izinkan juga *.dinus.ac.id (mis. halaman SSO kampus).
-        val parent = if (labels.size >= 4) labels.drop(1).joinToString(".") else targetHost
-        return host == parent || host.endsWith(".$parent")
-    }
+    private fun isTrustedUrl(url: String): Boolean = SiadinScripts.isTrusted(url, targetUrl)
 
     private fun confirmDone() {
         busy = true
@@ -533,66 +520,5 @@ class WebBrowserActivity : ComponentActivity() {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
 
-        /**
-         * Kode JS bersama: mencari form login yang BENAR-BENAR tampil di layar.
-         * Syarat: tepat satu kolom password terlihat (form ganti password / menu tersembunyi diabaikan),
-         * ada kolom NIM/username, dan tombol Masuk/Login. Hasil: objek {pw, user, btn, form} atau string status.
-         */
-        private const val FIND_LOGIN_JS = """
-            function __shown(e){
-              var r = e.getBoundingClientRect(), s = window.getComputedStyle(e);
-              return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' &&
-                r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < Math.max(window.innerHeight, document.documentElement.scrollHeight);
-            }
-            function __findLogin(){
-              var pws = Array.prototype.slice.call(document.querySelectorAll('input[type=password]')).filter(__shown);
-              if (pws.length === 0) return 'NO_FORM';
-              if (pws.length !== 1) return 'NOT_LOGIN';
-              var pw = pws[0], scope = pw.form || document;
-              var texts = Array.prototype.slice.call(scope.querySelectorAll('input')).filter(function(e){
-                var t = (e.getAttribute('type') || 'text').toLowerCase();
-                return __shown(e) && ['text','email','number','tel'].indexOf(t) >= 0;
-              });
-              var user = texts.filter(function(e){
-                return /nim|user|login|email|npm|induk/i.test((e.name||'') + ' ' + (e.id||'') + ' ' + (e.placeholder||'') + ' ' + (e.getAttribute('aria-label')||''));
-              })[0] || (texts.length === 1 ? texts[0] : null);
-              if (!user) return 'NOT_LOGIN';
-              var btns = Array.prototype.slice.call(scope.querySelectorAll('button,input[type=submit],input[type=button],a')).filter(__shown);
-              var btn = btns.filter(function(b){ return /masuk|login|log in|sign\s*in/i.test(b.innerText || b.value || ''); })[0] ||
-                btns.filter(function(b){ return (b.getAttribute('type') || '').toLowerCase() === 'submit'; })[0];
-              if (!btn) return 'NOT_LOGIN';
-              return { pw: pw, user: user, btn: btn };
-            }
-        """
-
-        /** Hanya mendeteksi apakah halaman login sedang tampil. */
-        private val DETECT_LOGIN_SCRIPT = """
-            (function(){
-              $FIND_LOGIN_JS
-              var f = __findLogin();
-              return typeof f === 'string' ? f : 'LOGIN_PAGE';
-            })();
-        """
-
-        /** Isi NIM & password pada form login yang tampil, lalu tekan tombol Masuk/Login. */
-        private fun fillLoginScript(nim: String, password: String): String = """
-            (function(nim, pw){
-              $FIND_LOGIN_JS
-              var f = __findLogin();
-              if (typeof f === 'string') return f;
-              var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-              function put(el, v){
-                el.focus();
-                setter.call(el, v);
-                el.dispatchEvent(new Event('input', {bubbles:true}));
-                el.dispatchEvent(new Event('change', {bubbles:true}));
-                el.blur();
-              }
-              put(f.user, nim);
-              put(f.pw, pw);
-              setTimeout(function(){ f.btn.click(); }, 300);
-              return 'SUBMITTED';
-            })(${JSONObject.quote(nim)}, ${JSONObject.quote(password)});
-        """
     }
 }

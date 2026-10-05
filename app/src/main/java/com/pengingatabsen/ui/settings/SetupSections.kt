@@ -244,6 +244,7 @@ fun TelegramSection(vm: SetupViewModel) {
  */
 @Composable
 fun SiadinWebSection(vm: SetupViewModel) {
+    val context = LocalContext.current
     val settings by vm.settings.collectAsState()
     var nim by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -267,6 +268,18 @@ fun SiadinWebSection(vm: SetupViewModel) {
                 Text("Isi NIM & password lalu tekan Login sendiri. Tombol presensi tetap kamu yang tekan.", style = MaterialTheme.typography.bodySmall)
             }
             Switch(checked = settings?.autoLogin ?: true, onCheckedChange = { vm.setAutoLogin(it) })
+        }
+
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Getar hanya saat presensi sudah dibuka")
+                Text(
+                    "Selama jam absen, SiAdin dicek otomatis tiap 1 menit. HP baru bergetar setelah dosen membuka " +
+                        "presensi. Butuh login tersimpan. Isi jam tutup di jadwal sampai akhir kuliah.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Switch(checked = settings?.smartPresensi ?: true, onCheckedChange = { vm.setSmartPresensi(it, context) })
         }
 
         vm.savedNim?.let { Text("Tersimpan: $it", style = MaterialTheme.typography.bodyMedium) }

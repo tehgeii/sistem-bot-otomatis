@@ -11,7 +11,9 @@ enum class RecordStatus(val label: String) {
     SENT("terkirim"),
     FAILED("gagal"),
     MISSED("terlewat"),
-    HOLIDAY("libur");
+    HOLIDAY("libur"),
+    /** Sampai jam tutup, dosen tidak membuka presensi di SiAdin. */
+    NO_SESSION("tidak dibuka");
 
     /** Tidak perlu diingatkan lagi. */
     val finished: Boolean get() = this != ACTIVE

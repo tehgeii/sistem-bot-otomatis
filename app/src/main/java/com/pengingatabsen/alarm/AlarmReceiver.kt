@@ -40,6 +40,16 @@ class AlarmReceiver : BroadcastReceiver() {
         val type = if (!LocalDateTime.now().isBefore(occ.end)) EventType.EXPIRE else planned
 
         val record = existing ?: repo.markOccurrence(course, date, RecordStatus.ACTIVE)
+
+        // Mode pintar (SiAdin web + login tersimpan): bergetar hanya bila presensi sudah dibuka dosen.
+        val store = Graph.settings
+        val smart = store.current().smartModeActive
+        val seenOpen = store.isPresensiOpen(courseId, date.toEpochDay())
+        if (smart && !seenOpen && type != EventType.EXPIRE) {
+            PresensiCheckWorker.enqueue(context, courseId, date.toEpochDay(), type)
+            return
+        }
+
         when (type) {
             EventType.OPEN, EventType.REMIND ->
                 if (record.awaitingConfirm) Notifications.showConfirm(context, course, record, silent = false)
@@ -47,7 +57,8 @@ class AlarmReceiver : BroadcastReceiver() {
             EventType.FINAL -> Notifications.showReminder(context, course, record, final = true)
             EventType.EXPIRE -> {
                 Notifications.cancel(context, courseId)
-                repo.markMissed(record)
+                // Dosen tidak pernah membuka presensi: catat "tidak dibuka", tanpa pesan terlewat.
+                if (smart && !seenOpen) repo.markNoSession(record) else repo.markMissed(record)
             }
         }
     }

@@ -99,6 +99,12 @@ class Repository(private val db: AppDatabase) {
         SendWorker.enqueue(Graph.appContext, record.id, SendWorker.KIND_MISSED)
     }
 
+    /** Jendela berakhir tapi dosen tidak pernah membuka presensi: bukan salah pengguna, tanpa Telegram. */
+    suspend fun markNoSession(record: AttendanceRecord) {
+        if (record.status != RecordStatus.ACTIVE) return
+        recordDao.update(record.copy(status = RecordStatus.NO_SESSION, awaitingConfirm = false))
+    }
+
     /** "Sudah, kirim bukti": waktu bukti = [pressedAt], lalu antre ke Telegram. */
     suspend fun confirmDone(record: AttendanceRecord, pressedAt: LocalDateTime) {
         if (record.status == RecordStatus.SENT || record.status == RecordStatus.QUEUED) return

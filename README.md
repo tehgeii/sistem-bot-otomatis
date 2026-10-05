@@ -119,6 +119,15 @@ di dalam aplikasi:
 - Jika login otomatis gagal 2 kali (password berubah, ada captcha, atau tampilan login kampus
   berubah), browser mini berhenti dan menampilkan pesan; login manual seperti biasa.
 
+**Getar hanya saat presensi sudah dibuka (mode pintar, aktif otomatis):** bila memakai SiAdin web
+dan login tersimpan, mulai jam absen NgiBsen mengecek halaman Presensi Online **diam-diam tiap
+1 menit**. Selama masih "Belum Ada Presensi Hari Ini!", notifikasinya **senyap** ("Menunggu
+presensi…"). Begitu dosen membuka presensi, ±1 menit kemudian HP **bergetar**. Jika pengecekan gagal
+(offline, login bermasalah), HP tetap bergetar seperti biasa supaya tidak terlewat. Jika sampai jam
+tutup dosen tidak membuka presensi, riwayat mencatat **"tidak dibuka"** tanpa pesan ❌ ke Telegram.
+**Isi jam tutup di jadwal sampai akhir kuliah**, karena pengecekan berhenti di jam tutup (atau 30
+menit setelah dibuka bila jam tutup kosong). Saklarnya ada di *Pengaturan → SiAdin web*.
+
 **Bantuan presensi di browser mini** (tombol presensi tetap kamu yang tekan):
 
 1. **Menunggu sesi dibuka:** selama halaman menampilkan "Belum Ada Presensi Hari Ini!", halaman
@@ -184,7 +193,7 @@ absennya. Tap widget = buka halaman presensi (SiAdin web) atau Dinusverse, sesua
 ## Riwayat
 
 Tab **Riwayat** menampilkan setiap absen: matkul, waktu, dan status
-**terkirim / antre / gagal / terlewat / libur**. Bukti yang gagal bisa **Kirim ulang**
+**terkirim / antre / gagal / terlewat / libur / tidak dibuka**. Bukti yang gagal bisa **Kirim ulang**
 (juga tersedia sebagai tombol di notifikasi "Gagal kirim bukti").
 
 ---

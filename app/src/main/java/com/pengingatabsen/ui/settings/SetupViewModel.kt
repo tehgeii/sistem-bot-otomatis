@@ -168,6 +168,11 @@ class SetupViewModel : ViewModel() {
 
     fun setAutoLogin(enabled: Boolean) = viewModelScope.launch { store.setAutoLogin(enabled) }
 
+    fun setSmartPresensi(enabled: Boolean, context: Context) = viewModelScope.launch {
+        store.setSmartPresensi(enabled)
+        AlarmScheduler.rescheduleAll(context.applicationContext)
+    }
+
     fun setVibrateOnly(enabled: Boolean) = viewModelScope.launch { store.setVibrateOnly(enabled) }
 
     fun finishOnboarding(context: Context) = viewModelScope.launch {
