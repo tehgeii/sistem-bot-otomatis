@@ -126,6 +126,10 @@ class SettingsStore(private val context: Context) {
         it.remove(Keys.SIADIN_PASSWORD_ENC)
     }
 
+    suspend fun unmarkPresensiOpen(courseId: Long, epochDay: Long) = context.dataStore.edit { prefs ->
+        prefs[Keys.PRESENSI_OPEN] = (prefs[Keys.PRESENSI_OPEN] ?: emptySet()) - "$courseId:$epochDay"
+    }
+
     /** Berapa kali berturut-turut pengecekan presensi gagal untuk satu kemunculan. */
     suspend fun presensiUnknownStreak(courseId: Long, epochDay: Long): Int =
         context.dataStore.data.first()[unknownKey(courseId, epochDay)] ?: 0

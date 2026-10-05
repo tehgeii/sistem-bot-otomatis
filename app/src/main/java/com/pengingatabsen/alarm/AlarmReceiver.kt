@@ -50,6 +50,8 @@ class AlarmReceiver : BroadcastReceiver() {
             return
         }
 
+        // Hapus dulu notifikasi lama: memperbarui notifikasi yang sama sering tidak bergetar lagi.
+        if (type != EventType.EXPIRE) Notifications.cancel(context, courseId)
         when (type) {
             EventType.OPEN, EventType.REMIND ->
                 if (record.awaitingConfirm) Notifications.showConfirm(context, course, record, silent = false)

@@ -332,6 +332,7 @@ class WebBrowserActivity : ComponentActivity() {
             view.removeCallbacks(reloadWhileWaiting)
             when (raw?.trim('"')) {
                 "WAITING" -> {
+                    healFalseOpen(view)
                     val now = System.currentTimeMillis()
                     if (waitingSince == 0L) waitingSince = now
                     wasWaiting = true
@@ -351,6 +352,24 @@ class WebBrowserActivity : ComponentActivity() {
                         status = "Halaman presensi berubah — cek apakah presensi sudah dibuka."
                         onSessionOpened()
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * Bila kemunculan ini pernah (keliru) dicatat "presensi sudah dibuka" padahal halaman—dalam keadaan
+     * login—masih "Belum Ada Presensi", hapus catatan itu supaya mode pintar kembali menunggu dengan senyap.
+     */
+    private fun healFalseOpen(view: WebView) {
+        if (courseId <= 0) return
+        view.evaluateJavascript(SiadinScripts.PRESENSI_STATE_SCRIPT) { raw ->
+            if (raw?.trim('"') != "WAITING") return@evaluateJavascript
+            val context = applicationContext
+            lifecycleScope.launch(Dispatchers.IO) {
+                if (Graph.settings.isPresensiOpen(courseId, epochDay)) {
+                    Graph.settings.unmarkPresensiOpen(courseId, epochDay)
+                    AlarmScheduler.reschedule(context, courseId)
                 }
             }
         }
