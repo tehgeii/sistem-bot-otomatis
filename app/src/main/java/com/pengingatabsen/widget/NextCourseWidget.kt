@@ -59,7 +59,17 @@ class NextCourseWidget : AppWidgetProvider() {
 
             val (course, occ) = next
             if (!occ.open.isAfter(now)) {
-                return "Sekarang: ${course.name}" to "Absen dibuka s/d ${Formatters.hm(occ.end)}"
+                val until = "s/d ${Formatters.hm(occ.end)}"
+                if (!settings.smartModeActive) return "Sekarang: ${course.name}" to "Absen dibuka $until"
+                // Mode pintar: tampilkan status presensi yang terdeteksi.
+                val record = dao.find(course.id, occ.date.toEpochDay())
+                val detail = when {
+                    record?.status == com.pengingatabsen.data.RecordStatus.SENT ||
+                        record?.status == com.pengingatabsen.data.RecordStatus.QUEUED -> "✅ Sudah presensi"
+                    Graph.settings.isPresensiOpen(course.id, occ.date.toEpochDay()) -> "🔵 Presensi dibuka — tap! $until"
+                    else -> "⏳ Menunggu presensi dibuka"
+                }
+                return "Sekarang: ${course.name}" to detail
             }
             val days = java.time.temporal.ChronoUnit.DAYS.between(now.toLocalDate(), occ.date)
             val day = when (days) {

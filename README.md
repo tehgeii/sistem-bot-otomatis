@@ -90,11 +90,20 @@ Tekan **Tes notifikasi** untuk memastikan notifikasi muncul dan HP bergetar. Tom
 tes hanya menutupnya (tidak mengirim apa pun ke Telegram), kecuali **Absen sekarang** yang membuka
 halaman presensi untuk dicoba.
 
-**HP Xiaomi / Oppo / Vivo / Realme / Samsung:** pengaturan baterai pabrikan sering lebih agresif.
-Buka *Pengaturan → Aplikasi → NgiBsen UDINUS* lalu:
-- aktifkan **Mulai otomatis / Autostart**,
-- set **Baterai** ke *Tidak dibatasi* / *Tanpa batasan*,
-- (Samsung) keluarkan dari *Aplikasi tidur*.
+**Penting agar pengecekan & layar penuh tetap jalan saat HP terkunci** — pabrikan sering mematikan
+aplikasi di latar belakang. Buka *Pengaturan → Aplikasi → NgiBsen UDINUS*, set **Baterai** ke
+*Tidak dibatasi*, lalu per merek:
+
+| Merek | Yang perlu diaktifkan |
+|---|---|
+| **Xiaomi / Redmi / POCO** (HyperOS/MIUI) | Autostart **ON**; Baterai → *Tanpa batasan*; izin lain → **Tampilkan jendela pop-up saat berjalan di latar belakang** & **di layar kunci** |
+| **Oppo / Realme / OnePlus** (ColorOS) | *Izinkan Mulai Otomatis*; Baterai → *Izinkan aktivitas latar belakang* / *Jangan optimalkan* |
+| **Vivo / iQOO** (Funtouch/OriginOS) | *Mulai otomatis* **ON**; Baterai → *Konsumsi daya tinggi di latar belakang* diizinkan |
+| **Samsung** (One UI) | Baterai → *Tanpa batasan*; keluarkan dari *Aplikasi tidur* & *Aplikasi tidur lelap* |
+| **Infinix / Tecno** (XOS) | *Autostart* **ON**; *Freezer*/penghemat → kecualikan NgiBsen |
+
+Bila layar penuh "Presensi sudah dibuka!" tidak muncul padahal presensi sudah dibuka, biasanya izin
+**pop-up di layar kunci / latar belakang** di tabel di atas belum aktif.
 
 ### Langkah 2 — SiAdin web atau aplikasi tujuan
 
