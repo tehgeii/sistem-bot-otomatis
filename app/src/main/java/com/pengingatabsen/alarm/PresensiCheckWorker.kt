@@ -14,11 +14,13 @@ import com.pengingatabsen.launch.PresensiState
 import com.pengingatabsen.launch.SiadinChecker
 import com.pengingatabsen.launch.TargetApps
 import com.pengingatabsen.logic.EventType
+import java.time.LocalDateTime
 
 /**
  * Mode pintar: saat alarm berbunyi, cek dulu halaman Presensi Online SiAdin.
  * - Belum dibuka dosen → notifikasi senyap "Menunggu presensi…"
- * - Sudah dibuka (tombol presensi terlihat stabil) → notifikasi baru yang bergetar
+ * - Sudah dibuka ("Presensi Sekarang" terlihat stabil) → notifikasi baru yang bergetar
+ * - "Berhasil Presensi" untuk matkul ini → dicatat selesai & bukti dikirim, pengingat berhenti
  * - Gagal cek → diam dulu; bergetar "cek manual" setelah 3 kali gagal berturut-turut (aman, tidak terlewat)
  */
 class PresensiCheckWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -52,9 +54,12 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
                 Notifications.showReminder(ctx, course, record, final = false, waiting = true)
             }
             PresensiState.DONE -> {
-                // Kemungkinan sudah presensi (mis. lewat Dinusverse): jangan getar, minta konfirmasi saja.
+                // SiAdin sudah menampilkan "Berhasil Presensi" untuk matkul ini (pengguna presensi sendiri,
+                // mis. lewat Chrome/Dinusverse): catat selesai, kirim bukti, hentikan pengingat.
                 store.setPresensiUnknownStreak(courseId, epochDay, 0)
-                Notifications.showReminder(ctx, course, record, final = false, alreadyDone = true)
+                Notifications.cancel(ctx, courseId)
+                Graph.repository.confirmDone(record, LocalDateTime.now())
+                AlarmScheduler.reschedule(ctx, courseId)
             }
             PresensiState.OPEN -> {
                 store.setPresensiUnknownStreak(courseId, epochDay, 0)

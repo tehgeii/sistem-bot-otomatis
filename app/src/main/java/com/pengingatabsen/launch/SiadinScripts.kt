@@ -27,60 +27,75 @@ object SiadinScripts {
     }
 
     /**
-     * Membaca kartu "Presensi Kuliah Online" di halaman (hanya membaca).
-     * Setiap kartu berisi nama matkul, KDMK/KLPK, tanggal, dan satu tombol:
-     * - "Belum Jadwalnya" (atau teks berisi "belum")   → state 'waiting'
-     * - tombol nonaktif lainnya (mis. sudah presensi)  → state 'done'
-     * - tombol aktif                                   → state 'open'
+     * Membaca kartu "Presensi Kuliah Online" (hanya membaca). Bentuk asli halaman SiAdin:
+     * setiap kartu berisi NAMA MATKUL, "KDMK: …", "KLPK: …", tanggal, dan satu status:
+     * - "Belum Jadwalnya"   → 'waiting' (belum dibuka dosen)
+     * - "Presensi Sekarang" → 'open'    (tombol biru; ditekan → kotak konfirmasi Tidak/Ya)
+     * - "Berhasil Presensi" → 'done'    (kotak hijau setelah "Ya")
+     * Kartu dicari dari label KDMK lalu naik ke pembungkus terbesar yang hanya memuat satu KDMK.
      * Kartu dicocokkan ke matkul jadwal lewat kata-kata nama matkul (≥3 huruf, tanpa angka).
-     * Bila tidak ada kartu yang cocok, semua kartu dipakai sebagai cadangan (nama di jadwal bisa beda).
      */
     private const val CARDS_JS = """
-        function __pShown(e){ var r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }
         function __norm(s){ return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+        function __count(s){ return ((s || '').match(/kdmk/gi) || []).length; }
+        // Elemen terdalam yang teksnya cocok (tahan terhadap <br>/<span> di dalam tombol).
+        function __leaf(card, re){
+          var all = card.querySelectorAll('*');
+          for (var i = 0; i < all.length; i++) {
+            var e = all[i];
+            if (!re.test(e.textContent || '')) continue;
+            var deeper = false;
+            for (var j = 0; j < e.children.length; j++) {
+              if (re.test(e.children[j].textContent || '')) { deeper = true; break; }
+            }
+            if (!deeper) return e;
+          }
+          return null;
+        }
         function __cards(course){
           var tokens = __norm(course).split(' ').filter(function(t){ return t.length >= 3 && !/^\d+$/.test(t); });
-          var btns = Array.prototype.slice.call(
-            document.querySelectorAll('button,a,input[type=button],input[type=submit],[role=button]')
-          ).filter(function(b){
-            if (!__pShown(b)) return false;
-            if (b.closest && b.closest('nav,header,footer,.navbar,.sidebar')) return false;
-            if (/presensiOnline/i.test(b.getAttribute('href') || '')) return false;
-            var t = (b.innerText || b.value || '').trim();
-            if (!t || t.length > 40 || /^presensi\s*online$/i.test(t)) return false;
-            return /belum|presensi|hadir|absen|isi|masuk|sudah|klik/i.test(t);
+          var labels = Array.prototype.slice.call(document.querySelectorAll('body *')).filter(function(e){
+            return e.children.length === 0 && /^\s*kdmk\b/i.test(e.textContent || '');
           });
-          return btns.map(function(b){
-            // Naik ke elemen kartu: pembungkus terdekat yang memuat KDMK/KLPK.
-            var card = b, i = 0;
-            while (card.parentElement && i < 8 && !/kdmk|klpk/i.test(card.innerText || '')) { card = card.parentElement; i++; }
-            var inCard = /kdmk|klpk/i.test(card.innerText || '');
-            var ct = __norm(card.innerText);
-            var t = (b.innerText || b.value || '').trim();
-            var st = window.getComputedStyle(b);
-            var disabled = b.disabled === true || b.getAttribute('aria-disabled') === 'true' ||
-              /disabled/i.test(b.getAttribute('class') || '') || st.pointerEvents === 'none' || st.cursor === 'not-allowed';
-            var state = /belum/i.test(t) ? 'waiting' : (disabled ? 'done' : 'open');
+          var cards = [];
+          labels.forEach(function(l){
+            var card = l;
+            while (card.parentElement && card.parentElement !== document.body && __count(card.parentElement.innerText) === 1) {
+              card = card.parentElement;
+            }
+            if (cards.indexOf(card) < 0) cards.push(card);
+          });
+          return cards.map(function(card){
+            var t = card.innerText || '';
+            var state = /berhasil\s*presensi|sudah\s*presensi/i.test(t) ? 'done'
+              : /presensi\s*sekarang/i.test(t) ? 'open'
+              : /belum\s*jadwal/i.test(t) ? 'waiting' : 'unknown';
+            var ct = __norm(t);
             var match = tokens.length > 0 && tokens.every(function(k){ return ct.indexOf(k) >= 0; });
-            return { el: b, state: state, match: match, inCard: inCard };
-          }).filter(function(c){ return c.inCard; });
+            var btn = __leaf(card, /presensi\s*sekarang/i);
+            if (btn && btn.closest) btn = btn.closest('button,a,[role=button]') || btn;
+            return { card: card, el: btn, doneEl: __leaf(card, /berhasil\s*presensi|sudah\s*presensi/i), state: state, match: match };
+          });
         }
         function __pick(course){
           var all = __cards(course);
           var matched = all.filter(function(c){ return c.match; });
           return { all: all, matched: matched.length > 0, cand: matched.length ? matched : all };
         }
+        function __has(list, st){ return list.some(function(c){ return c.state === st; }); }
     """
 
     /**
      * Status presensi untuk satu matkul (hanya membaca):
      * - LOGIN   = form login tampil
      * - LOADING = belum selesai termuat / data akun atau kartu belum muncul
-     * - WAITING = "Belum Ada Presensi", atau kartu matkul masih "Belum Jadwalnya"
-     * - BUTTON  = tombol presensi aktif (sudah dibuka dosen)
-     * - DONE    = kartu matkul ini tombolnya nonaktif tapi bukan "belum" (kemungkinan sudah presensi)
+     * - WAITING = "Belum Ada Presensi", atau kartu matkul ini "Belum Jadwalnya"
+     * - BUTTON  = kartu matkul ini "Presensi Sekarang" (dibuka dosen)
+     * - DONE    = kartu matkul ini "Berhasil Presensi"
      * - NO_TEXT = sudah login & termuat, tapi tidak ada kartu maupun tulisan "Belum Ada Presensi"
      *
+     * Bila tidak ada kartu yang cocok dengan nama matkul, kartu lain hanya dipakai untuk "dibuka"
+     * (cadangan agar tidak terlewat bila nama di jadwal berbeda), tidak pernah untuk "berhasil".
      * Halaman yang BELUM login juga bertuliskan "Belum Ada Presensi" (kotak masa studi th/bl/hr kosong),
      * jadi status hanya dipercaya bila angka masa studi sudah terisi.
      */
@@ -95,18 +110,22 @@ object SiadinScripts {
           if (!/\d+\s*(th|bl|hr)\b/i.test(text)) return 'LOADING';
           if (/belum ada presensi/i.test(text)) return 'WAITING';
           var p = __pick(course);
-          if (p.cand.some(function(c){ return c.state === 'open'; })) return 'BUTTON';
-          if (p.matched && p.cand.some(function(c){ return c.state === 'done'; })) return 'DONE';
-          if (p.all.length) return 'WAITING';
-          if (!/copyright/i.test(text)) return 'LOADING';
-          return 'NO_TEXT';
+          if (!p.all.length) return /copyright/i.test(text) ? 'NO_TEXT' : 'LOADING';
+          if (p.matched) {
+            if (__has(p.cand, 'done')) return 'DONE';
+            if (__has(p.cand, 'open')) return 'BUTTON';
+            if (__has(p.cand, 'waiting')) return 'WAITING';
+            return 'NO_TEXT';
+          }
+          return __has(p.all, 'open') ? 'BUTTON' : 'WAITING';
         })(${JSONObject.quote(courseName)});
     """
 
     /**
-     * Untuk browser mini: sorot tombol presensi AKTIF (bingkai kuning, digulir ke tengah) dan pasang
-     * listener klik yang hanya memberi tahu aplikasi saat PENGGUNA menekannya. Tidak pernah memanggil click().
-     * Hasil: WAITING / OPEN / UNKNOWN.
+     * Untuk browser mini (hanya tampilan): sorot tombol "Presensi Sekarang" matkul ini (bingkai kuning,
+     * digulir ke tengah) dan pasang listener klik yang hanya MEMBERI TAHU aplikasi saat PENGGUNA menekannya.
+     * Tidak pernah memanggil click(). Saat "Berhasil Presensi", kotak hijaunya digulir ke tengah layar.
+     * Hasil: WAITING / OPEN / DONE / UNKNOWN.
      */
     fun highlightScript(courseName: String): String = """
         (function(course){
@@ -114,7 +133,14 @@ object SiadinScripts {
           var text = document.body ? (document.body.innerText || '') : '';
           if (/belum ada presensi/i.test(text)) return 'WAITING';
           var p = __pick(course);
-          var open = p.cand.filter(function(c){ return c.state === 'open'; })[0];
+          if (p.matched) {
+            var done = p.cand.filter(function(c){ return c.state === 'done'; })[0];
+            if (done) {
+              (done.doneEl || done.card).scrollIntoView({block: 'center', inline: 'center'});
+              return 'DONE';
+            }
+          }
+          var open = (p.matched ? p.cand : p.all).filter(function(c){ return c.state === 'open' && c.el; })[0];
           if (open) {
             var b = open.el;
             if (!b.__pengingat) {
@@ -126,7 +152,7 @@ object SiadinScripts {
                 try { PengingatAbsen.onPresensiClicked(); } catch (e) {}
               }, true);
             }
-            b.scrollIntoView({block: 'center', behavior: 'smooth'});
+            b.scrollIntoView({block: 'center', inline: 'center', behavior: 'smooth'});
             return 'OPEN';
           }
           if (p.all.length) return 'WAITING';

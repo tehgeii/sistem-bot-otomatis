@@ -19,7 +19,7 @@ enum class PresensiState {
     WAITING,
     /** Tombol presensi aktif. */
     OPEN,
-    /** Kartu matkul ini tombolnya nonaktif tapi bukan "belum" — kemungkinan sudah presensi. */
+    /** Kartu matkul ini sudah "Berhasil Presensi". */
     DONE,
     /** Gagal memastikan (offline, login gagal, halaman tidak dikenali). */
     UNKNOWN,

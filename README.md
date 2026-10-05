@@ -122,13 +122,22 @@ di dalam aplikasi:
 **Getar hanya saat presensi sudah dibuka (mode pintar, aktif otomatis):** bila memakai SiAdin web
 dan login tersimpan, mulai jam absen NgiBsen mengecek halaman Presensi Online **diam-diam tiap
 1 menit**. Selama masih "Belum Ada Presensi Hari Ini!", notifikasinya **senyap** ("Menunggu
-presensi…"). NgiBsen membaca kartu **Presensi Kuliah Online** untuk matkul tersebut (dicocokkan dari
-nama matkul di jadwal): selama tombolnya masih **"Belum Jadwalnya"**, tetap senyap. Begitu tombolnya
-aktif (dibuka dosen), ±1 menit kemudian HP **bergetar**. Bila tombolnya sudah nonaktif (kemungkinan
-sudah presensi, mis. lewat Dinusverse), muncul notifikasi senyap untuk konfirmasi. **Tulis nama matkul
-di jadwal sama seperti di SiAdin** (boleh ada tambahan kode di belakangnya) supaya kartunya cocok. Jika pengecekan gagal 3 kali berturut-turut (offline, login bermasalah), HP bergetar
-dengan notifikasi **"Cek presensi"** supaya kamu mengecek manual dan tidak terlewat. Jika sampai jam
-tutup dosen tidak membuka presensi, riwayat mencatat **"tidak dibuka"** tanpa pesan ❌ ke Telegram.
+presensi…"). NgiBsen membaca kartu **Presensi Kuliah Online** milik matkul tersebut (dicocokkan dari
+nama matkul di jadwal):
+
+| Di SiAdin | NgiBsen |
+|---|---|
+| "Belum Ada Presensi Hari Ini!" / tombol **"Belum Jadwalnya"** | senyap, "Menunggu presensi…" |
+| tombol biru **"Presensi Sekarang"** (dibuka dosen) | ±1 menit kemudian **bergetar** "✅ Presensi sudah dibuka" |
+| kotak hijau **"Berhasil Presensi"** | absen dicatat selesai, bukti dikirim ke Telegram, pengingat berhenti |
+
+Di browser mini, tombol "Presensi Sekarang" disorot kuning. Setelah kamu menekannya, SiAdin menampilkan
+konfirmasi **Tidak / Ya**; bukti (screenshot kotak hijau "Berhasil Presensi") baru dikirim **setelah
+kamu menekan "Ya"** dan SiAdin menampilkan "Berhasil Presensi". Menekan "Tidak" tidak mengirim apa pun.
+**Tulis nama matkul di jadwal sama seperti di SiAdin** (boleh ada kode kelas di belakangnya, mis.
+"Pemrograman Game 4703") supaya kartunya cocok. Jika pengecekan gagal 3 kali berturut-turut (offline,
+login bermasalah), HP bergetar dengan notifikasi **"Cek presensi"**. Jika sampai jam tutup dosen tidak
+membuka presensi, riwayat mencatat **"tidak dibuka"** tanpa pesan ❌ ke Telegram.
 **Isi jam tutup di jadwal sampai akhir kuliah**, karena pengecekan berhenti di jam tutup (atau 30
 menit setelah dibuka bila jam tutup kosong). Saklarnya ada di *Pengaturan → SiAdin web*.
 
@@ -138,10 +147,11 @@ menit setelah dibuka bila jam tutup kosong). Saklarnya ada di *Pengaturan → Si
    dimuat ulang otomatis tiap ±20 detik (maks. 90 menit). Begitu berubah, HP bergetar dengan
    notifikasi **"Presensi sudah dibuka!"**.
 2. **Tombol disorot:** tombol presensi diberi bingkai kuning dan layar digulir ke tombol itu.
-3. **Bukti otomatis:** setelah **kamu** menekan tombol yang disorot, ±4 detik kemudian screenshot
-   halaman dikirim ke Telegram, absen ditandai selesai, pengingat berhenti, dan browser tertutup.
+3. **Bukti otomatis:** setelah **kamu** menekan "Presensi Sekarang" lalu **"Ya"**, begitu SiAdin
+   menampilkan "Berhasil Presensi", screenshot halaman dikirim ke Telegram, absen ditandai selesai,
+   pengingat berhenti, dan browser tertutup. Menekan "Tidak" tidak mengirim apa pun.
 
-Tombol presensi dikenali dari tulisannya (`presensi`, `hadir`, `absen`). Jika tidak tersorot,
+Tombol dikenali dari tulisan asli SiAdin ("Belum Jadwalnya", "Presensi Sekarang", "Berhasil Presensi"). Jika tidak tersorot,
 tekan tombolnya seperti biasa lalu pakai **📷 Kirim screenshot**. Aplikasi **tidak pernah menekan
 tombol presensi** — itu sengaja tidak dibuat, karena presensi adalah pernyataan kehadiranmu sendiri.
 

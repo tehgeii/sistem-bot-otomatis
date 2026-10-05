@@ -102,6 +102,8 @@ class WebBrowserActivity : ComponentActivity() {
     private var waitingSince = 0L
     private var wasWaiting = false
     private var autoProofScheduled = false
+    /** Pengguna sudah menekan "Presensi Sekarang"; menunggu kartu jadi "Berhasil Presensi". */
+    private var awaitingSuccess = false
     private val reloadWhileWaiting = Runnable { webView?.reload() }
 
     // Izin & upload yang diminta halaman web
@@ -349,8 +351,17 @@ class WebBrowserActivity : ComponentActivity() {
                     }
                 }
                 "OPEN" -> {
-                    status = "Tombol presensi sudah muncul — tekan tombol yang disorot kuning. Bukti dikirim otomatis setelahnya."
+                    if (!awaitingSuccess) {
+                        status = "Presensi sudah dibuka — tekan \"Presensi Sekarang\" (bingkai kuning) lalu \"Ya\". Bukti dikirim otomatis."
+                    }
                     onSessionOpened()
+                }
+                "DONE" -> {
+                    if (!awaitingSuccess && !autoProofScheduled) {
+                        status = "✅ SiAdin: Berhasil Presensi. Tekan 📷 Kirim screenshot untuk mengirim bukti."
+                    }
+                    waitingSince = 0L
+                    wasWaiting = false
                 }
                 else -> {
                     if (wasWaiting) {
@@ -399,14 +410,38 @@ class WebBrowserActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Pengguna menekan "Presensi Sekarang". SiAdin lalu menampilkan kotak konfirmasi (Tidak/Ya),
+     * jadi bukti BELUM dikirim di sini: tunggu sampai kartu matkul ini menjadi "Berhasil Presensi".
+     * Bila pengguna menekan "Tidak" (atau gagal), tidak ada bukti yang dikirim.
+     */
     private fun onPresensiClickedByUser() {
         val wv = webView ?: return
         val url = wv.url ?: return
-        if (autoProofScheduled || !isTrustedUrl(url)) return
-        autoProofScheduled = true
-        status = "Presensi ditekan — mengambil bukti dalam 4 detik…"
-        // Beri waktu halaman menampilkan hasil presensi sebelum di-screenshot.
-        wv.postDelayed({ if (!isFinishing) sendScreenshot() }, AUTO_PROOF_DELAY_MS)
+        if (autoProofScheduled || awaitingSuccess || !isTrustedUrl(url)) return
+        awaitingSuccess = true
+        status = "Tekan \"Ya\" di kotak konfirmasi SiAdin — bukti dikirim otomatis setelah \"Berhasil Presensi\"."
+        pollForSuccess(wv, attemptsLeft = SUCCESS_POLL_ATTEMPTS)
+    }
+
+    private fun pollForSuccess(wv: WebView, attemptsLeft: Int) {
+        if (isFinishing || autoProofScheduled) return
+        if (attemptsLeft <= 0) {
+            awaitingSuccess = false
+            status = "Presensi belum terkonfirmasi (\"Ya\" belum ditekan?). Tekan tombol kuning lagi bila perlu."
+            return
+        }
+        wv.evaluateJavascript(SiadinScripts.highlightScript(courseName)) { raw ->
+            if (raw?.trim('"') == "DONE") {
+                autoProofScheduled = true
+                awaitingSuccess = false
+                status = "✅ Berhasil Presensi — mengirim bukti…"
+                // Beri waktu kotak hijau tampil penuh & tergulir ke tengah sebelum di-screenshot.
+                wv.postDelayed({ if (!isFinishing) sendScreenshot() }, AUTO_PROOF_DELAY_MS)
+            } else {
+                wv.postDelayed({ pollForSuccess(wv, attemptsLeft - 1) }, 1_000)
+            }
+        }
     }
 
     /** Kredensial hanya diisikan ke halaman HTTPS di domain yang sama dengan URL tujuan. */
@@ -479,6 +514,7 @@ class WebBrowserActivity : ComponentActivity() {
         webView?.removeCallbacks(reloadWhileWaiting)
         waitingSince = 0L
         autoProofScheduled = false
+        awaitingSuccess = false
         if (started) webView?.loadUrl(targetUrl)
     }
 
@@ -499,7 +535,9 @@ class WebBrowserActivity : ComponentActivity() {
         private const val MAX_LOGIN_ATTEMPTS = 2
         private const val RELOAD_INTERVAL_MS = 20_000L
         private const val MAX_WAIT_MS = 90 * 60_000L
-        private const val AUTO_PROOF_DELAY_MS = 4_000L
+        private const val AUTO_PROOF_DELAY_MS = 1_500L
+        /** Waktu menunggu pengguna menekan "Ya" di kotak konfirmasi (±90 detik, dicek tiap detik). */
+        private const val SUCCESS_POLL_ATTEMPTS = 90
 
         fun intent(context: Context, url: String, courseId: Long = 0L, epochDay: Long = 0L): Intent =
             Intent(context, WebBrowserActivity::class.java).apply {
