@@ -76,6 +76,8 @@ object Notifications {
         silent: Boolean = false,
         /** Mode pintar: presensi di SiAdin belum dibuka dosen → notifikasi senyap. */
         waiting: Boolean = false,
+        /** Mode pintar: SiAdin gagal dicek beberapa kali → minta cek manual. */
+        checkFailed: Boolean = false,
     ) {
         val epochDay = record?.epochDay ?: 0L
         val detail = buildString {
@@ -84,11 +86,13 @@ object Notifications {
         }
         val title = when {
             waiting -> "Menunggu presensi: ${course.name}"
+            checkFailed -> "Cek presensi: ${course.name}"
             final -> "⚠️ 5 menit lagi ditutup: ${course.name}"
             else -> "Absen dibuka: ${course.name}"
         }
         val text = when {
             waiting -> "Belum dibuka dosen di SiAdin. Dicek otomatis tiap menit — HP bergetar begitu dibuka. $detail"
+            checkFailed -> "SiAdin tidak bisa dicek otomatis (internet/login). Tap untuk cek manual. $detail"
             final -> "Segera absen sekarang! $detail"
             else -> detail
         }
@@ -100,7 +104,7 @@ object Notifications {
             .addAction(0, "Absen sekarang", absen)
             .addAction(0, "Tunda 5 menit", action(context, NotificationActionReceiver.ACTION_SNOOZE, course.id, epochDay))
             .addAction(0, "Libur", action(context, NotificationActionReceiver.ACTION_HOLIDAY, course.id, epochDay))
-        if (final || waiting) builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        if (final || waiting || checkFailed) builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
         if (waiting) builder.setPriority(NotificationCompat.PRIORITY_LOW)
         notify(context, idFor(course.id), builder)
     }

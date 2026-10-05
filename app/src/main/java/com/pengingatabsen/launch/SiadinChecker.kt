@@ -2,6 +2,7 @@ package com.pengingatabsen.launch
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -21,7 +22,7 @@ enum class PresensiState { WAITING, OPEN, UNKNOWN }
  * HANYA membaca status halaman; tidak pernah menekan tombol presensi.
  */
 object SiadinChecker {
-    private const val TOTAL_TIMEOUT_MS = 45_000L
+    private const val TOTAL_TIMEOUT_MS = 55_000L
     private const val MAX_PAGES = 8
     private const val MAX_LOGIN_ATTEMPTS = 2
 
@@ -35,6 +36,14 @@ object SiadinChecker {
         val pages = Channel<String>(Channel.CONFLATED)
         val webView = WebView(context)
         try {
+            // WebView tak terlihat berukuran 0×0: tanpa ukuran, tata letak & deteksi elemen tidak akurat.
+            val width = 1080
+            val height = 2400
+            webView.measure(
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+            )
+            webView.layout(0, 0, width, height)
             webView.settings.javaScriptEnabled = true
             webView.settings.domStorageEnabled = true
             webView.settings.userAgentString = webView.settings.userAgentString
@@ -76,12 +85,27 @@ object SiadinChecker {
                     return@repeat
                 }
 
-                // Di halaman presensi: tunggu data akun & presensi termuat (maks. ±15 detik).
-                repeat(15) {
+                // Di halaman presensi: tunggu data akun & kartu presensi termuat (maks. ±20 detik).
+                // "Dibuka" baru dipercaya bila tombol presensi terlihat 3 kali berturut-turut (±3 detik),
+                // supaya kartu "Belum Ada Presensi" yang dimuat belakangan tidak disangka dibuka.
+                var buttonStreak = 0
+                var noTextStreak = 0
+                repeat(20) {
                     when (webView.eval(SiadinScripts.PRESENSI_STATE_SCRIPT)) {
                         "WAITING" -> return PresensiState.WAITING
-                        "OPEN" -> return PresensiState.OPEN
                         "LOGIN" -> return PresensiState.UNKNOWN
+                        "BUTTON" -> {
+                            noTextStreak = 0
+                            if (++buttonStreak >= 3) return PresensiState.OPEN
+                        }
+                        "NO_TEXT" -> {
+                            buttonStreak = 0
+                            if (++noTextStreak >= 8) return PresensiState.UNKNOWN
+                        }
+                        else -> {
+                            buttonStreak = 0
+                            noTextStreak = 0
+                        }
                     }
                     delay(1_000)
                 }

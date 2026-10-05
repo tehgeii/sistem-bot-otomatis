@@ -17,8 +17,9 @@ import com.pengingatabsen.logic.EventType
 
 /**
  * Mode pintar: saat alarm berbunyi, cek dulu halaman Presensi Online SiAdin.
- * - Belum dibuka dosen  → notifikasi senyap "Menunggu presensi…"
- * - Sudah dibuka / gagal cek → notifikasi biasa yang bergetar (gagal cek = tetap bergetar, aman).
+ * - Belum dibuka dosen → notifikasi senyap "Menunggu presensi…"
+ * - Sudah dibuka (tombol presensi terlihat stabil) → notifikasi baru yang bergetar
+ * - Gagal cek → diam dulu; bergetar "cek manual" setelah 3 kali gagal berturut-turut (aman, tidak terlewat)
  */
 class PresensiCheckWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
@@ -43,20 +44,39 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
         val record = dao.find(courseId, epochDay) ?: return Result.success()
         if (record.status.finished) return Result.success()
 
-        when {
-            state == PresensiState.WAITING ->
-                Notifications.showReminder(applicationContext, course, record, final = false, waiting = true)
-            type == EventType.FINAL ->
-                Notifications.showReminder(applicationContext, course, record, final = true)
-            record.awaitingConfirm ->
-                Notifications.showConfirm(applicationContext, course, record, silent = false)
-            else ->
-                Notifications.showReminder(applicationContext, course, record, final = false)
-        }
-        if (state == PresensiState.OPEN) {
-            store.markPresensiOpen(courseId, epochDay)
-            // Sudah dibuka: kembali ke interval pengingat pengguna (bukan cek tiap menit).
-            AlarmScheduler.reschedule(applicationContext, courseId)
+        val ctx = applicationContext
+        when (state) {
+            PresensiState.WAITING -> {
+                store.setPresensiUnknownStreak(courseId, epochDay, 0)
+                Notifications.showReminder(ctx, course, record, final = false, waiting = true)
+            }
+            PresensiState.OPEN -> {
+                store.setPresensiUnknownStreak(courseId, epochDay, 0)
+                store.markPresensiOpen(courseId, epochDay)
+                // Hapus dulu notifikasi senyap supaya yang baru diposting ulang & pasti bergetar.
+                Notifications.cancel(ctx, courseId)
+                when {
+                    type == EventType.FINAL -> Notifications.showReminder(ctx, course, record, final = true)
+                    record.awaitingConfirm -> Notifications.showConfirm(ctx, course, record, silent = false)
+                    else -> Notifications.showReminder(ctx, course, record, final = false)
+                }
+                // Sudah dibuka: kembali ke interval pengingat pengguna (bukan cek tiap menit).
+                AlarmScheduler.reschedule(ctx, courseId)
+            }
+            PresensiState.UNKNOWN -> {
+                // Sekali gagal (internet putus sebentar) jangan langsung mengubah notifikasi.
+                // Baru bergetar "cek manual" setiap 3 kali gagal berturut-turut (±3 menit), atau di FINAL.
+                val streak = store.presensiUnknownStreak(courseId, epochDay) + 1
+                val escalate = streak >= UNKNOWN_ESCALATE_AFTER || type == EventType.FINAL
+                store.setPresensiUnknownStreak(courseId, epochDay, if (escalate) 0 else streak)
+                if (escalate) {
+                    Notifications.cancel(ctx, courseId)
+                    Notifications.showReminder(ctx, course, record, final = type == EventType.FINAL, checkFailed = true)
+                } else if (type == EventType.OPEN) {
+                    // Pengecekan pertama gagal: tampilkan status menunggu (senyap) agar notifikasi tetap ada.
+                    Notifications.showReminder(ctx, course, record, final = false, waiting = true)
+                }
+            }
         }
         return Result.success()
     }
@@ -69,6 +89,7 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
         private const val KEY_EPOCH_DAY = "epoch_day"
         private const val KEY_TYPE = "type"
         private const val CHECKING_NOTIFICATION_ID = 778
+        private const val UNKNOWN_ESCALATE_AFTER = 3
 
         fun enqueue(context: Context, courseId: Long, epochDay: Long, type: EventType) {
             val request = OneTimeWorkRequestBuilder<PresensiCheckWorker>()

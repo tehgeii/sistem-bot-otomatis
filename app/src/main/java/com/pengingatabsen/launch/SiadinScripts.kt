@@ -28,11 +28,15 @@ object SiadinScripts {
 
     /**
      * Status halaman Presensi Online (hanya membaca):
-     * LOGIN = form login tampil; LOADING = belum selesai termuat / data akun belum muncul;
-     * WAITING = sudah login dan tertulis "Belum Ada Presensi"; OPEN = sudah login dan teks itu tidak ada.
+     * - LOGIN   = form login tampil
+     * - LOADING = belum selesai termuat / data akun belum muncul
+     * - WAITING = sudah login dan tertulis "Belum Ada Presensi"
+     * - BUTTON  = sudah login, teks itu tidak ada, dan tombol presensi terlihat
+     * - NO_TEXT = sudah login, teks itu tidak ada, tapi tombol presensi tidak terlihat
      *
-     * Penting: halaman yang BELUM login juga menampilkan "Belum Ada Presensi" (dengan kotak masa studi
-     * th/bl/hr kosong), jadi status hanya dipercaya bila angka masa studi sudah terisi.
+     * Penting: halaman yang BELUM login juga menampilkan "Belum Ada Presensi" (kotak masa studi
+     * th/bl/hr kosong), dan kartu presensi dimuat belakangan lewat AJAX. Jadi status hanya dipercaya
+     * bila angka masa studi sudah terisi, dan pemanggil harus melihat hasil yang sama beberapa kali.
      */
     val PRESENSI_STATE_SCRIPT = """
         (function(){
@@ -44,8 +48,19 @@ object SiadinScripts {
           var loggedIn = /\d+\s*(th|bl|hr)\b/i.test(text);
           if (!loggedIn) return 'LOADING';
           if (/belum ada presensi/i.test(text)) return 'WAITING';
-          if (/copyright/i.test(text)) return 'OPEN';
-          return 'LOADING';
+          if (!/copyright/i.test(text)) return 'LOADING';
+          var found = Array.prototype.slice.call(
+            document.querySelectorAll('button,a,input[type=button],input[type=submit]')
+          ).some(function(b){
+            var r = b.getBoundingClientRect();
+            if (r.width <= 0 || r.height <= 0) return false;
+            if (b.closest && b.closest('nav,header,.navbar,.sidebar')) return false;
+            if (/presensiOnline/i.test(b.getAttribute('href') || '')) return false;
+            var t = (b.innerText || b.value || '').trim();
+            if (/^presensi\s*online$/i.test(t)) return false;
+            return t.length > 0 && t.length < 40 && /presensi|hadir|absen/i.test(t);
+          });
+          return found ? 'BUTTON' : 'NO_TEXT';
         })();
     """
 

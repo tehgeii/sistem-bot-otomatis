@@ -122,8 +122,9 @@ di dalam aplikasi:
 **Getar hanya saat presensi sudah dibuka (mode pintar, aktif otomatis):** bila memakai SiAdin web
 dan login tersimpan, mulai jam absen NgiBsen mengecek halaman Presensi Online **diam-diam tiap
 1 menit**. Selama masih "Belum Ada Presensi Hari Ini!", notifikasinya **senyap** ("Menunggu
-presensi…"). Begitu dosen membuka presensi, ±1 menit kemudian HP **bergetar**. Jika pengecekan gagal
-(offline, login bermasalah), HP tetap bergetar seperti biasa supaya tidak terlewat. Jika sampai jam
+presensi…"). Begitu dosen membuka presensi (tombol presensi muncul), ±1 menit kemudian HP
+**bergetar**. Jika pengecekan gagal 3 kali berturut-turut (offline, login bermasalah), HP bergetar
+dengan notifikasi **"Cek presensi"** supaya kamu mengecek manual dan tidak terlewat. Jika sampai jam
 tutup dosen tidak membuka presensi, riwayat mencatat **"tidak dibuka"** tanpa pesan ❌ ke Telegram.
 **Isi jam tutup di jadwal sampai akhir kuliah**, karena pengecekan berhenti di jam tutup (atau 30
 menit setelah dibuka bila jam tutup kosong). Saklarnya ada di *Pengaturan → SiAdin web*.

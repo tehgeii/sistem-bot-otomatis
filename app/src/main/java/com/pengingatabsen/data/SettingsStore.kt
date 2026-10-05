@@ -126,6 +126,16 @@ class SettingsStore(private val context: Context) {
         it.remove(Keys.SIADIN_PASSWORD_ENC)
     }
 
+    /** Berapa kali berturut-turut pengecekan presensi gagal untuk satu kemunculan. */
+    suspend fun presensiUnknownStreak(courseId: Long, epochDay: Long): Int =
+        context.dataStore.data.first()[unknownKey(courseId, epochDay)] ?: 0
+
+    suspend fun setPresensiUnknownStreak(courseId: Long, epochDay: Long, value: Int) = context.dataStore.edit {
+        if (value <= 0) it.remove(unknownKey(courseId, epochDay)) else it[unknownKey(courseId, epochDay)] = value
+    }
+
+    private fun unknownKey(courseId: Long, epochDay: Long) = intPreferencesKey("presensi_unknown_${courseId}_$epochDay")
+
     suspend fun setSmartPresensi(enabled: Boolean) = context.dataStore.edit { it[Keys.SMART_PRESENSI] = enabled }
 
     suspend fun isPresensiOpen(courseId: Long, epochDay: Long): Boolean =
