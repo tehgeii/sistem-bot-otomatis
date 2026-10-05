@@ -42,12 +42,14 @@ class NextCourseWidget : AppWidgetProvider() {
 
         private suspend fun describeNext(): Pair<String, String> {
             val now = LocalDateTime.now()
-            val interval = Graph.settings.current().remindIntervalMinutes
+            val settings = Graph.settings.current()
+            val interval = settings.remindIntervalMinutes
+            val grace = if (settings.smartModeActive) ScheduleMath.SMART_GRACE_MINUTES else 0
             val dao = Graph.db.recordDao()
             val next = Graph.repository.allCourses().filter { it.active }.map { course ->
                 val records = dao.forCourseSince(course.id, now.toLocalDate().minusDays(2).toEpochDay())
                     .associateBy { it.epochDay }
-                val plan = ScheduleMath.plan(course.toSlot(), now, interval) { date ->
+                val plan = ScheduleMath.plan(course.toSlot(grace), now, interval) { date ->
                     records[date.toEpochDay()]?.let {
                         OccurrenceState(it.status.finished, it.snoozeUntilMillis?.toLocalDateTime())
                     }

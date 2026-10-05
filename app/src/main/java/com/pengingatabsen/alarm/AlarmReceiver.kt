@@ -29,7 +29,8 @@ class AlarmReceiver : BroadcastReceiver() {
     private suspend fun handle(context: Context, courseId: Long, date: LocalDate, planned: EventType) {
         val repo = Graph.repository
         val course = repo.course(courseId) ?: return
-        val slot = course.toSlot()
+        val smartActive = Graph.settings.current().smartModeActive
+        val slot = course.toSlot(if (smartActive) ScheduleMath.SMART_GRACE_MINUTES else 0)
         if (!course.active || ScheduleMath.isSkipped(slot, date)) return
 
         val existing = Graph.db.recordDao().find(courseId, date.toEpochDay())
@@ -43,7 +44,7 @@ class AlarmReceiver : BroadcastReceiver() {
 
         // Mode pintar (SiAdin web + login tersimpan): bergetar hanya bila presensi sudah dibuka dosen.
         val store = Graph.settings
-        val smart = store.current().smartModeActive
+        val smart = smartActive
         val seenOpen = store.isPresensiOpen(courseId, date.toEpochDay())
         if (smart && !seenOpen && type != EventType.EXPIRE) {
             PresensiCheckWorker.enqueue(context, courseId, date.toEpochDay(), type)

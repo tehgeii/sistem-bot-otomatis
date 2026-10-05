@@ -138,8 +138,9 @@ kamu menekan "Ya"** dan SiAdin menampilkan "Berhasil Presensi". Menekan "Tidak" 
 "Pemrograman Game 4703") supaya kartunya cocok. Jika pengecekan gagal 3 kali berturut-turut (offline,
 login bermasalah), HP bergetar dengan notifikasi **"Cek presensi"**. Jika sampai jam tutup dosen tidak
 membuka presensi, riwayat mencatat **"tidak dibuka"** tanpa pesan ❌ ke Telegram.
-**Isi jam tutup di jadwal sampai akhir kuliah**, karena pengecekan berhenti di jam tutup (atau 30
-menit setelah dibuka bila jam tutup kosong). Saklarnya ada di *Pengaturan → SiAdin web*.
+**Isi jam tutup di jadwal sampai akhir kuliah.** Karena dosen sering membuka presensi menjelang
+akhir kuliah, pengecekan diteruskan sampai **15 menit setelah jam tutup** (atau 45 menit setelah
+dibuka bila jam tutup kosong). Saklarnya ada di *Pengaturan → SiAdin web*.
 
 **Bantuan presensi di browser mini** (tombol presensi tetap kamu yang tekan):
 

@@ -80,7 +80,8 @@ class Repository(private val db: AppDatabase) {
             recordDao.update(updated)
             return updated
         }
-        val occ = ScheduleMath.occurrenceOn(course.toSlot(), date)
+        val grace = if (Graph.settings.current().smartModeActive) ScheduleMath.SMART_GRACE_MINUTES else 0
+        val occ = ScheduleMath.occurrenceOn(course.toSlot(grace), date)
         val record = AttendanceRecord(
             courseId = course.id,
             courseName = course.name,

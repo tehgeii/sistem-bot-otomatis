@@ -21,7 +21,8 @@ data class Course(
     /** Libur: kemunculan sampai tanggal ini (epoch day) dilewati. */
     val skipUntilEpochDay: Long? = null,
 ) {
-    fun toSlot() = Slot(dayOfWeek, openMinute, closeMinute, skipUntil)
+    /** [extraMinutes]: perpanjangan setelah jam tutup (mode pintar). */
+    fun toSlot(extraMinutes: Int = 0) = Slot(dayOfWeek, openMinute, closeMinute, skipUntil, extraMinutes)
 }
 
 /** Di luar entity supaya Room tidak menganggapnya kolom. */

@@ -27,13 +27,15 @@ data class Slot(
     val closeMinute: Int?,
     /** Kemunculan pada tanggal <= ini dilewati (libur). */
     val skipUntil: LocalDate? = null,
+    /** Perpanjangan jendela setelah jam tutup (mode pintar: dosen sering membuka presensi terlambat). */
+    val extraMinutes: Int = 0,
 )
 
 /** Satu kemunculan slot pada tanggal tertentu. */
 data class Occurrence(
     val date: LocalDate,
     val open: LocalDateTime,
-    /** Jam tutup, atau open + 30 menit bila jam tutup kosong. */
+    /** Jam tutup (atau open + 30 menit bila kosong), ditambah perpanjangan bila ada. */
     val end: LocalDateTime,
 )
 
@@ -53,13 +55,15 @@ object ScheduleMath {
     /** Peringatan terakhir dikirim sekian menit sebelum ditutup. */
     const val FINAL_WARNING_MINUTES = 5L
     const val DEFAULT_REMIND_INTERVAL = 3
+    /** Mode pintar: SiAdin tetap dicek sampai sekian menit setelah jam tutup. */
+    const val SMART_GRACE_MINUTES = 15
 
     fun occurrenceOn(slot: Slot, date: LocalDate): Occurrence {
         val midnight = date.atStartOfDay()
         val open = midnight.plusMinutes(slot.openMinute.toLong())
         val close = slot.closeMinute?.takeIf { it > slot.openMinute }
-        val end = if (close != null) midnight.plusMinutes(close.toLong())
-        else open.plusMinutes(DEFAULT_WINDOW_MINUTES)
+        val end = (if (close != null) midnight.plusMinutes(close.toLong()) else open.plusMinutes(DEFAULT_WINDOW_MINUTES))
+            .plusMinutes(slot.extraMinutes.coerceAtLeast(0).toLong())
         return Occurrence(date, open, end)
     }
 

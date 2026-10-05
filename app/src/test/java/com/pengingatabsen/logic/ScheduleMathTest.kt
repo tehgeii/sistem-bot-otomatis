@@ -64,6 +64,16 @@ class ScheduleMathTest {
     }
 
     @Test
+    fun occurrence_extraMinutesExtendsEnd() {
+        val slot = senin0700.copy(extraMinutes = ScheduleMath.SMART_GRACE_MINUTES)
+        assertEquals(at(monday, 7, 35), ScheduleMath.occurrenceOn(slot, monday).end)
+        // Masih dalam jendela 10 menit setelah jam tutup asli (07:20).
+        assertEquals(at(monday, 7, 0), ScheduleMath.currentOccurrence(slot, at(monday, 7, 30))?.open)
+        val noClose = Slot(1, mins(7, 0), null, extraMinutes = 15)
+        assertEquals(at(monday, 7, 45), ScheduleMath.occurrenceOn(noClose, monday).end)
+    }
+
+    @Test
     fun occurrence_closeBeforeOpenTreatedAsNoClose() {
         val slot = Slot(1, mins(9, 0), mins(8, 0))
         assertEquals(at(monday, 9, 30), ScheduleMath.occurrenceOn(slot, monday).end)

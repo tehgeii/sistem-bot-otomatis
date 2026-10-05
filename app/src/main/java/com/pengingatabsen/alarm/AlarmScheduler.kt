@@ -36,15 +36,17 @@ object AlarmScheduler {
             return
         }
         val settings = Graph.settings.current()
+        // Mode pintar: jendela diperpanjang setelah jam tutup karena dosen sering membuka terlambat.
+        val slot = course.toSlot(if (settings.smartModeActive) ScheduleMath.SMART_GRACE_MINUTES else 0)
         // Mode pintar: selama presensi belum terlihat dibuka, cek SiAdin tiap 1 menit (senyap).
-        val current = ScheduleMath.currentOccurrence(course.toSlot(), now)
+        val current = ScheduleMath.currentOccurrence(slot, now)
         val waitingForSession = settings.smartModeActive && current != null &&
             !Graph.settings.isPresensiOpen(courseId, current.date.toEpochDay())
         val interval = if (waitingForSession) SMART_CHECK_INTERVAL_MINUTES else settings.remindIntervalMinutes
         val records = Graph.db.recordDao()
             .forCourseSince(courseId, now.toLocalDate().minusDays(2).toEpochDay())
             .associateBy { it.epochDay }
-        val planned = ScheduleMath.plan(course.toSlot(), now, interval) { date ->
+        val planned = ScheduleMath.plan(slot, now, interval) { date ->
             records[date.toEpochDay()]?.let {
                 OccurrenceState(it.status.finished, it.snoozeUntilMillis?.toLocalDateTime())
             }
