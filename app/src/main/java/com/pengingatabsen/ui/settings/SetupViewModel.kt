@@ -12,6 +12,7 @@ import com.pengingatabsen.data.AppSettings
 import com.pengingatabsen.launch.InstalledApp
 import com.pengingatabsen.launch.TargetApps
 import com.pengingatabsen.logic.Formatters
+import com.pengingatabsen.telegram.SummaryWorker
 import com.pengingatabsen.telegram.TelegramClient
 import com.pengingatabsen.telegram.TgResult
 import kotlinx.coroutines.Job
@@ -173,6 +174,16 @@ class SetupViewModel : ViewModel() {
     fun setSmartPresensi(enabled: Boolean, context: Context) = viewModelScope.launch {
         store.setSmartPresensi(enabled)
         AlarmScheduler.rescheduleAll(context.applicationContext)
+    }
+
+    fun setWeeklySummary(enabled: Boolean, context: Context) = viewModelScope.launch {
+        store.setWeeklySummary(enabled)
+        SummaryWorker.schedule(context.applicationContext, enabled)
+    }
+
+    fun sendSummaryNow(context: Context) {
+        SummaryWorker.sendNow(context.applicationContext)
+        testStatus = "Ringkasan minggu ini dikirim ke Telegram (butuh internet)."
     }
 
     fun setVibrateOnly(enabled: Boolean) = viewModelScope.launch { store.setVibrateOnly(enabled) }

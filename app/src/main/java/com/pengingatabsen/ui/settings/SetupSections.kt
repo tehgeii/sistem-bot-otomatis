@@ -248,6 +248,18 @@ fun TelegramSection(vm: SetupViewModel) {
                 Button(enabled = chatId != null && !vm.busy, onClick = { vm.testSend() }) { Text("Tes kirim") }
             }
             vm.testStatus?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Ringkasan mingguan")
+                    Text(
+                        "Tiap Minggu jam 19.00: jumlah berhasil, terlewat, libur, dan tidak dibuka dosen.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Switch(checked = settings?.weeklySummary ?: true, onCheckedChange = { vm.setWeeklySummary(it, context) })
+            }
+            TextButton(enabled = chatId != null, onClick = { vm.sendSummaryNow(context) }) { Text("Kirim ringkasan sekarang") }
         }
     }
 }
@@ -304,6 +316,14 @@ fun SiadinWebSection(vm: SetupViewModel) {
                     "seluler pengecekan tiap 2 menit (1 menit menjelang jam tutup).",
                 style = MaterialTheme.typography.bodySmall,
             )
+            // Keterlambatan cek dari alarm: angka besar = HP menunda aplikasi (cek izin baterai/Autostart).
+            it.lastCheckDelaySec?.let { delay ->
+                Text(
+                    if (delay <= 30) "Cek terakhir tepat waktu (telat $delay dtk dari alarm)."
+                    else "⚠️ Cek terakhir telat $delay dtk dari alarm — aktifkan izin baterai & Autostart di Izin HP.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

@@ -44,6 +44,14 @@ import androidx.compose.ui.text.input.TextFieldValue
 import com.pengingatabsen.data.Course
 import com.pengingatabsen.data.skipUntil
 import com.pengingatabsen.logic.Formatters
+import com.pengingatabsen.logic.ScheduleMath
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.rememberDatePickerState
+import java.time.Instant
+import java.time.ZoneOffset
 import com.pengingatabsen.ui.MainViewModel
 import java.time.LocalDate
 
@@ -53,6 +61,8 @@ fun ScheduleMenu(vm: MainViewModel) {
     val context = LocalContext.current
     var menu by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
+    var pausing by remember { mutableStateOf(false) }
+    var resuming by remember { mutableStateOf(false) }
 
     Box {
         IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Menu jadwal") }
@@ -71,10 +81,58 @@ fun ScheduleMenu(vm: MainViewModel) {
                 }
             })
             DropdownMenuItem(text = { Text("Impor jadwal") }, onClick = { menu = false; importing = true })
+            DropdownMenuItem(text = { Text("Liburkan semua sampai…") }, onClick = { menu = false; pausing = true })
+            DropdownMenuItem(text = { Text("Aktifkan semua lagi") }, onClick = { menu = false; resuming = true })
         }
     }
 
     if (importing) ImportDialog(vm) { importing = false }
+    if (pausing) PauseAllDialog(vm) { pausing = false }
+    if (resuming) {
+        AlertDialog(
+            onDismissRequest = { resuming = false },
+            title = { Text("Aktifkan semua lagi?") },
+            text = { Text("Semua libur yang belum lewat (per matkul maupun libur massal) dibatalkan.") },
+            confirmButton = { TextButton(onClick = { vm.resumeAll(); resuming = false }) { Text("Aktifkan") } },
+            dismissButton = { TextButton(onClick = { resuming = false }) { Text("Batal") } },
+        )
+    }
+}
+
+/** Libur massal: pilih tanggal terakhir libur (UTS/UAS/libur semester). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PauseAllDialog(vm: MainViewModel, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val todayUtc = LocalDate.now().atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis = todayUtc + 6 * 24 * 60 * 60 * 1000L,
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis >= todayUtc
+        },
+    )
+    DatePickerDialog(
+        onDismissRequest = onClose,
+        confirmButton = {
+            TextButton(
+                enabled = state.selectedDateMillis != null,
+                onClick = {
+                    state.selectedDateMillis?.let { millis ->
+                        val until = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                        vm.pauseAll(until)
+                        Toast.makeText(context, "Semua jadwal libur s/d ${Formatters.date(until)}", Toast.LENGTH_LONG).show()
+                    }
+                    onClose()
+                },
+            ) { Text("Liburkan") }
+        },
+        dismissButton = { TextButton(onClick = onClose) { Text("Batal") } },
+    ) {
+        DatePicker(
+            state = state,
+            title = { Text("Libur semua sampai tanggal", modifier = Modifier.padding(start = 24.dp, top = 16.dp)) },
+        )
+    }
 }
 
 @Composable
@@ -144,6 +202,19 @@ fun ScheduleScreen(vm: MainViewModel, contentPadding: PaddingValues) {
                 modifier = Modifier.fillMaxSize().padding(inner),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
             ) {
+                val pausedUntil = ScheduleMath.allPausedUntil(list.filter { it.active }.map { it.skipUntil }, LocalDate.now())
+                if (pausedUntil != null) {
+                    item(key = "paused") {
+                        Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                            Text(
+                                "🏖 Semua jadwal libur s/d ${Formatters.date(pausedUntil)}. " +
+                                    "Batalkan lewat menu ⋮ → Aktifkan semua lagi.",
+                                modifier = Modifier.padding(16.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                }
                 list.groupBy { it.dayOfWeek }.toSortedMap().forEach { (day, dayCourses) ->
                     item(key = "h$day") {
                         Text(

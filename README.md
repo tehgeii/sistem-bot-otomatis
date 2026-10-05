@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 2.0** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 2.1** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -225,6 +225,27 @@ ruang (opsional). Jadwal berulang tiap minggu dan dikelompokkan per hari.
 teman lewat WhatsApp/Telegram, sekalian jadi cadangan) dan **Impor jadwal** (tempel teks → pratinjau
 jumlah matkul baru → Impor). Matkul yang sudah ada (nama + hari + jam sama) dilewati, jadi aman
 diimpor berulang. Teman sekelas cukup impor satu kali, tidak perlu mengetik ulang.
+
+## Libur massal (UTS/UAS/libur semester)
+
+Tab **Jadwal** → menu **⋮** → **Liburkan semua sampai…** → pilih tanggal terakhir libur. Semua
+pengingat berhenti sampai tanggal itu (di atas daftar tampil "🏖 Semua jadwal libur s/d …"), lalu
+otomatis aktif lagi. Mau batal lebih cepat: **⋮ → Aktifkan semua lagi**.
+
+## Ringkasan mingguan
+
+Tiap **Minggu jam 19.00** Telegram menerima ringkasan minggu itu: berapa presensi berhasil,
+terlewat (beserta nama matkulnya), libur, dan tidak dibuka dosen. Matikan/coba di
+*Pengaturan → Telegram* (**Ringkasan mingguan**, **Kirim ringkasan sekarang**).
+
+## Kalau login SiAdin gagal
+
+Bila NIM/password ditolak SiAdin (mis. password baru diganti), muncul notifikasi **"Login SiAdin
+gagal"** sekali sehari. Tap → Pengaturan → SiAdin web, simpan login yang baru. Selama itu pengingat
+tetap jalan (notifikasi "Cek presensi"), jadi tidak terlewat.
+
+**Cek tepat waktu?** Di *Pengaturan → SiAdin web* tampil "Cek terakhir telat X dtk dari alarm".
+Bila sering di atas 30 detik, HP menunda aplikasi: aktifkan izin baterai & Autostart (*Izin HP*).
 
 ## Widget
 

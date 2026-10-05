@@ -39,6 +39,10 @@ data class AppSettings(
     val fullScreenAlert: Boolean = true,
     /** Perkiraan data yang dipakai pengecekan SiAdin hari ini (byte). */
     val checkBytesToday: Long = 0,
+    /** Keterlambatan pengecekan SiAdin terakhir dari jadwal alarm (detik); null = belum ada data. */
+    val lastCheckDelaySec: Long? = null,
+    /** Kirim ringkasan mingguan ke Telegram tiap Minggu malam. */
+    val weeklySummary: Boolean = true,
 ) {
     /** Mode pintar hanya berlaku untuk SiAdin web dengan login tersimpan. */
     val smartModeActive: Boolean
@@ -67,6 +71,12 @@ class SettingsStore(private val context: Context) {
         val PRESENSI_OPEN = stringSetPreferencesKey("presensi_open")
         val CHECK_BYTES = longPreferencesKey("check_bytes")
         val CHECK_BYTES_DAY = longPreferencesKey("check_bytes_day")
+        val LAST_CHECK_DELAY = longPreferencesKey("last_check_delay_sec")
+        val WEEKLY_SUMMARY = booleanPreferencesKey("weekly_summary")
+        /** Senin (epoch day) minggu yang ringkasannya sudah terkirim. */
+        val SUMMARY_SENT_WEEK = longPreferencesKey("summary_sent_week")
+        /** Hari (epoch day) notifikasi "login gagal" terakhir ditampilkan. */
+        val LOGIN_FAILED_DAY = longPreferencesKey("login_failed_day")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -88,7 +98,30 @@ class SettingsStore(private val context: Context) {
         smartPresensi = this[Keys.SMART_PRESENSI] ?: true,
         fullScreenAlert = this[Keys.FULL_SCREEN_ALERT] ?: true,
         checkBytesToday = if (this[Keys.CHECK_BYTES_DAY] == todayEpochDay()) this[Keys.CHECK_BYTES] ?: 0 else 0,
+        lastCheckDelaySec = this[Keys.LAST_CHECK_DELAY],
+        weeklySummary = this[Keys.WEEKLY_SUMMARY] ?: true,
     )
+
+    suspend fun setLastCheckDelay(seconds: Long) = context.dataStore.edit { it[Keys.LAST_CHECK_DELAY] = seconds.coerceAtLeast(0) }
+
+    suspend fun setWeeklySummary(enabled: Boolean) = context.dataStore.edit { it[Keys.WEEKLY_SUMMARY] = enabled }
+
+    suspend fun summarySentWeek(): Long? = context.dataStore.data.first()[Keys.SUMMARY_SENT_WEEK]
+
+    suspend fun setSummarySentWeek(mondayEpochDay: Long) = context.dataStore.edit { it[Keys.SUMMARY_SENT_WEEK] = mondayEpochDay }
+
+    /** True bila notifikasi "login gagal" belum tampil hari ini (lalu menandainya sudah). */
+    suspend fun claimLoginFailedNotice(): Boolean {
+        val today = todayEpochDay()
+        var claimed = false
+        context.dataStore.edit {
+            if (it[Keys.LOGIN_FAILED_DAY] != today) {
+                it[Keys.LOGIN_FAILED_DAY] = today
+                claimed = true
+            }
+        }
+        return claimed
+    }
 
     /** Tambah perkiraan data pengecekan; total di-reset otomatis saat ganti hari. */
     suspend fun addCheckBytes(bytes: Long) = context.dataStore.edit { prefs ->
@@ -139,6 +172,7 @@ class SettingsStore(private val context: Context) {
     suspend fun setSiadinLogin(nim: String, password: String) = context.dataStore.edit {
         it[Keys.SIADIN_NIM_ENC] = TokenCipher.encrypt(nim.trim())
         it[Keys.SIADIN_PASSWORD_ENC] = TokenCipher.encrypt(password)
+        it.remove(Keys.LOGIN_FAILED_DAY)
     }
 
     suspend fun clearSiadinLogin() = context.dataStore.edit {

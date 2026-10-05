@@ -87,6 +87,25 @@ class Repository(private val db: AppDatabase) {
         applySkip(course, sunday, if (date.isBefore(today)) emptyList() else listOf(date))
     }
 
+    /**
+     * Libur massal (UTS/UAS/libur semester): semua matkul dilewati sampai [until] (inklusif).
+     * Memakai mesin libur per-matkul yang sama; kemunculan hari ini (bila ada) dicatat Libur
+     * supaya pengingat yang sedang tampil langsung berhenti.
+     */
+    suspend fun pauseAll(until: LocalDate, now: LocalDateTime = LocalDateTime.now()) {
+        val today = now.toLocalDate()
+        if (until.isBefore(today)) return
+        for (course in courseDao.getAll()) {
+            val dates = if (course.dayOfWeek == today.dayOfWeek.value) listOf(today) else emptyList()
+            applySkip(course, until, dates)
+        }
+    }
+
+    /** Batalkan semua libur (per matkul maupun massal) yang belum lewat. */
+    suspend fun resumeAll() {
+        for (course in courseDao.getAll()) if (course.skipUntilEpochDay != null) clearSkip(course)
+    }
+
     suspend fun clearSkip(course: Course) {
         val today = LocalDate.now()
         course.skipUntil?.let { until ->

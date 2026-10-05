@@ -21,8 +21,10 @@ enum class PresensiState {
     OPEN,
     /** Kartu matkul ini sudah "Berhasil Presensi". */
     DONE,
-    /** Gagal memastikan (offline, login gagal, halaman tidak dikenali). */
+    /** Gagal memastikan (offline, halaman tidak dikenali). */
     UNKNOWN,
+    /** Form login tetap tampil setelah NIM/password dikirim: data login kemungkinan salah/berubah. */
+    LOGIN_FAILED,
 }
 
 /**
@@ -101,7 +103,9 @@ object SiadinChecker {
                         loginAttempts++
                         return@repeat // tunggu halaman setelah login
                     }
-                    "LOGIN_PAGE" -> return PresensiState.UNKNOWN // tidak bisa login
+                    // Form login masih tampil setelah dikirim → NIM/password ditolak; tanpa data login → tak bisa cek.
+                    "LOGIN_PAGE" -> return if (credentials != null && loginAttempts > 0) PresensiState.LOGIN_FAILED
+                    else PresensiState.UNKNOWN
                 }
 
                 if (!url.startsWith(targetUrl)) {
@@ -122,7 +126,8 @@ object SiadinChecker {
                         "WAITING" -> return PresensiState.WAITING
                         "LOGIN" -> {
                             // Cookie lama tapi sesi sudah habis: login ulang lewat halaman depan, lalu cek lagi.
-                            if (credentials == null || loginAttempts >= MAX_LOGIN_ATTEMPTS) return PresensiState.UNKNOWN
+                            if (credentials == null) return PresensiState.UNKNOWN
+                            if (loginAttempts >= MAX_LOGIN_ATTEMPTS) return PresensiState.LOGIN_FAILED
                             loginAttempts++
                             relogin = true
                             webView.loadUrl(SiadinScripts.siteRoot(targetUrl))

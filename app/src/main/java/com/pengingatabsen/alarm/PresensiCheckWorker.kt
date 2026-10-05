@@ -36,6 +36,9 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
 
         val store = Graph.settings
         val settings = store.current()
+        // Ukur seberapa telat cek ini mulai sejak alarm berbunyi (Doze/penghemat baterai bisa menundanya).
+        val enqueuedAt = inputData.getLong(KEY_ENQUEUED_AT, 0L)
+        if (enqueuedAt > 0) store.setLastCheckDelay((System.currentTimeMillis() - enqueuedAt) / 1000)
         // Ukur perkiraan data yang dipakai pengecekan ini (untuk ditampilkan di Pengaturan).
         val uid = android.os.Process.myUid()
         val rxBefore = android.net.TrafficStats.getUidRxBytes(uid)
@@ -94,7 +97,11 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
                 // Sudah dibuka: kembali ke interval pengingat pengguna (bukan cek tiap menit).
                 AlarmScheduler.reschedule(ctx, courseId)
             }
-            PresensiState.UNKNOWN -> {
+            PresensiState.UNKNOWN, PresensiState.LOGIN_FAILED -> {
+                // Login ditolak (NIM/password berubah?): beri tahu sekali sehari, pengingat tetap jalan.
+                if (state == PresensiState.LOGIN_FAILED && store.claimLoginFailedNotice()) {
+                    Notifications.showLoginFailed(ctx)
+                }
                 // Sekali gagal (internet putus sebentar) jangan langsung mengubah notifikasi.
                 // Baru bergetar "cek manual" setiap 3 kali gagal berturut-turut (±3 menit), atau di FINAL.
                 val streak = store.presensiUnknownStreak(courseId, epochDay) + 1
@@ -123,16 +130,24 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
         private const val KEY_COURSE_ID = "course_id"
         private const val KEY_EPOCH_DAY = "epoch_day"
         private const val KEY_TYPE = "type"
+        private const val KEY_ENQUEUED_AT = "enqueued_at"
         private const val CHECKING_NOTIFICATION_ID = 778
         private const val UNKNOWN_ESCALATE_AFTER = 3
 
         fun enqueue(context: Context, courseId: Long, epochDay: Long, type: EventType) {
             val request = OneTimeWorkRequestBuilder<PresensiCheckWorker>()
-                .setInputData(workDataOf(KEY_COURSE_ID to courseId, KEY_EPOCH_DAY to epochDay, KEY_TYPE to type.name))
+                .setInputData(workDataOf(
+                    KEY_COURSE_ID to courseId,
+                    KEY_EPOCH_DAY to epochDay,
+                    KEY_TYPE to type.name,
+                    KEY_ENQUEUED_AT to System.currentTimeMillis(),
+                ))
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
+            // KEEP: cek yang masih berjalan (bisa ±55 dtk di sinyal lambat) dibiarkan selesai,
+            // jangan dibatalkan oleh alarm berikutnya — kalau dibatalkan, hasilnya tidak pernah tercatat.
             WorkManager.getInstance(context)
-                .enqueueUniqueWork("cek-presensi-$courseId-$epochDay", ExistingWorkPolicy.REPLACE, request)
+                .enqueueUniqueWork("cek-presensi-$courseId-$epochDay", ExistingWorkPolicy.KEEP, request)
         }
     }
 }

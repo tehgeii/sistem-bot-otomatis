@@ -30,6 +30,8 @@ class MainViewModel : ViewModel() {
     fun holidayToday(course: Course) = viewModelScope.launch { repo.holidayToday(course) }
     fun skipThisWeek(course: Course) = viewModelScope.launch { repo.skipThisWeek(course) }
     fun clearSkip(course: Course) = viewModelScope.launch { repo.clearSkip(course) }
+    fun pauseAll(until: java.time.LocalDate) = viewModelScope.launch { repo.pauseAll(until) }
+    fun resumeAll() = viewModelScope.launch { repo.resumeAll() }
     fun resend(record: AttendanceRecord) = viewModelScope.launch { repo.resend(record.id) }
 
     fun exportSchedule(onReady: (String) -> Unit) = viewModelScope.launch { onReady(repo.exportSchedule()) }

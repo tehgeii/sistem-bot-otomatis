@@ -81,6 +81,16 @@ object ScheduleMath {
         return Occurrence(date, open, end)
     }
 
+    /**
+     * Libur massal: bila SEMUA matkul aktif sedang libur (tanggal libur ≥ [today]), kembalikan tanggal
+     * libur paling awal berakhir (saat pengingat pertama kembali). Selain itu null.
+     */
+    fun allPausedUntil(activeSkipUntil: List<LocalDate?>, today: LocalDate): LocalDate? {
+        if (activeSkipUntil.isEmpty()) return null
+        if (activeSkipUntil.any { it == null || it.isBefore(today) }) return null
+        return activeSkipUntil.filterNotNull().minOrNull()
+    }
+
     fun isSkipped(slot: Slot, date: LocalDate): Boolean =
         slot.skipUntil?.let { !date.isAfter(it) } ?: false
 

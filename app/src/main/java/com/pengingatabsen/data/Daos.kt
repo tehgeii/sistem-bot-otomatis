@@ -44,6 +44,9 @@ interface RecordDao {
     @Query("SELECT * FROM records WHERE courseId = :courseId AND epochDay >= :fromEpochDay")
     suspend fun forCourseSince(courseId: Long, fromEpochDay: Long): List<AttendanceRecord>
 
+    @Query("SELECT * FROM records WHERE epochDay BETWEEN :fromEpochDay AND :toEpochDay ORDER BY epochDay")
+    suspend fun between(fromEpochDay: Long, toEpochDay: Long): List<AttendanceRecord>
+
     @Query("SELECT * FROM records WHERE status = 'ACTIVE' ORDER BY openAtMillis DESC")
     suspend fun active(): List<AttendanceRecord>
 

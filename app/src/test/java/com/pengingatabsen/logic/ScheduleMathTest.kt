@@ -235,6 +235,20 @@ class ScheduleMathTest {
         assertEquals(2, ScheduleMath.smartCheckInterval(metered = true, minutesToEnd = null))
     }
 
+    // ---------- Libur massal ----------
+
+    @Test
+    fun allPausedUntil_onlyWhenEveryActiveCourseIsPaused() {
+        val today = LocalDate.of(2026, 10, 5)
+        val until = LocalDate.of(2026, 10, 18)
+        assertEquals(until, ScheduleMath.allPausedUntil(listOf(until, until.plusDays(3)), today))
+        // Satu matkul tidak libur → bukan libur massal.
+        assertEquals(null, ScheduleMath.allPausedUntil(listOf(until, null), today))
+        // Libur yang sudah lewat tidak dihitung.
+        assertEquals(null, ScheduleMath.allPausedUntil(listOf(until, today.minusDays(1)), today))
+        assertEquals(null, ScheduleMath.allPausedUntil(emptyList(), today))
+    }
+
     // ---------- Format pesan ----------
 
     @Test

@@ -170,6 +170,7 @@ object Notifications {
     }
 
     private const val PRESENSI_OPEN_ID = 777
+    private const val LOGIN_FAILED_ID = 779
 
     /** Info non-heads-up, mis. gagal mengirim bukti. */
     fun showInfo(context: Context, id: Int, title: String, text: String, action: Pair<String, PendingIntent>? = null) {
@@ -182,6 +183,28 @@ object Notifications {
             .setContentIntent(openApp(context))
         action?.let { builder.addAction(0, it.first, it.second) }
         notify(context, id, builder)
+    }
+
+    /** NIM/password SiAdin ditolak saat login otomatis. Tap → Pengaturan untuk memperbarui. */
+    fun showLoginFailed(context: Context) {
+        val settings = PendingIntent.getActivity(
+            context, 2,
+            Intent(context, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val text = "Login otomatis ditolak SiAdin — NIM/password mungkin berubah. " +
+            "Perbarui di Pengaturan → SiAdin web. Pengingat tetap jalan."
+        val builder = NotificationCompat.Builder(context, CHANNEL_INFO)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Login SiAdin gagal")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(settings)
+            .addAction(0, "Perbarui", settings)
+        notify(context, LOGIN_FAILED_ID, builder)
     }
 
     fun cancel(context: Context, courseId: Long) {

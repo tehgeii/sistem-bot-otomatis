@@ -12,6 +12,7 @@ import com.pengingatabsen.data.toMillis
 import com.pengingatabsen.logic.OccurrenceState
 import com.pengingatabsen.logic.PlannedAlarm
 import com.pengingatabsen.logic.ScheduleMath
+import com.pengingatabsen.telegram.SummaryWorker
 import com.pengingatabsen.ui.MainActivity
 import com.pengingatabsen.widget.NextCourseWidget
 import java.time.LocalDateTime
@@ -67,6 +68,7 @@ object AlarmScheduler {
         expireStale(context)
         for (course in Graph.repository.allCourses()) reschedule(context, course.id)
         NextCourseWidget.updateAll(context)
+        SummaryWorker.schedule(context, Graph.settings.current().weeklySummary)
     }
 
     /** Jendela yang sudah lewat tapi masih ACTIVE (mis. HP mati) dicatat sebagai terlewat. */

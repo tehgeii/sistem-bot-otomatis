@@ -62,6 +62,7 @@ class AlarmReceiver : BroadcastReceiver() {
             EventType.FINAL -> Notifications.showReminder(context, course, record, final = true)
             EventType.EXPIRE -> {
                 Notifications.cancel(context, courseId)
+                store.setPresensiUnknownStreak(courseId, date.toEpochDay(), 0)
                 // Dosen tidak pernah membuka presensi: catat "tidak dibuka", tanpa pesan terlewat.
                 if (smart && !seenOpen) repo.markNoSession(record) else repo.markMissed(record)
             }

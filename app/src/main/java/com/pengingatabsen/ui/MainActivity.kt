@@ -1,5 +1,6 @@
 package com.pengingatabsen.ui
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +17,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -37,15 +39,22 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
     private val setupVm: SetupViewModel by viewModels()
+    /** Tab yang diminta lewat intent (mis. notifikasi "Login SiAdin gagal" → Pengaturan). */
+    private var requestedTab by mutableIntStateOf(-1)
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedTab = intent.getIntExtra(EXTRA_TAB, -1)
         enableEdgeToEdge()
         setContent {
             PengingatTheme {
                 val settings by vm.settings.collectAsState()
                 var tab by rememberSaveable { mutableIntStateOf(0) }
+                LaunchedEffect(requestedTab) {
+                    if (requestedTab in 0..2) tab = requestedTab
+                    requestedTab = -1
+                }
                 val current = settings ?: return@PengingatTheme
                 val titles = listOf("Jadwal", "Riwayat", "Pengaturan")
 
@@ -87,10 +96,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        requestedTab = intent.getIntExtra(EXTRA_TAB, -1)
+    }
+
     override fun onResume() {
         super.onResume()
         // Jaga-jaga: pastikan semua alarm terpasang setiap aplikasi dibuka.
         val context = applicationContext
         lifecycleScope.launch { AlarmScheduler.rescheduleAll(context) }
+    }
+
+    companion object {
+        const val EXTRA_TAB = "tab"
+        const val TAB_SETTINGS = 2
     }
 }
