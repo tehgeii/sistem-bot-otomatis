@@ -14,7 +14,16 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
-enum class PresensiState { WAITING, OPEN, UNKNOWN }
+enum class PresensiState {
+    /** Belum dibuka dosen ("Belum Ada Presensi" / "Belum Jadwalnya"). */
+    WAITING,
+    /** Tombol presensi aktif. */
+    OPEN,
+    /** Kartu matkul ini tombolnya nonaktif tapi bukan "belum" — kemungkinan sudah presensi. */
+    DONE,
+    /** Gagal memastikan (offline, login gagal, halaman tidak dikenali). */
+    UNKNOWN,
+}
 
 /**
  * Mengecek halaman Presensi Online SiAdin di latar belakang dengan WebView tak terlihat.
@@ -26,13 +35,23 @@ object SiadinChecker {
     private const val MAX_PAGES = 8
     private const val MAX_LOGIN_ATTEMPTS = 2
 
-    suspend fun check(context: Context, targetUrl: String, credentials: Pair<String, String>?): PresensiState =
+    suspend fun check(
+        context: Context,
+        targetUrl: String,
+        credentials: Pair<String, String>?,
+        courseName: String,
+    ): PresensiState =
         withTimeoutOrNull(TOTAL_TIMEOUT_MS) {
-            withContext(Dispatchers.Main) { runCheck(context.applicationContext, targetUrl, credentials) }
+            withContext(Dispatchers.Main) { runCheck(context.applicationContext, targetUrl, credentials, courseName) }
         } ?: PresensiState.UNKNOWN
 
     @SuppressLint("SetJavaScriptEnabled")
-    private suspend fun runCheck(context: Context, targetUrl: String, credentials: Pair<String, String>?): PresensiState {
+    private suspend fun runCheck(
+        context: Context,
+        targetUrl: String,
+        credentials: Pair<String, String>?,
+        courseName: String,
+    ): PresensiState {
         val pages = Channel<String>(Channel.CONFLATED)
         val webView = WebView(context)
         try {
@@ -88,23 +107,28 @@ object SiadinChecker {
                 // Di halaman presensi: tunggu data akun & kartu presensi termuat (maks. ±20 detik).
                 // "Dibuka" baru dipercaya bila tombol presensi terlihat 3 kali berturut-turut (±3 detik),
                 // supaya kartu "Belum Ada Presensi" yang dimuat belakangan tidak disangka dibuka.
+                val stateScript = SiadinScripts.presensiStateScript(courseName)
                 var buttonStreak = 0
+                var doneStreak = 0
                 var noTextStreak = 0
                 repeat(20) {
-                    when (webView.eval(SiadinScripts.PRESENSI_STATE_SCRIPT)) {
+                    when (webView.eval(stateScript)) {
                         "WAITING" -> return PresensiState.WAITING
                         "LOGIN" -> return PresensiState.UNKNOWN
                         "BUTTON" -> {
-                            noTextStreak = 0
+                            doneStreak = 0; noTextStreak = 0
                             if (++buttonStreak >= 3) return PresensiState.OPEN
                         }
+                        "DONE" -> {
+                            buttonStreak = 0; noTextStreak = 0
+                            if (++doneStreak >= 3) return PresensiState.DONE
+                        }
                         "NO_TEXT" -> {
-                            buttonStreak = 0
+                            buttonStreak = 0; doneStreak = 0
                             if (++noTextStreak >= 8) return PresensiState.UNKNOWN
                         }
                         else -> {
-                            buttonStreak = 0
-                            noTextStreak = 0
+                            buttonStreak = 0; doneStreak = 0; noTextStreak = 0
                         }
                     }
                     delay(1_000)

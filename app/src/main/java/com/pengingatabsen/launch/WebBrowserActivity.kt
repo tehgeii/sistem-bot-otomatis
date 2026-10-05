@@ -80,6 +80,8 @@ class WebBrowserActivity : ComponentActivity() {
     private lateinit var targetUrl: String
     private var courseId = 0L
     private var epochDay = 0L
+    /** Nama matkul untuk mencocokkan kartu presensi di SiAdin ("" = semua kartu). */
+    private var courseName = ""
 
     // State UI
     private var pageTitle by mutableStateOf("SiAdin")
@@ -181,6 +183,7 @@ class WebBrowserActivity : ComponentActivity() {
             val settings = Graph.settings.current()
             autoLogin = settings.autoLogin
             credentials = if (settings.autoLogin) Graph.settings.siadinLogin() else null
+            courseName = Graph.repository.course(courseId)?.name.orEmpty()
             settingsLoaded = true
             startLoadingIfReady()
         }
@@ -330,7 +333,7 @@ class WebBrowserActivity : ComponentActivity() {
      * Tombol presensi TIDAK pernah ditekan oleh aplikasi; pengguna yang menekannya.
      */
     private fun checkPresensi(view: WebView) {
-        view.evaluateJavascript(CHECK_PRESENSI_SCRIPT) { raw ->
+        view.evaluateJavascript(SiadinScripts.highlightScript(courseName)) { raw ->
             view.removeCallbacks(reloadWhileWaiting)
             when (raw?.trim('"')) {
                 "WAITING" -> {
@@ -365,7 +368,7 @@ class WebBrowserActivity : ComponentActivity() {
      */
     private fun healFalseOpen(view: WebView) {
         if (courseId <= 0) return
-        view.evaluateJavascript(SiadinScripts.PRESENSI_STATE_SCRIPT) { raw ->
+        view.evaluateJavascript(SiadinScripts.presensiStateScript(courseName)) { raw ->
             if (raw?.trim('"') != "WAITING") return@evaluateJavascript
             val context = applicationContext
             lifecycleScope.launch(Dispatchers.IO) {
@@ -469,6 +472,7 @@ class WebBrowserActivity : ComponentActivity() {
         courseId = intent.getLongExtra(AlarmScheduler.EXTRA_COURSE_ID, 0L)
         epochDay = intent.getLongExtra(AlarmScheduler.EXTRA_EPOCH_DAY, 0L)
         targetUrl = intent.getStringExtra(EXTRA_URL) ?: targetUrl
+        lifecycleScope.launch { courseName = Graph.repository.course(courseId)?.name.orEmpty() }
         loginAttempts = 0
         redirectAfterLogin = false
         status = null
@@ -497,45 +501,6 @@ class WebBrowserActivity : ComponentActivity() {
         private const val MAX_WAIT_MS = 90 * 60_000L
         private const val AUTO_PROOF_DELAY_MS = 4_000L
 
-        /**
-         * Status halaman presensi: WAITING ("Belum Ada Presensi"), OPEN (tombol presensi ditemukan →
-         * diberi sorotan kuning, digulir ke tengah, dan dipasangi listener klik), atau UNKNOWN.
-         * Script ini TIDAK menekan tombol; listener hanya memberi tahu aplikasi saat pengguna menekannya.
-         */
-        private val CHECK_PRESENSI_SCRIPT = """
-            (function(){
-              var text = document.body ? document.body.innerText : '';
-              if (/belum ada presensi/i.test(text)) return 'WAITING';
-              function shown(e){
-                var r = e.getBoundingClientRect(), s = window.getComputedStyle(e);
-                return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
-              }
-              var cands = Array.prototype.slice.call(
-                document.querySelectorAll('button,a,input[type=button],input[type=submit]')
-              ).filter(function(b){
-                if (!shown(b)) return false;
-                if (b.closest && b.closest('nav,header,.navbar,.sidebar')) return false;
-                if (/presensiOnline/i.test(b.getAttribute('href') || '')) return false;
-                var t = (b.innerText || b.value || '').trim();
-                if (/^presensi\s*online$/i.test(t)) return false;
-                return t.length > 0 && t.length < 40 && /presensi|hadir|absen/i.test(t);
-              });
-              var b = cands[0];
-              if (!b) return 'UNKNOWN';
-              if (!b.__pengingat) {
-                b.__pengingat = true;
-                b.style.outline = '4px solid #F2B705';
-                b.style.outlineOffset = '3px';
-                b.style.boxShadow = '0 0 0 8px rgba(242,183,5,.35)';
-                b.addEventListener('click', function(){
-                  try { PengingatAbsen.onPresensiClicked(); } catch (e) {}
-                }, true);
-              }
-              b.scrollIntoView({block: 'center', behavior: 'smooth'});
-              return 'OPEN';
-            })();
-        """
-
         fun intent(context: Context, url: String, courseId: Long = 0L, epochDay: Long = 0L): Intent =
             Intent(context, WebBrowserActivity::class.java).apply {
                 putExtra(EXTRA_URL, url)
@@ -543,6 +508,5 @@ class WebBrowserActivity : ComponentActivity() {
                 putExtra(AlarmScheduler.EXTRA_EPOCH_DAY, epochDay)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
-
     }
 }

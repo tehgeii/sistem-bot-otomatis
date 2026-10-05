@@ -80,6 +80,8 @@ object Notifications {
         checkFailed: Boolean = false,
         /** Mode pintar: presensi di SiAdin terdeteksi SUDAH dibuka dosen. */
         sessionOpen: Boolean = false,
+        /** Mode pintar: di SiAdin tombol presensi matkul ini sudah nonaktif (kemungkinan sudah presensi). */
+        alreadyDone: Boolean = false,
     ) {
         val epochDay = record?.epochDay ?: 0L
         val detail = buildString {
@@ -87,6 +89,7 @@ object Notifications {
             course.room?.let { append(" · Ruang ").append(it) }
         }
         val title = when {
+            alreadyDone -> "Sudah presensi ${course.name}?"
             waiting -> "Menunggu presensi: ${course.name}"
             checkFailed -> "Cek presensi: ${course.name}"
             final -> "⚠️ 5 menit lagi ditutup: ${course.name}"
@@ -95,21 +98,22 @@ object Notifications {
             else -> "Waktunya absen: ${course.name}"
         }
         val text = when {
+            alreadyDone -> "Di SiAdin presensi matkul ini tampaknya sudah terisi. Tekan Absen sekarang lalu \"Sudah, kirim bukti\". $detail"
             waiting -> "Belum dibuka dosen di SiAdin. Dicek otomatis tiap menit — HP bergetar begitu dibuka. $detail"
             checkFailed -> "SiAdin tidak bisa dicek otomatis (internet/login). Tap untuk cek manual. $detail"
             final -> "Segera absen sekarang! $detail"
             else -> detail
         }
         val absen = launchIntent(context, course.id, epochDay)
-        val builder = base(context, absenChannel(), silent || waiting)
+        val builder = base(context, absenChannel(), silent || waiting || alreadyDone)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(absen)
             .addAction(0, "Absen sekarang", absen)
             .addAction(0, "Tunda 5 menit", action(context, NotificationActionReceiver.ACTION_SNOOZE, course.id, epochDay))
             .addAction(0, "Libur", action(context, NotificationActionReceiver.ACTION_HOLIDAY, course.id, epochDay))
-        if (final || waiting || checkFailed) builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
-        if (waiting) builder.setPriority(NotificationCompat.PRIORITY_LOW)
+        if (final || waiting || checkFailed || alreadyDone) builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        if (waiting || alreadyDone) builder.setPriority(NotificationCompat.PRIORITY_LOW)
         notify(context, idFor(course.id), builder)
     }
 

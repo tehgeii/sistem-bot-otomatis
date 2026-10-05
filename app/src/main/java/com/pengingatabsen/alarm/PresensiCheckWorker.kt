@@ -38,6 +38,7 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
             applicationContext,
             settings.deepLink ?: TargetApps.SIADIN_PRESENSI_URL,
             if (settings.autoLogin) store.siadinLogin() else null,
+            course.name,
         )
 
         // Baca ulang: pengguna mungkin sudah menekan tombol selama pengecekan berjalan.
@@ -49,6 +50,11 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
             PresensiState.WAITING -> {
                 store.setPresensiUnknownStreak(courseId, epochDay, 0)
                 Notifications.showReminder(ctx, course, record, final = false, waiting = true)
+            }
+            PresensiState.DONE -> {
+                // Kemungkinan sudah presensi (mis. lewat Dinusverse): jangan getar, minta konfirmasi saja.
+                store.setPresensiUnknownStreak(courseId, epochDay, 0)
+                Notifications.showReminder(ctx, course, record, final = false, alreadyDone = true)
             }
             PresensiState.OPEN -> {
                 store.setPresensiUnknownStreak(courseId, epochDay, 0)

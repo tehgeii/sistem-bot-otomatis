@@ -27,41 +27,111 @@ object SiadinScripts {
     }
 
     /**
-     * Status halaman Presensi Online (hanya membaca):
-     * - LOGIN   = form login tampil
-     * - LOADING = belum selesai termuat / data akun belum muncul
-     * - WAITING = sudah login dan tertulis "Belum Ada Presensi"
-     * - BUTTON  = sudah login, teks itu tidak ada, dan tombol presensi terlihat
-     * - NO_TEXT = sudah login, teks itu tidak ada, tapi tombol presensi tidak terlihat
-     *
-     * Penting: halaman yang BELUM login juga menampilkan "Belum Ada Presensi" (kotak masa studi
-     * th/bl/hr kosong), dan kartu presensi dimuat belakangan lewat AJAX. Jadi status hanya dipercaya
-     * bila angka masa studi sudah terisi, dan pemanggil harus melihat hasil yang sama beberapa kali.
+     * Membaca kartu "Presensi Kuliah Online" di halaman (hanya membaca).
+     * Setiap kartu berisi nama matkul, KDMK/KLPK, tanggal, dan satu tombol:
+     * - "Belum Jadwalnya" (atau teks berisi "belum")   → state 'waiting'
+     * - tombol nonaktif lainnya (mis. sudah presensi)  → state 'done'
+     * - tombol aktif                                   → state 'open'
+     * Kartu dicocokkan ke matkul jadwal lewat kata-kata nama matkul (≥3 huruf, tanpa angka).
+     * Bila tidak ada kartu yang cocok, semua kartu dipakai sebagai cadangan (nama di jadwal bisa beda).
      */
-    val PRESENSI_STATE_SCRIPT = """
-        (function(){
+    private const val CARDS_JS = """
+        function __pShown(e){ var r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }
+        function __norm(s){ return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+        function __cards(course){
+          var tokens = __norm(course).split(' ').filter(function(t){ return t.length >= 3 && !/^\d+$/.test(t); });
+          var btns = Array.prototype.slice.call(
+            document.querySelectorAll('button,a,input[type=button],input[type=submit],[role=button]')
+          ).filter(function(b){
+            if (!__pShown(b)) return false;
+            if (b.closest && b.closest('nav,header,footer,.navbar,.sidebar')) return false;
+            if (/presensiOnline/i.test(b.getAttribute('href') || '')) return false;
+            var t = (b.innerText || b.value || '').trim();
+            if (!t || t.length > 40 || /^presensi\s*online$/i.test(t)) return false;
+            return /belum|presensi|hadir|absen|isi|masuk|sudah|klik/i.test(t);
+          });
+          return btns.map(function(b){
+            // Naik ke elemen kartu: pembungkus terdekat yang memuat KDMK/KLPK.
+            var card = b, i = 0;
+            while (card.parentElement && i < 8 && !/kdmk|klpk/i.test(card.innerText || '')) { card = card.parentElement; i++; }
+            var inCard = /kdmk|klpk/i.test(card.innerText || '');
+            var ct = __norm(card.innerText);
+            var t = (b.innerText || b.value || '').trim();
+            var st = window.getComputedStyle(b);
+            var disabled = b.disabled === true || b.getAttribute('aria-disabled') === 'true' ||
+              /disabled/i.test(b.getAttribute('class') || '') || st.pointerEvents === 'none' || st.cursor === 'not-allowed';
+            var state = /belum/i.test(t) ? 'waiting' : (disabled ? 'done' : 'open');
+            var match = tokens.length > 0 && tokens.every(function(k){ return ct.indexOf(k) >= 0; });
+            return { el: b, state: state, match: match, inCard: inCard };
+          }).filter(function(c){ return c.inCard; });
+        }
+        function __pick(course){
+          var all = __cards(course);
+          var matched = all.filter(function(c){ return c.match; });
+          return { all: all, matched: matched.length > 0, cand: matched.length ? matched : all };
+        }
+    """
+
+    /**
+     * Status presensi untuk satu matkul (hanya membaca):
+     * - LOGIN   = form login tampil
+     * - LOADING = belum selesai termuat / data akun atau kartu belum muncul
+     * - WAITING = "Belum Ada Presensi", atau kartu matkul masih "Belum Jadwalnya"
+     * - BUTTON  = tombol presensi aktif (sudah dibuka dosen)
+     * - DONE    = kartu matkul ini tombolnya nonaktif tapi bukan "belum" (kemungkinan sudah presensi)
+     * - NO_TEXT = sudah login & termuat, tapi tidak ada kartu maupun tulisan "Belum Ada Presensi"
+     *
+     * Halaman yang BELUM login juga bertuliskan "Belum Ada Presensi" (kotak masa studi th/bl/hr kosong),
+     * jadi status hanya dipercaya bila angka masa studi sudah terisi.
+     */
+    fun presensiStateScript(courseName: String): String = """
+        (function(course){
+          $CARDS_JS
           var body = document.body;
           if (!body) return 'LOADING';
           if (document.querySelector('input[type=password]')) return 'LOGIN';
           if (document.readyState !== 'complete') return 'LOADING';
           var text = body.innerText || '';
-          var loggedIn = /\d+\s*(th|bl|hr)\b/i.test(text);
-          if (!loggedIn) return 'LOADING';
+          if (!/\d+\s*(th|bl|hr)\b/i.test(text)) return 'LOADING';
           if (/belum ada presensi/i.test(text)) return 'WAITING';
+          var p = __pick(course);
+          if (p.cand.some(function(c){ return c.state === 'open'; })) return 'BUTTON';
+          if (p.matched && p.cand.some(function(c){ return c.state === 'done'; })) return 'DONE';
+          if (p.all.length) return 'WAITING';
           if (!/copyright/i.test(text)) return 'LOADING';
-          var found = Array.prototype.slice.call(
-            document.querySelectorAll('button,a,input[type=button],input[type=submit]')
-          ).some(function(b){
-            var r = b.getBoundingClientRect();
-            if (r.width <= 0 || r.height <= 0) return false;
-            if (b.closest && b.closest('nav,header,.navbar,.sidebar')) return false;
-            if (/presensiOnline/i.test(b.getAttribute('href') || '')) return false;
-            var t = (b.innerText || b.value || '').trim();
-            if (/^presensi\s*online$/i.test(t)) return false;
-            return t.length > 0 && t.length < 40 && /presensi|hadir|absen/i.test(t);
-          });
-          return found ? 'BUTTON' : 'NO_TEXT';
-        })();
+          return 'NO_TEXT';
+        })(${JSONObject.quote(courseName)});
+    """
+
+    /**
+     * Untuk browser mini: sorot tombol presensi AKTIF (bingkai kuning, digulir ke tengah) dan pasang
+     * listener klik yang hanya memberi tahu aplikasi saat PENGGUNA menekannya. Tidak pernah memanggil click().
+     * Hasil: WAITING / OPEN / UNKNOWN.
+     */
+    fun highlightScript(courseName: String): String = """
+        (function(course){
+          $CARDS_JS
+          var text = document.body ? (document.body.innerText || '') : '';
+          if (/belum ada presensi/i.test(text)) return 'WAITING';
+          var p = __pick(course);
+          var open = p.cand.filter(function(c){ return c.state === 'open'; })[0];
+          if (open) {
+            var b = open.el;
+            if (!b.__pengingat) {
+              b.__pengingat = true;
+              b.style.outline = '4px solid #F2B705';
+              b.style.outlineOffset = '3px';
+              b.style.boxShadow = '0 0 0 8px rgba(242,183,5,.35)';
+              b.addEventListener('click', function(){
+                try { PengingatAbsen.onPresensiClicked(); } catch (e) {}
+              }, true);
+            }
+            b.scrollIntoView({block: 'center', behavior: 'smooth'});
+            return 'OPEN';
+          }
+          if (p.all.length) return 'WAITING';
+          return 'UNKNOWN';
+        })(${JSONObject.quote(courseName)});
     """
 
     /**
