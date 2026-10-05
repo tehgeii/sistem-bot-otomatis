@@ -6,6 +6,7 @@ import android.content.Intent
 import com.pengingatabsen.Graph
 import com.pengingatabsen.data.RecordStatus
 import com.pengingatabsen.data.toMillis
+import com.pengingatabsen.logic.EventType
 import com.pengingatabsen.widget.NextCourseWidget
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -56,7 +57,15 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     if (record.status == RecordStatus.ACTIVE) {
                         val updated = record.copy(awaitingConfirm = false)
                         dao.update(updated)
-                        Notifications.showReminder(context, course, updated, final = false, silent = true)
+                        val smart = Graph.settings.current().smartModeActive
+                        val seenOpen = Graph.settings.isPresensiOpen(courseId, epochDay)
+                        if (smart && !seenOpen) {
+                            // Presensi belum terlihat dibuka: kembali menunggu dengan senyap & cek ulang.
+                            Notifications.showReminder(context, course, updated, final = false, waiting = true)
+                            PresensiCheckWorker.enqueue(context, courseId, epochDay, EventType.REMIND)
+                        } else {
+                            Notifications.showReminder(context, course, updated, final = false, silent = true, sessionOpen = smart)
+                        }
                     } else {
                         Notifications.cancel(context, courseId)
                     }

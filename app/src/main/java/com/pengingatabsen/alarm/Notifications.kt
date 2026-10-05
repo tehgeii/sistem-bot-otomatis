@@ -67,7 +67,7 @@ object Notifications {
 
     fun idFor(courseId: Long): Int = 1000 + (courseId % 1_000_000).toInt()
 
-    /** Notifikasi utama: "Absen dibuka: <matkul>" + tombol Absen sekarang / Tunda 5 menit / Libur. */
+    /** Notifikasi utama: "Waktunya absen / Presensi sudah dibuka: <matkul>" + tombol Absen sekarang / Tunda 5 menit / Libur. */
     fun showReminder(
         context: Context,
         course: Course,
@@ -78,6 +78,8 @@ object Notifications {
         waiting: Boolean = false,
         /** Mode pintar: SiAdin gagal dicek beberapa kali → minta cek manual. */
         checkFailed: Boolean = false,
+        /** Mode pintar: presensi di SiAdin terdeteksi SUDAH dibuka dosen. */
+        sessionOpen: Boolean = false,
     ) {
         val epochDay = record?.epochDay ?: 0L
         val detail = buildString {
@@ -88,7 +90,9 @@ object Notifications {
             waiting -> "Menunggu presensi: ${course.name}"
             checkFailed -> "Cek presensi: ${course.name}"
             final -> "⚠️ 5 menit lagi ditutup: ${course.name}"
-            else -> "Absen dibuka: ${course.name}"
+            sessionOpen -> "✅ Presensi sudah dibuka: ${course.name}"
+            // Tanpa pengecekan SiAdin hanya jadwal yang diketahui, jadi jangan klaim "dibuka".
+            else -> "Waktunya absen: ${course.name}"
         }
         val text = when {
             waiting -> "Belum dibuka dosen di SiAdin. Dicek otomatis tiap menit — HP bergetar begitu dibuka. $detail"

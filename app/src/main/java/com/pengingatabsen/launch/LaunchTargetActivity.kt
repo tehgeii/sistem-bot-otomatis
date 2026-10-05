@@ -65,10 +65,14 @@ class LaunchTargetActivity : Activity() {
             Notifications.cancel(context, courseId)
             return
         }
-        // Beri waktu untuk absen sebelum pengingat berikutnya berbunyi.
+        // Beri waktu untuk absen sebelum pengingat berikutnya berbunyi — kecuali mode pintar masih
+        // menunggu presensi dibuka: pengecekan tiap menit harus tetap jalan.
+        val smartWaiting = Graph.settings.current().smartModeActive &&
+            !Graph.settings.isPresensiOpen(courseId, epochDay)
         val updated = record.copy(
             awaitingConfirm = true,
-            snoozeUntilMillis = LocalDateTime.now().plusMinutes(interval.toLong()).toMillis(),
+            snoozeUntilMillis = if (smartWaiting) record.snoozeUntilMillis
+            else LocalDateTime.now().plusMinutes(interval.toLong()).toMillis(),
         )
         dao.update(updated)
         Notifications.showConfirm(context, course, updated, silent = true)

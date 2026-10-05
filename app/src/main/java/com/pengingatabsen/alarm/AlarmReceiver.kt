@@ -55,7 +55,7 @@ class AlarmReceiver : BroadcastReceiver() {
         when (type) {
             EventType.OPEN, EventType.REMIND ->
                 if (record.awaitingConfirm) Notifications.showConfirm(context, course, record, silent = false)
-                else Notifications.showReminder(context, course, record, final = false)
+                else Notifications.showReminder(context, course, record, final = false, sessionOpen = smart && seenOpen)
             EventType.FINAL -> Notifications.showReminder(context, course, record, final = true)
             EventType.EXPIRE -> {
                 Notifications.cancel(context, courseId)

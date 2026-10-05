@@ -58,6 +58,8 @@ import androidx.lifecycle.lifecycleScope
 import com.pengingatabsen.Graph
 import com.pengingatabsen.alarm.AlarmScheduler
 import com.pengingatabsen.alarm.Notifications
+import com.pengingatabsen.alarm.PresensiCheckWorker
+import com.pengingatabsen.logic.EventType
 import com.pengingatabsen.ui.theme.PengingatTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -369,7 +371,10 @@ class WebBrowserActivity : ComponentActivity() {
             lifecycleScope.launch(Dispatchers.IO) {
                 if (Graph.settings.isPresensiOpen(courseId, epochDay)) {
                     Graph.settings.unmarkPresensiOpen(courseId, epochDay)
+                    val dao = Graph.db.recordDao()
+                    dao.find(courseId, epochDay)?.let { dao.update(it.copy(snoozeUntilMillis = null)) }
                     AlarmScheduler.reschedule(context, courseId)
+                    PresensiCheckWorker.enqueue(context, courseId, epochDay, EventType.REMIND)
                 }
             }
         }

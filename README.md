@@ -21,7 +21,7 @@ Tidak tersedia untuk iPhone.
 
 ## Cara kerja harian (setelah setup sekali)
 
-1. Jam absen dibuka → notifikasi heads-up (getar): **"Absen dibuka: Basis Data"**
+1. Jam absen dibuka → notifikasi heads-up (getar): **"Waktunya absen: Basis Data"** (mode pintar: **"✅ Presensi sudah dibuka: Basis Data"** begitu dosen membuka presensi)
    (jam buka–tutup dan ruang). Tombol: **Absen sekarang** · **Tunda 5 menit** · **Libur**.
 2. Tap **Absen sekarang** (atau tap notifikasinya):
    - **Mode SiAdin web (disarankan):** halaman **Presensi Online** terbuka di browser mini di dalam

@@ -58,7 +58,7 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
                 when {
                     type == EventType.FINAL -> Notifications.showReminder(ctx, course, record, final = true)
                     record.awaitingConfirm -> Notifications.showConfirm(ctx, course, record, silent = false)
-                    else -> Notifications.showReminder(ctx, course, record, final = false)
+                    else -> Notifications.showReminder(ctx, course, record, final = false, sessionOpen = true)
                 }
                 // Sudah dibuka: kembali ke interval pengingat pengguna (bukan cek tiap menit).
                 AlarmScheduler.reschedule(ctx, courseId)
