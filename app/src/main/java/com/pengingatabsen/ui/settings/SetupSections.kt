@@ -117,6 +117,11 @@ fun PermissionsSection(autoRequest: Boolean = false) {
         StatusRow(exactOk, "Alarm tepat waktu", "Supaya notifikasi berbunyi tepat di jam absen", "Buka") {
             runCatching { context.startActivity(Permissions.exactAlarmIntent(context)) }
         }
+        val fullScreenOk = remember(tick) { Notifications.canUseFullScreen(context) }
+        StatusRow(fullScreenOk, "Layar penuh", "Supaya layar menyala saat presensi dibuka dosen", "Izinkan") {
+            runCatching { context.startActivity(Permissions.fullScreenIntent(context)) }
+                .onFailure { context.startActivity(Permissions.appDetailsIntent(context)) }
+        }
         StatusRow(batteryOk, "Tanpa optimasi baterai", "Supaya alarm tidak ditahan sistem", "Izinkan") {
             runCatching { context.startActivity(Permissions.batteryIntent(context)) }
                 .onFailure { context.startActivity(Permissions.appDetailsIntent(context)) }
@@ -280,6 +285,18 @@ fun SiadinWebSection(vm: SetupViewModel) {
                 )
             }
             Switch(checked = settings?.smartPresensi ?: true, onCheckedChange = { vm.setSmartPresensi(it, context) })
+        }
+
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Layar penuh saat presensi dibuka")
+                Text(
+                    "Saat tombol berubah jadi \"Presensi Sekarang\", layar menyala seperti alarm (walau terkunci). " +
+                        "Kamu tetap yang menekan presensi.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Switch(checked = settings?.fullScreenAlert ?: true, onCheckedChange = { vm.setFullScreenAlert(it) })
         }
 
         vm.savedNim?.let { Text("Tersimpan: $it", style = MaterialTheme.typography.bodyMedium) }

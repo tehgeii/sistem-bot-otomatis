@@ -34,6 +34,8 @@ data class AppSettings(
     val autoLogin: Boolean = true,
     /** Getar hanya saat presensi SiAdin benar-benar sudah dibuka (dicek tiap menit). */
     val smartPresensi: Boolean = true,
+    /** Layar penuh seperti alarm saat presensi baru saja dibuka dosen. */
+    val fullScreenAlert: Boolean = true,
 ) {
     /** Mode pintar hanya berlaku untuk SiAdin web dengan login tersimpan. */
     val smartModeActive: Boolean
@@ -57,6 +59,7 @@ class SettingsStore(private val context: Context) {
         val SIADIN_PASSWORD_ENC = stringPreferencesKey("siadin_password_enc")
         val AUTO_LOGIN = booleanPreferencesKey("auto_login")
         val SMART_PRESENSI = booleanPreferencesKey("smart_presensi")
+        val FULL_SCREEN_ALERT = booleanPreferencesKey("full_screen_alert")
         /** Kemunculan ("courseId:epochDay") yang presensinya sudah terlihat dibuka dosen. */
         val PRESENSI_OPEN = stringSetPreferencesKey("presensi_open")
     }
@@ -78,6 +81,7 @@ class SettingsStore(private val context: Context) {
         hasSiadinLogin = this[Keys.SIADIN_NIM_ENC] != null && this[Keys.SIADIN_PASSWORD_ENC] != null,
         autoLogin = this[Keys.AUTO_LOGIN] ?: true,
         smartPresensi = this[Keys.SMART_PRESENSI] ?: true,
+        fullScreenAlert = this[Keys.FULL_SCREEN_ALERT] ?: true,
     )
 
     /** Bot token dalam bentuk asli; hanya dipakai saat memanggil Telegram, jangan di-log. */
@@ -139,6 +143,8 @@ class SettingsStore(private val context: Context) {
     }
 
     private fun unknownKey(courseId: Long, epochDay: Long) = intPreferencesKey("presensi_unknown_${courseId}_$epochDay")
+
+    suspend fun setFullScreenAlert(enabled: Boolean) = context.dataStore.edit { it[Keys.FULL_SCREEN_ALERT] = enabled }
 
     suspend fun setSmartPresensi(enabled: Boolean) = context.dataStore.edit { it[Keys.SMART_PRESENSI] = enabled }
 

@@ -168,6 +168,8 @@ class SetupViewModel : ViewModel() {
 
     fun setAutoLogin(enabled: Boolean) = viewModelScope.launch { store.setAutoLogin(enabled) }
 
+    fun setFullScreenAlert(enabled: Boolean) = viewModelScope.launch { store.setFullScreenAlert(enabled) }
+
     fun setSmartPresensi(enabled: Boolean, context: Context) = viewModelScope.launch {
         store.setSmartPresensi(enabled)
         AlarmScheduler.rescheduleAll(context.applicationContext)

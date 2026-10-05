@@ -131,6 +131,12 @@ nama matkul di jadwal):
 | tombol biru **"Presensi Sekarang"** (dibuka dosen) | ±1 menit kemudian **bergetar** "✅ Presensi sudah dibuka" |
 | kotak hijau **"Berhasil Presensi"** | absen dicatat selesai, bukti dikirim ke Telegram, pengingat berhenti |
 
+**Layar penuh anti-lupa (aktif otomatis):** tepat saat kartu matkul berubah menjadi **"Presensi
+Sekarang"** (baik kartu yang tadinya "Belum Jadwalnya" maupun kartu yang baru dibuat dan langsung
+dibuka), layar HP menyala penuh seperti alarm, walau terkunci, dengan tombol besar **"Presensi
+sekarang"** yang membuka browser mini. Kartu yang masih "Belum Jadwalnya" tidak memicunya. Android
+14+ butuh izin **Layar penuh** sekali (Pengaturan → Izin). Bisa dimatikan di Pengaturan → SiAdin web.
+
 Di browser mini, tombol "Presensi Sekarang" disorot kuning. Setelah kamu menekannya, SiAdin menampilkan
 konfirmasi **Tidak / Ya**; bukti (screenshot kotak hijau "Berhasil Presensi") baru dikirim **setelah
 kamu menekan "Ya"** dan SiAdin menampilkan "Berhasil Presensi". Menekan "Tidak" tidak mengirim apa pun.

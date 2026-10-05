@@ -40,6 +40,14 @@ object Permissions {
     fun batteryIntent(context: Context): Intent =
         Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${context.packageName}"))
 
+    /** Android 14+: izin "tampilkan notifikasi layar penuh". */
+    fun fullScreenIntent(context: Context): Intent =
+        if (Build.VERSION.SDK_INT >= 34) {
+            Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:${context.packageName}"))
+        } else {
+            appDetailsIntent(context)
+        }
+
     fun notificationSettingsIntent(context: Context): Intent =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)

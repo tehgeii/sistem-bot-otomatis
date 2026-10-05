@@ -66,10 +66,15 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
                 store.markPresensiOpen(courseId, epochDay)
                 // Hapus dulu notifikasi senyap supaya yang baru diposting ulang & pasti bergetar.
                 Notifications.cancel(ctx, courseId)
+                // Layar penuh hanya di momen ini: kartu baru saja berubah menjadi "Presensi Sekarang".
+                val fullScreenUrl = if (settings.fullScreenAlert) settings.deepLink ?: TargetApps.SIADIN_PRESENSI_URL else null
                 when {
-                    type == EventType.FINAL -> Notifications.showReminder(ctx, course, record, final = true)
+                    type == EventType.FINAL ->
+                        Notifications.showReminder(ctx, course, record, final = true, fullScreenUrl = fullScreenUrl)
                     record.awaitingConfirm -> Notifications.showConfirm(ctx, course, record, silent = false)
-                    else -> Notifications.showReminder(ctx, course, record, final = false, sessionOpen = true)
+                    else -> Notifications.showReminder(
+                        ctx, course, record, final = false, sessionOpen = true, fullScreenUrl = fullScreenUrl,
+                    )
                 }
                 // Sudah dibuka: kembali ke interval pengingat pengguna (bukan cek tiap menit).
                 AlarmScheduler.reschedule(ctx, courseId)

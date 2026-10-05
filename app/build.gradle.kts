@@ -13,8 +13,8 @@ android {
         applicationId = "com.pengingatabsen"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.8"
+        versionCode = 10
+        versionName = "1.9"
     }
 
     // Kunci rilis RAHASIA: hanya dari environment (GitHub Secrets di CI), tidak pernah di repo.

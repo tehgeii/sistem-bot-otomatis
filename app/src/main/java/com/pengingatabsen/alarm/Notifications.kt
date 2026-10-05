@@ -19,6 +19,7 @@ import com.pengingatabsen.R
 import com.pengingatabsen.data.AttendanceRecord
 import com.pengingatabsen.data.Course
 import com.pengingatabsen.launch.LaunchTargetActivity
+import com.pengingatabsen.launch.PresensiAlertActivity
 import com.pengingatabsen.launch.WebBrowserActivity
 import com.pengingatabsen.logic.Formatters
 import com.pengingatabsen.ui.MainActivity
@@ -80,6 +81,8 @@ object Notifications {
         checkFailed: Boolean = false,
         /** Mode pintar: presensi di SiAdin terdeteksi SUDAH dibuka dosen. */
         sessionOpen: Boolean = false,
+        /** Bila diisi: tampilkan layar penuh "Presensi sudah dibuka!" yang membuka URL ini. */
+        fullScreenUrl: String? = null,
     ) {
         val epochDay = record?.epochDay ?: 0L
         val detail = buildString {
@@ -110,8 +113,19 @@ object Notifications {
             .addAction(0, "Libur", action(context, NotificationActionReceiver.ACTION_HOLIDAY, course.id, epochDay))
         if (final || waiting || checkFailed) builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
         if (waiting) builder.setPriority(NotificationCompat.PRIORITY_LOW)
+        if (fullScreenUrl != null && canUseFullScreen(context)) {
+            val alert = PendingIntent.getActivity(
+                context, 3, PresensiAlertActivity.intent(context, course.id, epochDay, course.name, fullScreenUrl),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            builder.setCategory(NotificationCompat.CATEGORY_ALARM).setFullScreenIntent(alert, true)
+        }
         notify(context, idFor(course.id), builder)
     }
+
+    /** Android 14+ mewajibkan izin khusus untuk notifikasi layar penuh. */
+    fun canUseFullScreen(context: Context): Boolean =
+        Build.VERSION.SDK_INT < 34 || context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
 
     /** Notifikasi senyap untuk pekerjaan "Mengecek presensi SiAdin…" (wajib untuk expedited work Android < 12). */
     fun checkingNotification(context: Context) =
