@@ -122,8 +122,8 @@ object SiadinScripts {
     """
 
     /**
-     * Untuk browser mini (hanya tampilan): sorot tombol "Presensi Sekarang" matkul ini (bingkai kuning,
-     * digulir ke tengah) dan pasang listener klik yang hanya MEMBERI TAHU aplikasi saat PENGGUNA menekannya.
+     * Untuk browser mini (hanya tampilan): sorot & perbesar tombol "Presensi Sekarang" matkul ini (bingkai
+     * kuning, digulir ke tengah sekali, kartu matkul lain diredupkan) dan pasang listener klik yang hanya MEMBERI TAHU aplikasi saat PENGGUNA menekannya.
      * Tidak pernah memanggil click(). Saat "Berhasil Presensi", kotak hijaunya digulir ke tengah layar.
      * Hasil: WAITING / OPEN / DONE / UNKNOWN.
      */
@@ -145,14 +145,25 @@ object SiadinScripts {
             var b = open.el;
             if (!b.__pengingat) {
               b.__pengingat = true;
+              // Sorot & perbesar (hanya tampilan) supaya tombol langsung terlihat dan mudah dipencet.
               b.style.outline = '4px solid #F2B705';
               b.style.outlineOffset = '3px';
               b.style.boxShadow = '0 0 0 8px rgba(242,183,5,.35)';
+              b.style.fontSize = '1.2em';
+              b.style.fontWeight = 'bold';
+              b.style.padding = '14px 24px';
+              b.style.minHeight = '56px';
               b.addEventListener('click', function(){
                 try { PengingatAbsen.onPresensiClicked(); } catch (e) {}
               }, true);
+              // Kartu matkul lain diredupkan agar tidak salah pencet (hanya bila kartu matkul ini ketemu).
+              if (p.matched) {
+                p.all.forEach(function(c){ if (c.card !== open.card) c.card.style.opacity = '0.4'; });
+              }
+              // Gulir ke tengah sekali saja saat pertama disorot; pengecekan berikutnya tidak menggulir
+              // lagi supaya tidak mengganggu bila pengguna sedang menggulir.
+              b.scrollIntoView({block: 'center', inline: 'center', behavior: 'smooth'});
             }
-            b.scrollIntoView({block: 'center', inline: 'center', behavior: 'smooth'});
             return 'OPEN';
           }
           if (p.all.length) return 'WAITING';

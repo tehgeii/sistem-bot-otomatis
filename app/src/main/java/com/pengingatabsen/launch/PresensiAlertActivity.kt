@@ -32,17 +32,29 @@ import com.pengingatabsen.ui.theme.PengingatTheme
 
 /**
  * Layar penuh "Presensi sudah dibuka!" (anti-lupa), muncul di atas layar kunci tepat saat dosen
- * membuka presensi. Hanya mengarahkan ke halaman presensi; tombol presensi tetap ditekan pengguna.
+ * membuka presensi. Begitu HP dibuka kuncinya (sidik jari/PIN/wajah), halaman presensi langsung
+ * terbuka tanpa tap tambahan. Hanya mengarahkan ke halaman presensi; tombol presensi tetap ditekan pengguna.
  */
 class PresensiAlertActivity : ComponentActivity() {
+    private var courseId = 0L
+    private var epochDay = 0L
+    private var url = TargetApps.SIADIN_PRESENSI_URL
+    private var opened = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        showOverLockScreen()
-
-        val courseId = intent.getLongExtra(AlarmScheduler.EXTRA_COURSE_ID, 0L)
-        val epochDay = intent.getLongExtra(AlarmScheduler.EXTRA_EPOCH_DAY, 0L)
+        courseId = intent.getLongExtra(AlarmScheduler.EXTRA_COURSE_ID, 0L)
+        epochDay = intent.getLongExtra(AlarmScheduler.EXTRA_EPOCH_DAY, 0L)
         val courseName = intent.getStringExtra(EXTRA_COURSE_NAME).orEmpty()
-        val url = intent.getStringExtra(EXTRA_URL) ?: TargetApps.SIADIN_PRESENSI_URL
+        url = intent.getStringExtra(EXTRA_URL) ?: TargetApps.SIADIN_PRESENSI_URL
+
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        if (keyguard?.isKeyguardLocked != true) {
+            // HP sedang tidak terkunci: tak perlu layar perantara, langsung ke halaman presensi.
+            openPresensi()
+            return
+        }
+        showOverLockScreen()
 
         setContent {
             PengingatTheme {
@@ -71,11 +83,15 @@ class PresensiAlertActivity : ComponentActivity() {
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                     Spacer(Modifier.height(40.dp))
+                    Text(
+                        "Buka kunci HP — halaman presensi langsung terbuka.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Spacer(Modifier.height(16.dp))
                     Button(
-                        onClick = {
-                            startActivity(WebBrowserActivity.intent(this@PresensiAlertActivity, url, courseId, epochDay))
-                            finish()
-                        },
+                        onClick = { unlockThenOpen() },
                         modifier = Modifier.fillMaxWidth().height(72.dp),
                     ) {
                         Text("Presensi sekarang", style = MaterialTheme.typography.titleLarge)
@@ -87,11 +103,38 @@ class PresensiAlertActivity : ComponentActivity() {
         }
     }
 
+    /** Buka browser mini di halaman presensi (sekali saja), lalu tutup layar ini. */
+    private fun openPresensi() {
+        if (opened) return
+        opened = true
+        startActivity(WebBrowserActivity.intent(this, url, courseId, epochDay))
+        finish()
+    }
+
+    /**
+     * Minta sistem membuka kunci (sidik jari/PIN/wajah); setelah berhasil, halaman presensi langsung
+     * terbuka. Bila dibatalkan, layar ini tetap tampil dengan tombol "Presensi sekarang" sebagai cadangan.
+     */
+    private fun unlockThenOpen() {
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        if (keyguard == null || !keyguard.isKeyguardLocked) {
+            openPresensi()
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            keyguard.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
+                override fun onDismissSucceeded() = openPresensi()
+            })
+        } else {
+            openPresensi()
+        }
+    }
+
     private fun showOverLockScreen() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
-            getSystemService(KeyguardManager::class.java)?.requestDismissKeyguard(this, null)
+            unlockThenOpen()
         } else {
             @Suppress("DEPRECATION")
             window.addFlags(

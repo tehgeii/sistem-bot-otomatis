@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 2.1** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 2.2** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -148,8 +148,10 @@ nama matkul di jadwal):
 
 **Layar penuh anti-lupa (aktif otomatis):** tepat saat kartu matkul berubah menjadi **"Presensi
 Sekarang"** (baik kartu yang tadinya "Belum Jadwalnya" maupun kartu yang baru dibuat dan langsung
-dibuka), layar HP menyala penuh seperti alarm, walau terkunci, dengan tombol besar **"Presensi
-sekarang"** yang membuka browser mini. Kartu yang masih "Belum Jadwalnya" tidak memicunya. Android
+dibuka), layar HP menyala penuh seperti alarm, walau terkunci. **Begitu kunci HP dibuka** (sidik
+jari/PIN/wajah), halaman presensi **langsung terbuka** di browser mini tanpa tap tambahan; bila HP
+memang sedang tidak terkunci, halaman presensi langsung terbuka. Tombol besar **"Presensi sekarang"**
+tetap ada sebagai cadangan bila buka kunci dibatalkan. Kartu yang masih "Belum Jadwalnya" tidak memicunya. Android
 14+ butuh izin **Layar penuh** sekali (Pengaturan → Izin). Bisa dimatikan di Pengaturan → SiAdin web.
 
 Di browser mini, tombol "Presensi Sekarang" disorot kuning. Setelah kamu menekannya, SiAdin menampilkan
@@ -168,7 +170,9 @@ dibuka bila jam tutup kosong). Saklarnya ada di *Pengaturan → SiAdin web*.
 1. **Menunggu sesi dibuka:** selama halaman menampilkan "Belum Ada Presensi Hari Ini!", halaman
    dimuat ulang otomatis tiap ±20 detik (maks. 90 menit). Begitu berubah, HP bergetar dengan
    notifikasi **"Presensi sudah dibuka!"**.
-2. **Tombol disorot:** tombol presensi diberi bingkai kuning dan layar digulir ke tombol itu.
+2. **Tombol disorot:** tombol presensi matkul ini diberi bingkai kuning, diperbesar, dan digulir ke
+   tengah layar (sekali saja, jadi tidak mengganggu saat kamu menggulir); kartu matkul lain diredupkan
+   supaya tidak salah pencet.
 3. **Bukti otomatis:** setelah **kamu** menekan "Presensi Sekarang" lalu **"Ya"**, begitu SiAdin
    menampilkan "Berhasil Presensi", screenshot halaman dikirim ke Telegram, absen ditandai selesai,
    pengingat berhenti, dan browser tertutup. Menekan "Tidak" tidak mengirim apa pun.
