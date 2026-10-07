@@ -45,8 +45,16 @@ object SiadinScripts {
      * - "Belum Jadwalnya"   → 'waiting' (belum dibuka dosen)
      * - "Presensi Sekarang" → 'open'    (tombol biru; ditekan → kotak konfirmasi Tidak/Ya)
      * - "Berhasil Presensi" → 'done'    (kotak hijau setelah "Ya")
-     * Kartu dicari dari label KDMK lalu naik ke pembungkus terbesar yang hanya memuat satu KDMK.
-     * Kartu dicocokkan ke matkul jadwal lewat kata-kata nama matkul (≥3 huruf, tanpa angka).
+     *
+     * Kartu dicari dari SETIAP teks yang memuat "KDMK" (bentuk HTML apa pun: `<span>KDMK:</span>`,
+     * `KDMK: <b>A11…</b>`, atau teks langsung di dalam kotak), lalu naik ke pembungkus terbesar yang hanya
+     * memuat satu KDMK. (7 Okt: aturan lama hanya menerima elemen tanpa anak yang diawali "KDMK", sehingga
+     * di halaman asli tidak ada satu kartu pun yang ditemukan.)
+     *
+     * Kartu dicocokkan ke matkul jadwal (lihat juga SiadinPresensiRules.matches, aturan yang sama & teruji):
+     * 1. kode kelas di nama jadwal (deret ≥4 angka, mis. "MPTI 4515") sama dengan angka di kartu (KLPK A11.4515);
+     * 2. atau setiap kata (≥2 huruf) ada di kartu ATAU sama dengan singkatan nama matkul di kartu
+     *    ("MPTI" = Manajemen Proyek Teknologi Informasi).
      */
     private const val CARDS_JS = """
         function __norm(s){ return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
@@ -65,35 +73,65 @@ object SiadinScripts {
           }
           return null;
         }
-        function __cards(course){
-          var tokens = __norm(course).split(' ').filter(function(t){ return t.length >= 3 && !/^\d+$/.test(t); });
-          var labels = Array.prototype.slice.call(document.querySelectorAll('body *')).filter(function(e){
-            return e.children.length === 0 && /^\s*kdmk\b/i.test(e.textContent || '');
+        // Elemen pembungkus langsung dari setiap teks yang memuat "KDMK".
+        function __labels(){
+          var out = [];
+          if (!document.body) return out;
+          var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+          var n;
+          while ((n = w.nextNode())) {
+            var el = n.parentElement;
+            if (el && /kdmk/i.test(n.nodeValue || '') && out.indexOf(el) < 0) out.push(el);
+          }
+          return out;
+        }
+        function __codes(course){ return (course || '').match(/\d{4,}/g) || []; }
+        function __initials(title){
+          return __norm(title).split(' ').filter(function(w){ return /^[a-z]/.test(w) && ['dan','di','ke','of','and'].indexOf(w) < 0; })
+            .map(function(w){ return w.charAt(0); }).join('');
+        }
+        function __matches(cardText, course){
+          var codes = __codes(course);
+          for (var i = 0; i < codes.length; i++) {
+            if (new RegExp('(^|[^0-9])' + codes[i] + '([^0-9]|$)').test(cardText)) return true;
+          }
+          var tokens = __norm(course).split(' ').filter(function(t){ return t.length >= 2 && !/^\d+$/.test(t); });
+          if (!tokens.length) return false;
+          var ct = __norm(cardText);
+          var ini = __initials(cardText.split(/kdmk/i)[0] || '');
+          return tokens.every(function(k){
+            // Kata ≥3 huruf cukup termuat; kata 2 huruf (mis. "II") harus kata utuh; atau bagian singkatan nama.
+            if (k.length >= 3 ? ct.indexOf(k) >= 0 : (' ' + ct + ' ').indexOf(' ' + k + ' ') >= 0) return true;
+            return /^[a-z]+$/.test(k) && ini.indexOf(k) >= 0;
           });
+        }
+        function __cards(course){
           var cards = [];
-          labels.forEach(function(l){
+          __labels().forEach(function(l){
             var card = l;
-            while (card.parentElement && card.parentElement !== document.body && __count(card.parentElement.innerText) === 1) {
+            while (card.parentElement && card.parentElement !== document.body && __count(card.parentElement.innerText || card.parentElement.textContent) === 1) {
               card = card.parentElement;
             }
             if (cards.indexOf(card) < 0) cards.push(card);
           });
           return cards.map(function(card){
-            var t = card.innerText || '';
+            var t = card.innerText || card.textContent || '';
             var state = /berhasil\s*presensi|sudah\s*presensi/i.test(t) ? 'done'
               : /presensi\s*sekarang/i.test(t) ? 'open'
               : /belum\s*jadwal/i.test(t) ? 'waiting' : 'unknown';
-            var ct = __norm(t);
-            var match = tokens.length > 0 && tokens.every(function(k){ return ct.indexOf(k) >= 0; });
             var btn = __leaf(card, /presensi\s*sekarang/i);
             if (btn && btn.closest) btn = btn.closest('button,a,[role=button]') || btn;
-            return { card: card, el: btn, doneEl: __leaf(card, /berhasil\s*presensi|sudah\s*presensi/i), state: state, match: match };
+            return { card: card, el: btn, doneEl: __leaf(card, /berhasil\s*presensi|sudah\s*presensi/i), state: state, match: __matches(t, course) };
           });
         }
+        // Kartu lain hanya dipakai sebagai cadangan "dibuka" bila nama jadwal TANPA kode kelas tidak cocok
+        // dengan kartu mana pun. Nama jadwal dengan kode kelas (mis. "MPTI 4515") tidak pernah memakai
+        // kartu matkul lain, supaya presensi matkul lain yang masih dibuka tidak dikira matkul ini.
         function __pick(course){
           var all = __cards(course);
           var matched = all.filter(function(c){ return c.match; });
-          return { all: all, matched: matched.length > 0, cand: matched.length ? matched : all };
+          var fallback = matched.length === 0 && __codes(course).length === 0;
+          return { all: all, matched: matched.length > 0, cand: matched.length ? matched : (fallback ? all : []) };
         }
         function __has(list, st){ return list.some(function(c){ return c.state === st; }); }
     """
@@ -135,7 +173,7 @@ object SiadinScripts {
               if (__has(p.cand, 'waiting')) return 'WAITING';
               return 'NO_TEXT';
             }
-            return __has(p.all, 'open') ? 'BUTTON' : 'WAITING';
+            return __has(p.cand, 'open') ? 'BUTTON' : 'WAITING';
           }
           var rendered = /copyright/i.test(text);
           var empty = /belum ada presensi/i.test(text);
@@ -197,7 +235,7 @@ object SiadinScripts {
               return 'DONE';
             }
           }
-          var open = (p.matched ? p.cand : p.all).filter(function(c){ return c.state === 'open' && c.el; })[0];
+          var open = p.cand.filter(function(c){ return c.state === 'open' && c.el; })[0];
           if (open) {
             var b = open.el;
             if (!b.__pengingat) {

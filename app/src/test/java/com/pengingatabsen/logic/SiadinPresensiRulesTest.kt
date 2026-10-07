@@ -80,4 +80,38 @@ class SiadinPresensiRulesTest {
         assertEquals(CardStatus.OPEN, SiadinPresensiRules.pageStatus(true, false, cards, "Pemrograman Sisi Klien 4702"))
         assertEquals(CardStatus.WAITING, SiadinPresensiRules.pageStatus(true, true, cards, "Manajemen Proyek Teknologi Informasi"))
     }
+
+    // ---------- 7 Okt (teks asli dari screenshot): nama jadwal pakai singkatan + kode kelas ----------
+
+    private val mpti = "MANAJEMEN PROYEK TEKNOLOGI INFORMASI KDMK: A11.64504 KLPK: A11.4515 07 October 2026 28.57 % Belum Jadwalnya"
+    private val psk = "PEMROGRAMAN SISI KLIEN KDMK: A11.64706 KLPK: A11.4702 07 October 2026 21.43 % Presensi Sekarang"
+
+    @Test
+    fun matches_byClassCode() {
+        assertTrue(SiadinPresensiRules.matches(mpti, "MPTI 4515"))
+        assertTrue(SiadinPresensiRules.matches(psk, "Pemrograman Sisi Klien 4702"))
+        assertFalse(SiadinPresensiRules.matches(psk, "MPTI 4515"))
+        assertFalse(SiadinPresensiRules.matches(mpti, "Sistem Terdistribusi 4512"))
+        // "4504" hanya bagian dari KDMK A11.64504, bukan angka utuh: tidak boleh cocok.
+        assertFalse(SiadinPresensiRules.matches(mpti, "Basis Data 4504"))
+    }
+
+    @Test
+    fun matches_byAcronymOrWords() {
+        assertTrue(SiadinPresensiRules.matches(mpti, "MPTI"))
+        assertTrue(SiadinPresensiRules.matches(mpti, "Manajemen Proyek TI"))
+        assertTrue(SiadinPresensiRules.matches(psk, "PSK"))
+        assertFalse(SiadinPresensiRules.matches(psk, "MPTI"))
+        assertTrue(SiadinPresensiRules.matches("KALKULUS II KDMK: X", "Kalkulus II"))
+        assertFalse(SiadinPresensiRules.matches("KALKULUS I KDMK: X", "Kalkulus II"))
+    }
+
+    @Test
+    fun pageStatus_realPage7Oct() {
+        val cards = listOf(PresensiCard(mpti, "Belum Jadwalnya"), PresensiCard(psk, "Presensi Sekarang"))
+        assertEquals(CardStatus.OPEN, SiadinPresensiRules.pageStatus(true, false, cards, "Pemrograman Sisi Klien 4702"))
+        assertEquals(CardStatus.WAITING, SiadinPresensiRules.pageStatus(true, false, cards, "MPTI 4515"))
+        // Matkul lain (kode 4512) belum punya kartu: presensi Sisi Klien yang dibuka BUKAN miliknya.
+        assertEquals(CardStatus.WAITING, SiadinPresensiRules.pageStatus(true, false, cards, "Sistem Terdistribusi 4512"))
+    }
 }
