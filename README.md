@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 2.2** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 2.3** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -248,8 +248,11 @@ Bila NIM/password ditolak SiAdin (mis. password baru diganti), muncul notifikasi
 gagal"** sekali sehari. Tap → Pengaturan → SiAdin web, simpan login yang baru. Selama itu pengingat
 tetap jalan (notifikasi "Cek presensi"), jadi tidak terlewat.
 
-**Cek tepat waktu?** Di *Pengaturan → SiAdin web* tampil "Cek terakhir telat X dtk dari alarm".
-Bila sering di atas 30 detik, HP menunda aplikasi: aktifkan izin baterai & Autostart (*Izin HP*).
+**Cek berjalan & tepat waktu?** Di *Pengaturan → SiAdin web* tampil **"Cek terakhir: 10.14 ·
+Pemrograman Sisi Klien · menunggu dibuka / presensi DIBUKA / …"** dan "telat X dtk dari alarm".
+Pengecekan berjalan sebagai notifikasi singkat **"Mengecek presensi SiAdin…"** yang dimulai tepat saat
+alarm berbunyi (tidak ditunda penghemat baterai). Bila angka telat sering di atas 30 detik, aktifkan
+izin baterai & Autostart (*Izin HP*). Kalau ada yang meleset, kirim screenshot baris "Cek terakhir".
 
 ## Widget
 

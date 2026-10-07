@@ -43,6 +43,8 @@ data class AppSettings(
     val lastCheckDelaySec: Long? = null,
     /** Kirim ringkasan mingguan ke Telegram tiap Minggu malam. */
     val weeklySummary: Boolean = true,
+    /** Catatan pengecekan SiAdin terakhir, mis. "10.14 · Pemrograman Sisi Klien · presensi DIBUKA". */
+    val lastCheck: String? = null,
 ) {
     /** Mode pintar hanya berlaku untuk SiAdin web dengan login tersimpan. */
     val smartModeActive: Boolean
@@ -77,6 +79,7 @@ class SettingsStore(private val context: Context) {
         val SUMMARY_SENT_WEEK = longPreferencesKey("summary_sent_week")
         /** Hari (epoch day) notifikasi "login gagal" terakhir ditampilkan. */
         val LOGIN_FAILED_DAY = longPreferencesKey("login_failed_day")
+        val LAST_CHECK = stringPreferencesKey("last_check")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -100,7 +103,10 @@ class SettingsStore(private val context: Context) {
         checkBytesToday = if (this[Keys.CHECK_BYTES_DAY] == todayEpochDay()) this[Keys.CHECK_BYTES] ?: 0 else 0,
         lastCheckDelaySec = this[Keys.LAST_CHECK_DELAY],
         weeklySummary = this[Keys.WEEKLY_SUMMARY] ?: true,
+        lastCheck = this[Keys.LAST_CHECK],
     )
+
+    suspend fun setLastCheck(text: String) = context.dataStore.edit { it[Keys.LAST_CHECK] = text }
 
     suspend fun setLastCheckDelay(seconds: Long) = context.dataStore.edit { it[Keys.LAST_CHECK_DELAY] = seconds.coerceAtLeast(0) }
 

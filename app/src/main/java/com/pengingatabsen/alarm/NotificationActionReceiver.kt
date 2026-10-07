@@ -62,7 +62,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         if (smart && !seenOpen) {
                             // Presensi belum terlihat dibuka: kembali menunggu dengan senyap & cek ulang.
                             Notifications.showReminder(context, course, updated, final = false, waiting = true)
-                            PresensiCheckWorker.enqueue(context, courseId, epochDay, EventType.REMIND)
+                            PresensiCheck.start(context, courseId, epochDay, EventType.REMIND)
                         } else {
                             Notifications.showReminder(context, course, updated, final = false, silent = true, sessionOpen = smart)
                         }

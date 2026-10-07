@@ -6,22 +6,15 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import com.pengingatabsen.Graph
-import com.pengingatabsen.launch.PresensiState
-import com.pengingatabsen.launch.SiadinChecker
-import com.pengingatabsen.launch.TargetApps
 import com.pengingatabsen.logic.EventType
-import java.time.LocalDateTime
 
 /**
- * Mode pintar: saat alarm berbunyi, cek dulu halaman Presensi Online SiAdin.
- * - Belum dibuka dosen → notifikasi senyap "Menunggu presensi…"
- * - Sudah dibuka ("Presensi Sekarang" terlihat stabil) → notifikasi baru yang bergetar
- * - "Berhasil Presensi" untuk matkul ini → dicatat selesai & bukti dikirim, pengingat berhenti
- * - Gagal cek → diam dulu; bergetar "cek manual" setelah 3 kali gagal berturut-turut (aman, tidak terlewat)
+ * Cadangan [PresensiCheckService]: menjalankan [PresensiCheck] lewat WorkManager bila sistem menolak
+ * memulai foreground service (jarang; mis. dipicu saat aplikasi tidak boleh memulai service dari latar).
  */
 class PresensiCheckWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
@@ -30,96 +23,7 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
         val epochDay = inputData.getLong(KEY_EPOCH_DAY, 0)
         val type = inputData.getString(KEY_TYPE)?.let { runCatching { EventType.valueOf(it) }.getOrNull() }
             ?: EventType.REMIND
-        val course = Graph.repository.course(courseId) ?: return Result.success()
-        val dao = Graph.db.recordDao()
-        if (dao.find(courseId, epochDay)?.status?.finished != false) return Result.success()
-
-        val store = Graph.settings
-        val settings = store.current()
-        // Ukur seberapa telat cek ini mulai sejak alarm berbunyi (Doze/penghemat baterai bisa menundanya).
-        val enqueuedAt = inputData.getLong(KEY_ENQUEUED_AT, 0L)
-        if (enqueuedAt > 0) store.setLastCheckDelay((System.currentTimeMillis() - enqueuedAt) / 1000)
-        // Ukur perkiraan data yang dipakai pengecekan ini (untuk ditampilkan di Pengaturan).
-        val uid = android.os.Process.myUid()
-        val rxBefore = android.net.TrafficStats.getUidRxBytes(uid)
-        val txBefore = android.net.TrafficStats.getUidTxBytes(uid)
-        val state = SiadinChecker.check(
-            applicationContext,
-            settings.deepLink ?: TargetApps.SIADIN_PRESENSI_URL,
-            if (settings.autoLogin) store.siadinLogin() else null,
-            course.name,
-        )
-        val rxAfter = android.net.TrafficStats.getUidRxBytes(uid)
-        val txAfter = android.net.TrafficStats.getUidTxBytes(uid)
-        if (rxBefore >= 0 && rxAfter >= rxBefore) {
-            store.addCheckBytes((rxAfter - rxBefore) + (txAfter - txBefore).coerceAtLeast(0))
-        }
-
-        // Baca ulang: pengguna mungkin sudah menekan tombol selama pengecekan berjalan.
-        val record = dao.find(courseId, epochDay) ?: return Result.success()
-        if (record.status.finished) return Result.success()
-
-        val ctx = applicationContext
-        val wasOpen = store.isPresensiOpen(courseId, epochDay)
-        when (state) {
-            PresensiState.WAITING -> {
-                store.setPresensiUnknownStreak(courseId, epochDay, 0)
-                Notifications.showReminder(ctx, course, record, final = false, waiting = true)
-            }
-            PresensiState.DONE -> {
-                // SiAdin sudah menampilkan "Berhasil Presensi" untuk matkul ini (pengguna presensi sendiri,
-                // mis. lewat Chrome/Dinusverse): catat selesai, kirim bukti, hentikan pengingat.
-                store.setPresensiUnknownStreak(courseId, epochDay, 0)
-                Notifications.cancel(ctx, courseId)
-                Graph.repository.confirmDone(record, LocalDateTime.now())
-                AlarmScheduler.reschedule(ctx, courseId)
-            }
-            PresensiState.OPEN -> {
-                store.setPresensiUnknownStreak(courseId, epochDay, 0)
-                store.markPresensiOpen(courseId, epochDay)
-                // Hapus dulu notifikasi senyap supaya yang baru diposting ulang & pasti bergetar.
-                Notifications.cancel(ctx, courseId)
-                // Layar penuh hanya di momen ini: kartu baru saja berubah menjadi "Presensi Sekarang".
-                // Pengingat lanjutan (sudah dibuka sebelumnya) cukup notifikasi bergetar.
-                val fullScreenUrl = if (settings.fullScreenAlert && !wasOpen) {
-                    settings.deepLink ?: TargetApps.SIADIN_PRESENSI_URL
-                } else {
-                    null
-                }
-                when {
-                    type == EventType.FINAL ->
-                        Notifications.showReminder(ctx, course, record, final = true, fullScreenUrl = fullScreenUrl)
-                    record.awaitingConfirm -> Notifications.showConfirm(ctx, course, record, silent = false)
-                    else -> Notifications.showReminder(
-                        ctx, course, record, final = false, sessionOpen = true, fullScreenUrl = fullScreenUrl,
-                    )
-                }
-                // Sudah dibuka: kembali ke interval pengingat pengguna (bukan cek tiap menit).
-                AlarmScheduler.reschedule(ctx, courseId)
-            }
-            PresensiState.UNKNOWN, PresensiState.LOGIN_FAILED -> {
-                // Login ditolak (NIM/password berubah?): beri tahu sekali sehari, pengingat tetap jalan.
-                if (state == PresensiState.LOGIN_FAILED && store.claimLoginFailedNotice()) {
-                    Notifications.showLoginFailed(ctx)
-                }
-                // Sekali gagal (internet putus sebentar) jangan langsung mengubah notifikasi.
-                // Baru bergetar "cek manual" setiap 3 kali gagal berturut-turut (±3 menit), atau di FINAL.
-                val streak = store.presensiUnknownStreak(courseId, epochDay) + 1
-                val escalate = streak >= UNKNOWN_ESCALATE_AFTER || type == EventType.FINAL
-                store.setPresensiUnknownStreak(courseId, epochDay, if (escalate) 0 else streak)
-                if (escalate) {
-                    Notifications.cancel(ctx, courseId)
-                    Notifications.showReminder(ctx, course, record, final = type == EventType.FINAL, checkFailed = true)
-                } else if (wasOpen) {
-                    // Presensi sudah terlihat dibuka: pengingat tetap jalan walau cek kali ini gagal.
-                    Notifications.cancel(ctx, courseId)
-                    Notifications.showReminder(ctx, course, record, final = false, sessionOpen = true)
-                } else if (type == EventType.OPEN) {
-                    // Pengecekan pertama gagal: tampilkan status menunggu (senyap) agar notifikasi tetap ada.
-                    Notifications.showReminder(ctx, course, record, final = false, waiting = true)
-                }
-            }
-        }
+        PresensiCheck.run(applicationContext, courseId, epochDay, type, inputData.getLong(KEY_ENQUEUED_AT, 0L))
         return Result.success()
     }
 
@@ -132,22 +36,27 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
         private const val KEY_TYPE = "type"
         private const val KEY_ENQUEUED_AT = "enqueued_at"
         private const val CHECKING_NOTIFICATION_ID = 778
-        private const val UNKNOWN_ESCALATE_AFTER = 3
 
-        fun enqueue(context: Context, courseId: Long, epochDay: Long, type: EventType) {
+        fun enqueue(context: Context, courseId: Long, epochDay: Long, type: EventType, enqueuedAt: Long) {
+            val name = "cek-presensi-$courseId-$epochDay"
+            val wm = WorkManager.getInstance(context)
+            // Cek yang SEDANG berjalan dibiarkan selesai (KEEP); cek yang masih tertunda di antrean
+            // diganti (REPLACE) supaya satu antrean yang ditahan sistem tidak menahan semua cek berikutnya.
+            val running = runCatching {
+                wm.getWorkInfosForUniqueWork(name).get().any { it.state == WorkInfo.State.RUNNING }
+            }.getOrDefault(false)
             val request = OneTimeWorkRequestBuilder<PresensiCheckWorker>()
-                .setInputData(workDataOf(
-                    KEY_COURSE_ID to courseId,
-                    KEY_EPOCH_DAY to epochDay,
-                    KEY_TYPE to type.name,
-                    KEY_ENQUEUED_AT to System.currentTimeMillis(),
-                ))
+                .setInputData(
+                    workDataOf(
+                        KEY_COURSE_ID to courseId,
+                        KEY_EPOCH_DAY to epochDay,
+                        KEY_TYPE to type.name,
+                        KEY_ENQUEUED_AT to enqueuedAt,
+                    ),
+                )
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
-            // KEEP: cek yang masih berjalan (bisa ±55 dtk di sinyal lambat) dibiarkan selesai,
-            // jangan dibatalkan oleh alarm berikutnya — kalau dibatalkan, hasilnya tidak pernah tercatat.
-            WorkManager.getInstance(context)
-                .enqueueUniqueWork("cek-presensi-$courseId-$epochDay", ExistingWorkPolicy.KEEP, request)
+            wm.enqueueUniqueWork(name, if (running) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE, request)
         }
     }
 }

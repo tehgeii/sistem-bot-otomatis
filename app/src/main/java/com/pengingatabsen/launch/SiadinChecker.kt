@@ -33,9 +33,15 @@ enum class PresensiState {
  * HANYA membaca status halaman; tidak pernah menekan tombol presensi.
  */
 object SiadinChecker {
-    private const val TOTAL_TIMEOUT_MS = 55_000L
+    private const val TOTAL_TIMEOUT_MS = 75_000L
     private const val MAX_PAGES = 8
     private const val MAX_LOGIN_ATTEMPTS = 2
+    /** Lama maksimal menunggu kartu presensi termuat di satu halaman (detik). */
+    private const val POLL_SECONDS = 30
+    /** Kartu terbaca sama sekian kali berturut-turut (±1 dtk sekali) baru dipercaya. */
+    private const val STABLE_CARD = 3
+    /** "Belum Ada Presensi"/tanpa kartu baru dipercaya setelah sekian kali berturut-turut. */
+    private const val STABLE_EMPTY = 10
 
     suspend fun check(
         context: Context,
@@ -108,22 +114,23 @@ object SiadinChecker {
                     else PresensiState.UNKNOWN
                 }
 
-                if (!url.startsWith(targetUrl)) {
+                if (!SiadinScripts.isTargetPage(url, targetUrl)) {
                     webView.loadUrl(targetUrl)
                     return@repeat
                 }
 
-                // Di halaman presensi: tunggu data akun & kartu presensi termuat (maks. ±20 detik).
-                // "Dibuka" baru dipercaya bila tombol presensi terlihat 3 kali berturut-turut (±3 detik),
-                // supaya kartu "Belum Ada Presensi" yang dimuat belakangan tidak disangka dibuka.
+                // Di halaman presensi: tunggu data akun & kartu presensi termuat (maks. ±30 detik).
+                // Setiap status baru dipercaya bila terlihat beberapa kali BERTURUT-TURUT, supaya tampilan
+                // sementara saat memuat (mis. "Belum Ada Presensi" sebelum kartu muncul) tidak menipu.
                 val stateScript = SiadinScripts.presensiStateScript(courseName)
-                var buttonStreak = 0
-                var doneStreak = 0
-                var noTextStreak = 0
+                var last: String? = null
+                var streak = 0
                 var relogin = false
-                poll@ for (i in 0 until 20) {
-                    when (webView.eval(stateScript)) {
-                        "WAITING" -> return PresensiState.WAITING
+                poll@ for (i in 0 until POLL_SECONDS) {
+                    val result = webView.eval(stateScript)
+                    streak = if (result == last) streak + 1 else 1
+                    last = result
+                    when (result) {
                         "LOGIN" -> {
                             // Cookie lama tapi sesi sudah habis: login ulang lewat halaman depan, lalu cek lagi.
                             if (credentials == null) return PresensiState.UNKNOWN
@@ -133,21 +140,12 @@ object SiadinChecker {
                             webView.loadUrl(SiadinScripts.siteRoot(targetUrl))
                             break@poll
                         }
-                        "BUTTON" -> {
-                            doneStreak = 0; noTextStreak = 0
-                            if (++buttonStreak >= 3) return PresensiState.OPEN
-                        }
-                        "DONE" -> {
-                            buttonStreak = 0; noTextStreak = 0
-                            if (++doneStreak >= 3) return PresensiState.DONE
-                        }
-                        "NO_TEXT" -> {
-                            buttonStreak = 0; doneStreak = 0
-                            if (++noTextStreak >= 8) return PresensiState.UNKNOWN
-                        }
-                        else -> {
-                            buttonStreak = 0; doneStreak = 0; noTextStreak = 0
-                        }
+                        "WAITING" -> if (streak >= STABLE_CARD) return PresensiState.WAITING
+                        "BUTTON" -> if (streak >= STABLE_CARD) return PresensiState.OPEN
+                        "DONE" -> if (streak >= STABLE_CARD) return PresensiState.DONE
+                        // Tanpa kartu: tunggu lebih lama, daftar kartu SiAdin sering termuat belakangan.
+                        "EMPTY" -> if (streak >= STABLE_EMPTY) return PresensiState.WAITING
+                        "NO_TEXT" -> if (streak >= STABLE_EMPTY) return PresensiState.UNKNOWN
                     }
                     delay(1_000)
                 }

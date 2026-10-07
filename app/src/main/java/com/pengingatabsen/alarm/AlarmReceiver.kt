@@ -49,7 +49,7 @@ class AlarmReceiver : BroadcastReceiver() {
         val smart = smartActive
         val seenOpen = store.isPresensiOpen(courseId, date.toEpochDay())
         if (smart && type != EventType.EXPIRE && !record.awaitingConfirm) {
-            PresensiCheckWorker.enqueue(context, courseId, date.toEpochDay(), type)
+            PresensiCheck.start(context, courseId, date.toEpochDay(), type)
             return
         }
 

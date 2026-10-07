@@ -67,4 +67,17 @@ class SiadinPresensiRulesTest {
         val open = listOf(card("STATISTIKA", "Presensi Sekarang"))
         assertEquals(CardStatus.OPEN, SiadinPresensiRules.pageStatus(true, false, open, "Kalkulus"))
     }
+
+    @Test
+    fun pageStatus_cardsWinOverBelumAdaPresensiText() {
+        // 7 Okt 2026: "Pemrograman Sisi Klien" sudah "Presensi Sekarang" sejak 09.30, tapi aplikasi
+        // tetap "menunggu". Tulisan "Belum Ada Presensi" (sisa tampilan saat memuat) tak boleh mengalahkan kartu.
+        val cards = listOf(
+            card("MANAJEMEN PROYEK TEKNOLOGI INFORMASI", "Belum Jadwalnya"),
+            card("PEMROGRAMAN SISI KLIEN", "Presensi Sekarang"),
+        )
+        assertEquals(CardStatus.OPEN, SiadinPresensiRules.pageStatus(true, true, cards, "Pemrograman Sisi Klien"))
+        assertEquals(CardStatus.OPEN, SiadinPresensiRules.pageStatus(true, false, cards, "Pemrograman Sisi Klien 4702"))
+        assertEquals(CardStatus.WAITING, SiadinPresensiRules.pageStatus(true, true, cards, "Manajemen Proyek Teknologi Informasi"))
+    }
 }

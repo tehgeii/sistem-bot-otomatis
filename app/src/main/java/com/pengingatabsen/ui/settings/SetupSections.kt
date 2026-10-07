@@ -316,6 +316,8 @@ fun SiadinWebSection(vm: SetupViewModel) {
                     "seluler pengecekan tiap 2 menit (1 menit menjelang jam tutup).",
                 style = MaterialTheme.typography.bodySmall,
             )
+            // Catatan cek terakhir: untuk memastikan pengecekan benar-benar berjalan & apa yang terbaca.
+            it.lastCheck?.let { last -> Text("Cek terakhir: $last", style = MaterialTheme.typography.bodySmall) }
             // Keterlambatan cek dari alarm: angka besar = HP menunda aplikasi (cek izin baterai/Autostart).
             it.lastCheckDelaySec?.let { delay ->
                 Text(

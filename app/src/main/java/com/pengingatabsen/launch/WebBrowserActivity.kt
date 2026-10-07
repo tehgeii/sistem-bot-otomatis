@@ -58,7 +58,7 @@ import androidx.lifecycle.lifecycleScope
 import com.pengingatabsen.Graph
 import com.pengingatabsen.alarm.AlarmScheduler
 import com.pengingatabsen.alarm.Notifications
-import com.pengingatabsen.alarm.PresensiCheckWorker
+import com.pengingatabsen.alarm.PresensiCheck
 import com.pengingatabsen.logic.EventType
 import com.pengingatabsen.ui.theme.PengingatTheme
 import kotlinx.coroutines.Dispatchers
@@ -319,12 +319,12 @@ class WebBrowserActivity : ComponentActivity() {
                     if (status?.startsWith("Login otomatis") == true || status?.startsWith("Silakan login") == true) status = null
                     if (redirectAfterLogin) {
                         redirectAfterLogin = false
-                        if (!url.startsWith(targetUrl)) {
+                        if (!SiadinScripts.isTargetPage(url, targetUrl)) {
                             view.loadUrl(targetUrl)
                             return@evaluateJavascript
                         }
                     }
-                    if (url.startsWith(targetUrl)) checkPresensi(view)
+                    if (SiadinScripts.isTargetPage(url, targetUrl)) checkPresensi(view)
                 }
             }
         }
@@ -332,24 +332,29 @@ class WebBrowserActivity : ComponentActivity() {
 
     /**
      * Di halaman presensi: tunggu sesi dibuka (muat ulang berkala), lalu sorot tombol presensi.
+     * Daftar kartu SiAdin termuat BELAKANGAN setelah halaman selesai, jadi halaman dibaca ulang tiap detik
+     * sampai kartu muncul (maks. [CARD_LOAD_TRIES] detik). Tulisan "Belum Ada Presensi" tanpa kartu baru
+     * dipercaya setelah terlihat [EMPTY_STABLE] kali berturut-turut (bisa tampil sesaat saat memuat).
      * Tombol presensi TIDAK pernah ditekan oleh aplikasi; pengguna yang menekannya.
      */
-    private fun checkPresensi(view: WebView) {
+    private fun checkPresensi(view: WebView, triesLeft: Int = CARD_LOAD_TRIES, emptyStreak: Int = 0) {
+        if (isFinishing) return
         view.evaluateJavascript(SiadinScripts.highlightScript(courseName)) { raw ->
             view.removeCallbacks(reloadWhileWaiting)
-            when (raw?.trim('"')) {
-                "WAITING" -> {
-                    healFalseOpen(view)
-                    val now = System.currentTimeMillis()
-                    if (waitingSince == 0L) waitingSince = now
-                    wasWaiting = true
-                    if (now - waitingSince < MAX_WAIT_MS) {
-                        status = "Menunggu dosen membuka presensi… dicek otomatis tiap 20 detik."
-                        view.postDelayed(reloadWhileWaiting, RELOAD_INTERVAL_MS)
-                    } else {
-                        status = "Berhenti menunggu (90 menit). Tekan ⟳ untuk cek lagi."
+            when (val result = raw?.trim('"')) {
+                "LOADING", "EMPTY" -> {
+                    val streak = if (result == "EMPTY") emptyStreak + 1 else 0
+                    when {
+                        result == "EMPTY" && streak >= EMPTY_STABLE -> onWaiting(view)
+                        triesLeft > 0 -> {
+                            if (status == null || wasWaiting) status = "Memuat daftar presensi…"
+                            view.postDelayed({ checkPresensi(view, triesLeft - 1, streak) }, 1_000)
+                        }
+                        // Kartu tak kunjung muncul: muat ulang berkala seperti saat menunggu.
+                        else -> onWaiting(view)
                     }
                 }
+                "WAITING" -> onWaiting(view)
                 "OPEN" -> {
                     if (!awaitingSuccess) {
                         status = "Presensi sudah dibuka — tekan \"Presensi Sekarang\" (bingkai kuning) lalu \"Ya\". Bukti dikirim otomatis."
@@ -363,13 +368,21 @@ class WebBrowserActivity : ComponentActivity() {
                     waitingSince = 0L
                     wasWaiting = false
                 }
-                else -> {
-                    if (wasWaiting) {
-                        status = "Halaman presensi berubah — cek apakah presensi sudah dibuka."
-                        onSessionOpened()
-                    }
-                }
             }
+        }
+    }
+
+    /** Presensi belum dibuka: muat ulang berkala (maks. 90 menit) sambil menunggu dosen. */
+    private fun onWaiting(view: WebView) {
+        healFalseOpen(view)
+        val now = System.currentTimeMillis()
+        if (waitingSince == 0L) waitingSince = now
+        wasWaiting = true
+        if (now - waitingSince < MAX_WAIT_MS) {
+            status = "Menunggu dosen membuka presensi… dicek otomatis tiap 20 detik."
+            view.postDelayed(reloadWhileWaiting, RELOAD_INTERVAL_MS)
+        } else {
+            status = "Berhenti menunggu (90 menit). Tekan ⟳ untuk cek lagi."
         }
     }
 
@@ -388,7 +401,7 @@ class WebBrowserActivity : ComponentActivity() {
                     val dao = Graph.db.recordDao()
                     dao.find(courseId, epochDay)?.let { dao.update(it.copy(snoozeUntilMillis = null)) }
                     AlarmScheduler.reschedule(context, courseId)
-                    PresensiCheckWorker.enqueue(context, courseId, epochDay, EventType.REMIND)
+                    PresensiCheck.start(context, courseId, epochDay, EventType.REMIND)
                 }
             }
         }
@@ -534,6 +547,10 @@ class WebBrowserActivity : ComponentActivity() {
         private const val EXTRA_URL = "url"
         private const val MAX_LOGIN_ATTEMPTS = 2
         private const val RELOAD_INTERVAL_MS = 20_000L
+        /** Maks. detik menunggu daftar kartu presensi termuat setelah halaman selesai dimuat. */
+        private const val CARD_LOAD_TRIES = 30
+        /** "Belum Ada Presensi" tanpa kartu harus terlihat sekian detik berturut-turut sebelum dipercaya. */
+        private const val EMPTY_STABLE = 5
         private const val MAX_WAIT_MS = 90 * 60_000L
         private const val AUTO_PROOF_DELAY_MS = 1_500L
         /** Waktu menunggu pengguna menekan "Ya" di kotak konfirmasi (±90 detik, dicek tiap detik). */

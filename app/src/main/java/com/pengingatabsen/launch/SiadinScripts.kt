@@ -21,6 +21,19 @@ object SiadinScripts {
         return host == parent || host.endsWith(".$parent")
     }
 
+    /**
+     * Apakah [url] adalah halaman tujuan ([targetUrl]) — host sama, path diawali path tujuan tanpa
+     * peduli huruf besar/kecil & garis miring di akhir (mis. ".../presensionline/" tetap cocok).
+     */
+    fun isTargetPage(url: String, targetUrl: String): Boolean {
+        val u = Uri.parse(url)
+        val t = Uri.parse(targetUrl)
+        if (!u.host.equals(t.host, ignoreCase = true)) return false
+        val path = (u.path ?: "").trimEnd('/').lowercase()
+        val target = (t.path ?: "").trimEnd('/').lowercase()
+        return path == target || path.startsWith("$target/")
+    }
+
     fun siteRoot(targetUrl: String): String {
         val uri = Uri.parse(targetUrl)
         return "${uri.scheme}://${uri.host}/"
@@ -87,13 +100,17 @@ object SiadinScripts {
 
     /**
      * Status presensi untuk satu matkul (hanya membaca):
-     * - LOGIN   = form login tampil
+     * - LOGIN   = form login TERLIHAT (kolom password tersembunyi, mis. dialog ganti password, diabaikan)
      * - LOADING = belum selesai termuat / data akun atau kartu belum muncul
-     * - WAITING = "Belum Ada Presensi", atau kartu matkul ini "Belum Jadwalnya"
+     * - EMPTY   = tidak ada kartu sama sekali dan tertulis "Belum Ada Presensi" (bisa juga tampilan
+     *             sementara saat daftar kartu masih dimuat — pemanggil wajib menunggu beberapa kali berturut-turut)
+     * - WAITING = kartu matkul ini "Belum Jadwalnya"
      * - BUTTON  = kartu matkul ini "Presensi Sekarang" (dibuka dosen)
      * - DONE    = kartu matkul ini "Berhasil Presensi"
      * - NO_TEXT = sudah login & termuat, tapi tidak ada kartu maupun tulisan "Belum Ada Presensi"
      *
+     * KARTU selalu didahulukan daripada tulisan "Belum Ada Presensi": tulisan itu bisa tampil sesaat sebelum
+     * daftar kartu termuat, jadi tidak boleh mengalahkan kartu yang sudah terlihat.
      * Bila tidak ada kartu yang cocok dengan nama matkul, kartu lain hanya dipakai untuk "dibuka"
      * (cadangan agar tidak terlewat bila nama di jadwal berbeda), tidak pernah untuk "berhasil".
      * Halaman yang BELUM login juga bertuliskan "Belum Ada Presensi" (kotak masa studi th/bl/hr kosong),
@@ -102,36 +119,51 @@ object SiadinScripts {
     fun presensiStateScript(courseName: String): String = """
         (function(course){
           $CARDS_JS
+          $VISIBLE_PASSWORD_JS
           var body = document.body;
           if (!body) return 'LOADING';
-          if (document.querySelector('input[type=password]')) return 'LOGIN';
+          if (__visiblePassword()) return 'LOGIN';
           if (document.readyState !== 'complete') return 'LOADING';
           var text = body.innerText || '';
           if (!/\d+\s*(th|bl|hr)\b/i.test(text)) return 'LOADING';
-          if (/belum ada presensi/i.test(text)) return 'WAITING';
           var p = __pick(course);
-          if (!p.all.length) return /copyright/i.test(text) ? 'NO_TEXT' : 'LOADING';
-          if (p.matched) {
-            if (__has(p.cand, 'done')) return 'DONE';
-            if (__has(p.cand, 'open')) return 'BUTTON';
-            if (__has(p.cand, 'waiting')) return 'WAITING';
-            return 'NO_TEXT';
+          if (p.all.length) {
+            if (p.matched) {
+              if (__has(p.cand, 'done')) return 'DONE';
+              if (__has(p.cand, 'open')) return 'BUTTON';
+              if (__has(p.cand, 'waiting')) return 'WAITING';
+              return 'NO_TEXT';
+            }
+            return __has(p.all, 'open') ? 'BUTTON' : 'WAITING';
           }
-          return __has(p.all, 'open') ? 'BUTTON' : 'WAITING';
+          if (/belum ada presensi/i.test(text)) return 'EMPTY';
+          return /copyright/i.test(text) ? 'NO_TEXT' : 'LOADING';
         })(${JSONObject.quote(courseName)});
+    """
+
+    /** Ada kolom password yang benar-benar terlihat (bukan dialog/menu tersembunyi). */
+    private const val VISIBLE_PASSWORD_JS = """
+        function __visiblePassword(){
+          var pws = document.querySelectorAll('input[type=password]');
+          for (var i = 0; i < pws.length; i++) {
+            var r = pws[i].getBoundingClientRect(), s = window.getComputedStyle(pws[i]);
+            if (r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none') return true;
+          }
+          return false;
+        }
     """
 
     /**
      * Untuk browser mini (hanya tampilan): sorot & perbesar tombol "Presensi Sekarang" matkul ini (bingkai
      * kuning, digulir ke tengah sekali, kartu matkul lain diredupkan) dan pasang listener klik yang hanya MEMBERI TAHU aplikasi saat PENGGUNA menekannya.
      * Tidak pernah memanggil click(). Saat "Berhasil Presensi", kotak hijaunya digulir ke tengah layar.
-     * Hasil: WAITING / OPEN / DONE / UNKNOWN.
+     * Hasil: WAITING (kartu "Belum Jadwalnya") / EMPTY ("Belum Ada Presensi" tanpa kartu) / OPEN / DONE /
+     * LOADING (kartu belum termuat — panggil lagi sebentar lagi). Kartu didahulukan daripada tulisan.
      */
     fun highlightScript(courseName: String): String = """
         (function(course){
           $CARDS_JS
           var text = document.body ? (document.body.innerText || '') : '';
-          if (/belum ada presensi/i.test(text)) return 'WAITING';
           var p = __pick(course);
           if (p.matched) {
             var done = p.cand.filter(function(c){ return c.state === 'done'; })[0];
@@ -167,7 +199,8 @@ object SiadinScripts {
             return 'OPEN';
           }
           if (p.all.length) return 'WAITING';
-          return 'UNKNOWN';
+          if (/belum ada presensi/i.test(text)) return 'EMPTY';
+          return 'LOADING';
         })(${JSONObject.quote(courseName)});
     """
 

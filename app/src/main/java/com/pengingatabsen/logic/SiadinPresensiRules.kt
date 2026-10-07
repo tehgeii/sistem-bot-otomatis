@@ -34,10 +34,11 @@ object SiadinPresensiRules {
     /**
      * Status keseluruhan untuk [courseName], meniru `presensiStateScript`:
      * - belum login (`loggedIn` false) → UNKNOWN (pemanggil memperlakukannya "tunggu/coba lagi");
-     * - halaman "Belum Ada Presensi" → WAITING;
-     * - ada kartu cocok: DONE > OPEN > WAITING;
-     * - tidak ada kartu cocok tapi ada kartu lain: OPEN bila ada yang OPEN (cadangan), selain itu WAITING;
-     * - tak ada kartu sama sekali → UNKNOWN.
+     * - KARTU didahulukan: ada kartu cocok → DONE > OPEN > WAITING; tidak ada kartu cocok tapi ada kartu
+     *   lain → OPEN bila ada yang OPEN (cadangan), selain itu WAITING;
+     * - tanpa kartu & tertulis "Belum Ada Presensi" → WAITING (di aplikasi wajib terlihat berkali-kali,
+     *   karena tulisan itu bisa tampil sesaat sebelum kartu termuat);
+     * - tanpa kartu dan tanpa tulisan → UNKNOWN.
      */
     fun pageStatus(
         loggedIn: Boolean,
@@ -46,8 +47,7 @@ object SiadinPresensiRules {
         courseName: String,
     ): CardStatus {
         if (!loggedIn) return CardStatus.UNKNOWN
-        if (belumAdaPresensi) return CardStatus.WAITING
-        if (cards.isEmpty()) return CardStatus.UNKNOWN
+        if (cards.isEmpty()) return if (belumAdaPresensi) CardStatus.WAITING else CardStatus.UNKNOWN
         val matched = cards.filter { matches(it.cardText, courseName) }
         val pool = matched.ifEmpty { cards }
         val statuses = pool.map { cardStatus(it.buttonText) }
