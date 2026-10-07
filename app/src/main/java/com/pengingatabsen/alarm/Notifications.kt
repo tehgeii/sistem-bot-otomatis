@@ -235,10 +235,16 @@ object Notifications {
     private fun notify(context: Context, id: Int, builder: NotificationCompat.Builder) {
         val granted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        if (!granted) return
+        if (!granted) {
+            com.pengingatabsen.data.DiagLog.add("NOTIFIKASI DIBLOKIR: izin notifikasi belum diberikan")
+            return
+        }
+        val nm = NotificationManagerCompat.from(context)
+        if (!nm.areNotificationsEnabled()) com.pengingatabsen.data.DiagLog.add("NOTIFIKASI DIMATIKAN di pengaturan HP untuk NgiBsen")
         try {
-            NotificationManagerCompat.from(context).notify(id, builder.build())
-        } catch (_: SecurityException) {
+            nm.notify(id, builder.build())
+        } catch (e: SecurityException) {
+            com.pengingatabsen.data.DiagLog.add("notifikasi gagal: ${e.message}")
         }
     }
 

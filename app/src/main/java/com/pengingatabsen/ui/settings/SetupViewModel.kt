@@ -186,6 +186,59 @@ class SetupViewModel : ViewModel() {
         testStatus = "Ringkasan minggu ini dikirim ke Telegram (butuh internet)."
     }
 
+    // ---------- Diagnosis ----------
+
+    var diagBusy by mutableStateOf(false)
+        private set
+    var diagResult by mutableStateOf<String?>(null)
+        private set
+
+    /**
+     * "Tes cek sekarang": jalankan pengecek SiAdin latar (persis yang dipakai saat kuliah) untuk matkul
+     * yang sedang berlangsung, atau matkul aktif berikutnya. Hanya membaca & menampilkan hasil;
+     * notifikasi dan riwayat tidak diubah.
+     */
+    fun testCheckNow(context: Context) = viewModelScope.launch {
+        if (diagBusy) return@launch
+        diagBusy = true
+        diagResult = "Mengecek SiAdin seperti saat kuliah… (bisa sampai ±1 menit)"
+        val settings = store.current()
+        val now = LocalDateTime.now()
+        val grace = if (settings.smartModeActive) com.pengingatabsen.logic.ScheduleMath.SMART_GRACE_MINUTES else 0
+        val courses = Graph.repository.allCourses().filter { it.active }
+        val course = courses.firstOrNull { com.pengingatabsen.logic.ScheduleMath.currentOccurrence(it.toSlot(grace), now) != null }
+            ?: courses.minByOrNull { com.pengingatabsen.logic.ScheduleMath.nextOccurrence(it.toSlot(grace), now).open }
+        if (course == null) {
+            diagResult = "Belum ada jadwal aktif untuk dites."
+            diagBusy = false
+            return@launch
+        }
+        val credentials = if (settings.autoLogin) store.siadinLogin() else null
+        com.pengingatabsen.data.DiagLog.add("tes manual: ${course.name}")
+        val result = com.pengingatabsen.launch.SiadinChecker.check(
+            context.applicationContext,
+            settings.deepLink ?: TargetApps.SIADIN_PRESENSI_URL,
+            credentials,
+            course.name,
+        ) { com.pengingatabsen.data.DiagLog.add("tes ${course.name}: $it") }
+        com.pengingatabsen.data.DiagLog.add("tes HASIL ${course.name}: ${result.state} — ${result.detail}")
+        val meaning = when (result.state) {
+            com.pengingatabsen.launch.PresensiState.WAITING -> "✅ Berhasil membaca: presensi BELUM dibuka (menunggu)."
+            com.pengingatabsen.launch.PresensiState.OPEN -> "✅ Berhasil membaca: presensi SUDAH DIBUKA."
+            com.pengingatabsen.launch.PresensiState.DONE -> "✅ Berhasil membaca: sudah \"Berhasil Presensi\"."
+            com.pengingatabsen.launch.PresensiState.LOGIN_FAILED -> "❌ Login ditolak SiAdin — cek NIM/password."
+            com.pengingatabsen.launch.PresensiState.UNKNOWN -> "⚠️ Gagal membaca SiAdin."
+        }
+        diagResult = "Matkul: ${course.name}\n$meaning" +
+            (if (credentials == null) "\n(Data login belum disimpan / login otomatis mati.)" else "") +
+            "\n\nDetail: ${result.detail}"
+        diagBusy = false
+    }
+
+    fun readLog(): String = com.pengingatabsen.data.DiagLog.read()
+
+    fun clearLog() = com.pengingatabsen.data.DiagLog.clear()
+
     fun setVibrateOnly(enabled: Boolean) = viewModelScope.launch { store.setVibrateOnly(enabled) }
 
     fun finishOnboarding(context: Context) = viewModelScope.launch {

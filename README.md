@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 2.3** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 2.4** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -101,7 +101,7 @@ layar Autostart merek HP-mu bila tersedia. Atau buka *Pengaturan → Aplikasi �
 | Merek | Yang perlu diaktifkan |
 |---|---|
 | **Xiaomi / Redmi / POCO** (HyperOS/MIUI) | Autostart **ON**; Baterai → *Tanpa batasan*; izin lain → **Tampilkan jendela pop-up saat berjalan di latar belakang** & **di layar kunci** |
-| **Oppo / Realme / OnePlus** (ColorOS) | *Izinkan Mulai Otomatis*; Baterai → *Izinkan aktivitas latar belakang* / *Jangan optimalkan* |
+| **Oppo / Realme / OnePlus** (ColorOS) | *Izinkan Mulai Otomatis*; Baterai → *Izinkan aktivitas latar belakang* / *Jangan optimalkan*; **kunci NgiBsen di Recent apps** (tahan kartunya → ikon gembok) supaya tidak ikut dibersihkan |
 | **Vivo / iQOO** (Funtouch/OriginOS) | *Mulai otomatis* **ON**; Baterai → *Konsumsi daya tinggi di latar belakang* diizinkan |
 | **Samsung** (One UI) | Baterai → *Tanpa batasan*; keluarkan dari *Aplikasi tidur* & *Aplikasi tidur lelap* |
 | **Infinix / Tecno** (XOS) | *Autostart* **ON**; *Freezer*/penghemat → kecualikan NgiBsen |
@@ -248,11 +248,18 @@ Bila NIM/password ditolak SiAdin (mis. password baru diganti), muncul notifikasi
 gagal"** sekali sehari. Tap → Pengaturan → SiAdin web, simpan login yang baru. Selama itu pengingat
 tetap jalan (notifikasi "Cek presensi"), jadi tidak terlewat.
 
-**Cek berjalan & tepat waktu?** Di *Pengaturan → SiAdin web* tampil **"Cek terakhir: 10.14 ·
-Pemrograman Sisi Klien · menunggu dibuka / presensi DIBUKA / …"** dan "telat X dtk dari alarm".
+**Cek berjalan & tepat waktu?** Di *Pengaturan → Diagnosis*:
+- **Tes cek sekarang** — menjalankan pengecek SiAdin yang sama persis dengan saat kuliah (login otomatis,
+  buka halaman presensi, baca kartu) dan menampilkan hasilnya, mis. "✅ Berhasil membaca: presensi BELUM
+  dibuka". Coba sebelum kuliah; bila hasilnya ⚠️/❌, ada yang perlu dibereskan dulu.
+- **Log diagnosis** — catatan otomatis: kapan alarm berbunyi, cek dimulai (dan telat berapa detik), apa
+  yang terbaca di SiAdin (kartu mana, status apa, sudah login atau belum), dan notifikasi apa yang tampil.
+  Bila ada yang meleset di kelas, tekan **Bagikan** — tidak perlu screenshot. Log tidak berisi NIM,
+  password, atau token.
+
 Pengecekan berjalan sebagai notifikasi singkat **"Mengecek presensi SiAdin…"** yang dimulai tepat saat
-alarm berbunyi (tidak ditunda penghemat baterai). Bila angka telat sering di atas 30 detik, aktifkan
-izin baterai & Autostart (*Izin HP*). Kalau ada yang meleset, kirim screenshot baris "Cek terakhir".
+alarm berbunyi. Bila sesi SiAdin habis (halaman presensi tampil kosong tanpa form login), pengecek login
+ulang sendiri lewat halaman depan; bila masih gagal, sesi lama dihapus lalu login dari awal.
 
 ## Widget
 

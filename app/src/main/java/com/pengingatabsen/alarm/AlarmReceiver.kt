@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.pengingatabsen.Graph
+import com.pengingatabsen.data.DiagLog
 import com.pengingatabsen.data.RecordStatus
 import com.pengingatabsen.logic.EventType
 import com.pengingatabsen.logic.ScheduleMath
@@ -30,17 +31,29 @@ class AlarmReceiver : BroadcastReceiver() {
         val repo = Graph.repository
         val course = repo.course(courseId) ?: return
         val smartActive = Graph.settings.current().smartModeActive
+        DiagLog.add("⏰ alarm ${planned.name} · ${course.name} · mode pintar ${if (smartActive) "AKTIF" else "mati"}")
         val slot = course.toSlot(if (smartActive) ScheduleMath.SMART_GRACE_MINUTES else 0)
-        if (!course.active || ScheduleMath.isSkipped(slot, date)) return
+        if (!course.active || ScheduleMath.isSkipped(slot, date)) {
+            DiagLog.add("alarm diabaikan: matkul nonaktif/libur")
+            return
+        }
 
         val existing = Graph.db.recordDao().find(courseId, date.toEpochDay())
-        if (existing != null && existing.status.finished) return
+        if (existing != null && existing.status.finished) {
+            DiagLog.add("alarm diabaikan: hari ini sudah ${existing.status.label}")
+            return
+        }
 
         // Alarm yang telat sampai melewati jam tutup diperlakukan sebagai EXPIRE.
         val occ = ScheduleMath.occurrenceOn(slot, date)
         val type = if (!LocalDateTime.now().isBefore(occ.end)) EventType.EXPIRE else planned
 
-        val record = existing ?: repo.markOccurrence(course, date, RecordStatus.ACTIVE)
+        var record = existing ?: repo.markOccurrence(course, date, RecordStatus.ACTIVE)
+        // Mode pintar tidak memakai "Sudah absen?": sisa tanda lama tidak boleh menghentikan pengecekan SiAdin.
+        if (smartActive && record.awaitingConfirm) {
+            record = record.copy(awaitingConfirm = false)
+            Graph.db.recordDao().update(record)
+        }
 
         // Mode pintar (SiAdin web + login tersimpan): bergetar hanya bila presensi sudah dibuka dosen.
         // Setelah dibuka pun tetap cek SiAdin, supaya "Berhasil Presensi" (lewat Chrome/Dinusverse)
@@ -53,6 +66,7 @@ class AlarmReceiver : BroadcastReceiver() {
             return
         }
 
+        if (type != EventType.EXPIRE) DiagLog.add("alarm ${type.name}: notifikasi jadwal (tanpa cek SiAdin)")
         // Hapus dulu notifikasi lama: memperbarui notifikasi yang sama sering tidak bergetar lagi.
         if (type != EventType.EXPIRE) Notifications.cancel(context, courseId)
         when (type) {
@@ -64,6 +78,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 Notifications.cancel(context, courseId)
                 store.setPresensiUnknownStreak(courseId, date.toEpochDay(), 0)
                 // Dosen tidak pernah membuka presensi: catat "tidak dibuka", tanpa pesan terlewat.
+                DiagLog.add("jendela berakhir: " + if (smart && !seenOpen) "presensi tak pernah terlihat dibuka → \"tidak dibuka\"" else "belum presensi → TERLEWAT")
                 if (smart && !seenOpen) repo.markNoSession(record) else repo.markMissed(record)
             }
         }

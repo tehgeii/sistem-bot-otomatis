@@ -42,6 +42,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -404,5 +407,61 @@ fun IntervalSection(vm: SetupViewModel) {
         OutlinedButton(enabled = interval > 1, onClick = { vm.setInterval(interval - 1, context) }) { Text("−") }
         Spacer(Modifier.width(8.dp))
         OutlinedButton(enabled = interval < 30, onClick = { vm.setInterval(interval + 1, context) }) { Text("+") }
+    }
+}
+
+/**
+ * Diagnosis: "Tes cek sekarang" menjalankan pengecek SiAdin latar (yang sama dengan saat kuliah) dan
+ * menampilkan hasilnya; "Log diagnosis" berisi jejak alarm, pengecekan, dan notifikasi (tanpa NIM,
+ * password, atau token) yang bisa dibagikan untuk dicek.
+ */
+@Composable
+fun DiagnosisSection(vm: SetupViewModel) {
+    val context = LocalContext.current
+    var showLog by remember { mutableStateOf<String?>(null) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            "Pastikan pengecekan SiAdin jalan sebelum kuliah: tekan Tes cek sekarang. Bila ada yang meleset di " +
+                "kelas, tekan Bagikan log — tidak perlu screenshot.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(enabled = !vm.diagBusy, onClick = { vm.testCheckNow(context) }) {
+                Text(if (vm.diagBusy) "Mengecek…" else "Tes cek sekarang")
+            }
+            OutlinedButton(onClick = { showLog = vm.readLog() }) { Text("Log diagnosis") }
+        }
+        vm.diagResult?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+    }
+
+    showLog?.let { full ->
+        val lines = full.lines().filter { it.isNotBlank() }
+        val shown = lines.takeLast(200).joinToString("\n").ifBlank { "Log masih kosong." }
+        AlertDialog(
+            onDismissRequest = { showLog = null },
+            title = { Text("Log diagnosis") },
+            text = {
+                Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                    Text(shown, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val share = Intent(Intent.ACTION_SEND).setType("text/plain")
+                        .putExtra(Intent.EXTRA_SUBJECT, "Log diagnosis NgiBsen")
+                        .putExtra(Intent.EXTRA_TEXT, lines.takeLast(600).joinToString("\n"))
+                    runCatching {
+                        context.startActivity(Intent.createChooser(share, "Bagikan log").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }
+                }) { Text("Bagikan") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { vm.clearLog(); showLog = "" }) { Text("Hapus") }
+                    TextButton(onClick = { showLog = null }) { Text("Tutup") }
+                }
+            },
+        )
     }
 }

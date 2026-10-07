@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.ServiceCompat
+import com.pengingatabsen.data.DiagLog
 import com.pengingatabsen.logic.EventType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,13 +29,6 @@ class PresensiCheckService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Wajib segera: Android menghentikan paksa service yang tidak memanggil startForeground.
-        ServiceCompat.startForeground(
-            this,
-            NOTIFICATION_ID,
-            Notifications.checkingNotification(this),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0,
-        )
         val courseId = intent?.getLongExtra(KEY_COURSE_ID, -1L) ?: -1L
         val epochDay = intent?.getLongExtra(KEY_EPOCH_DAY, 0L) ?: 0L
         val type = intent?.getStringExtra(KEY_TYPE)?.let { runCatching { EventType.valueOf(it) }.getOrNull() }
@@ -42,15 +36,37 @@ class PresensiCheckService : Service() {
         val startedAt = intent?.getLongExtra(KEY_STARTED_AT, 0L) ?: 0L
         val key = "$courseId:$epochDay"
 
+        // Wajib segera: Android menghentikan paksa service yang tidak memanggil startForeground.
+        // Bila sistem menolak (pembatasan latar belakang), jangan crash: pindah ke cadangan WorkManager.
+        val foreground = runCatching {
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                Notifications.checkingNotification(this),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0,
+            )
+        }
+        if (foreground.isFailure) {
+            DiagLog.add("cek: startForeground DITOLAK (${foreground.exceptionOrNull()?.javaClass?.simpleName}) → cadangan WorkManager")
+            // enqueue() membaca status antrean (memblokir sebentar): jangan di main thread.
+            val app = applicationContext
+            if (courseId >= 0) Thread { PresensiCheckWorker.enqueue(app, courseId, epochDay, type, startedAt) }.start()
+            if (running.isEmpty()) stopSelf()
+            return START_NOT_STICKY
+        }
+
         if (courseId < 0 || !running.add(key)) {
+            if (courseId >= 0) DiagLog.add("cek: dilewati, cek matkul ini masih berjalan")
             stopIfIdle()
             return START_NOT_STICKY
         }
         scope.launch {
             try {
                 PresensiCheck.run(applicationContext, courseId, epochDay, type, startedAt)
-            } catch (_: Exception) {
-                // Gagal tak terduga: biarkan alarm berikutnya mencoba lagi.
+            } catch (e: Exception) {
+                // Gagal tak terduga: catat, biarkan alarm berikutnya mencoba lagi.
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                DiagLog.add("cek ERROR: ${e.javaClass.simpleName}: ${e.message}")
             } finally {
                 running.remove(key)
                 stopIfIdle()

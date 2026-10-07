@@ -32,7 +32,7 @@ object SiadinPresensiRules {
     }
 
     /**
-     * Status keseluruhan untuk [courseName], meniru `presensiStateScript`:
+     * Status keseluruhan untuk [courseName], meniru urutan kartu pada `probeScript` (launch/SiadinScripts.kt):
      * - belum login (`loggedIn` false) → UNKNOWN (pemanggil memperlakukannya "tunggu/coba lagi");
      * - KARTU didahulukan: ada kartu cocok → DONE > OPEN > WAITING; tidak ada kartu cocok tapi ada kartu
      *   lain → OPEN bila ada yang OPEN (cadangan), selain itu WAITING;

@@ -4,14 +4,20 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.pengingatabsen.logic.CheckerBrain
+import com.pengingatabsen.logic.Outcome
+import com.pengingatabsen.logic.PageKind
+import com.pengingatabsen.logic.Probe
+import com.pengingatabsen.logic.Step
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONArray
 import kotlin.coroutines.resume
 
 enum class PresensiState {
@@ -21,37 +27,46 @@ enum class PresensiState {
     OPEN,
     /** Kartu matkul ini sudah "Berhasil Presensi". */
     DONE,
-    /** Gagal memastikan (offline, halaman tidak dikenali). */
+    /** Gagal memastikan (offline, belum login, halaman tidak dikenali). */
     UNKNOWN,
     /** Form login tetap tampil setelah NIM/password dikirim: data login kemungkinan salah/berubah. */
     LOGIN_FAILED,
 }
 
+/** Hasil satu pengecekan + keterangan untuk log diagnosis (tanpa data rahasia). */
+data class CheckResult(val state: PresensiState, val detail: String)
+
 /**
  * Mengecek halaman Presensi Online SiAdin di latar belakang dengan WebView tak terlihat.
  * Memakai cookie/sesi yang sama dengan browser mini dan login otomatis yang sama.
- * HANYA membaca status halaman; tidak pernah menekan tombol presensi.
+ * HANYA membaca status halaman (dan mengisi form LOGIN); tidak pernah menekan tombol presensi.
+ *
+ * Keputusan diambil [CheckerBrain] (murni & teruji). Kelas ini hanya pelaksana: tiap detik membaca
+ * alamat halaman + isi halaman (`probeScript`), lalu mengerjakan langkah dari otak.
  */
 object SiadinChecker {
-    private const val TOTAL_TIMEOUT_MS = 75_000L
-    private const val MAX_PAGES = 8
-    private const val MAX_LOGIN_ATTEMPTS = 2
-    /** Lama maksimal menunggu kartu presensi termuat di satu halaman (detik). */
-    private const val POLL_SECONDS = 30
-    /** Kartu terbaca sama sekian kali berturut-turut (±1 dtk sekali) baru dipercaya. */
-    private const val STABLE_CARD = 3
-    /** "Belum Ada Presensi"/tanpa kartu baru dipercaya setelah sekian kali berturut-turut. */
-    private const val STABLE_EMPTY = 10
+    private const val TOTAL_TIMEOUT_MS = (CheckerBrain.DEADLINE_SECONDS + 15) * 1_000L
+    private const val WIDTH = 1080
+    private const val HEIGHT = 2400
 
     suspend fun check(
         context: Context,
         targetUrl: String,
         credentials: Pair<String, String>?,
         courseName: String,
-    ): PresensiState =
-        withTimeoutOrNull(TOTAL_TIMEOUT_MS) {
-            withContext(Dispatchers.Main) { runCheck(context.applicationContext, targetUrl, credentials, courseName) }
-        } ?: PresensiState.UNKNOWN
+        log: (String) -> Unit = {},
+    ): CheckResult {
+        if (!hasInternet(context)) return CheckResult(PresensiState.UNKNOWN, "tidak ada internet")
+        return withTimeoutOrNull(TOTAL_TIMEOUT_MS) {
+            withContext(Dispatchers.Main) { runCheck(context.applicationContext, targetUrl, credentials, courseName, log) }
+        } ?: CheckResult(PresensiState.UNKNOWN, "batas waktu total habis")
+    }
+
+    private fun hasInternet(context: Context): Boolean {
+        val cm = context.getSystemService(android.net.ConnectivityManager::class.java) ?: return true
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     private suspend fun runCheck(
@@ -59,99 +74,71 @@ object SiadinChecker {
         targetUrl: String,
         credentials: Pair<String, String>?,
         courseName: String,
-    ): PresensiState {
-        val pages = Channel<String>(Channel.CONFLATED)
+        log: (String) -> Unit,
+    ): CheckResult {
         val webView = WebView(context)
         try {
-            // WebView tak terlihat berukuran 0×0: tanpa ukuran, tata letak & deteksi elemen tidak akurat.
-            val width = 1080
-            val height = 2400
+            // WebView tak terlihat diberi ukuran layar HP: tanpa ukuran, tata letak & deteksi elemen tidak akurat.
             webView.measure(
-                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(WIDTH, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(HEIGHT, View.MeasureSpec.EXACTLY),
             )
-            webView.layout(0, 0, width, height)
+            webView.layout(0, 0, WIDTH, HEIGHT)
             webView.settings.javaScriptEnabled = true
             webView.settings.domStorageEnabled = true
-            // Hemat kuota: deteksi presensi memakai teks, jadi gambar (logo, dsb.) tidak perlu diunduh.
-            webView.settings.loadsImagesAutomatically = false
-            webView.settings.blockNetworkImage = true
             webView.settings.userAgentString = webView.settings.userAgentString
                 .replace("; wv", "")
                 .replace(Regex("Version/\\d+(\\.\\d+)* "), "")
             CookieManager.getInstance().setAcceptCookie(true)
-            webView.webViewClient = object : WebViewClient() {
-                override fun onPageFinished(view: WebView, url: String?) {
-                    if (url != null) pages.trySend(url)
-                }
+            // WebViewClient kosong: semua pindah halaman tetap di WebView ini (tidak membuka browser lain).
+            webView.webViewClient = WebViewClient()
 
-                override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
-                    if (url != null) pages.trySend(url)
-                }
-            }
-
-            // Hemat kuota: bila sesi login (cookie) masih ada, langsung ke halaman presensi.
-            // Hanya mampir halaman depan untuk login bila belum ada cookie (sesi habis / pertama kali).
+            val root = SiadinScripts.siteRoot(targetUrl)
+            // Ada cookie → langsung ke halaman presensi (otak akan login ulang bila ternyata sesi habis).
+            // Belum ada cookie → lewat halaman depan supaya form login muncul.
             val hasCookie = !CookieManager.getInstance().getCookie(targetUrl).isNullOrBlank()
-            webView.loadUrl(if (credentials != null && !hasCookie) SiadinScripts.siteRoot(targetUrl) else targetUrl)
-            var loginAttempts = 0
+            webView.loadUrl(if (credentials != null && !hasCookie) root else targetUrl)
 
-            repeat(MAX_PAGES) {
-                val url = pages.receive()
-                if (!SiadinScripts.isTrusted(url, targetUrl)) return PresensiState.UNKNOWN
-                delay(700) // beri waktu halaman SPA merender form/isi
-
-                val canFill = credentials != null && loginAttempts < MAX_LOGIN_ATTEMPTS
-                val loginScript = if (canFill) SiadinScripts.fillLoginScript(credentials!!.first, credentials.second)
-                else SiadinScripts.DETECT_LOGIN_SCRIPT
-                when (webView.eval(loginScript)) {
-                    "SUBMITTED" -> {
-                        loginAttempts++
-                        return@repeat // tunggu halaman setelah login
+            val brain = CheckerBrain(hasCredentials = credentials != null)
+            val probeScript = SiadinScripts.probeScript(courseName)
+            var tick = 0
+            while (true) {
+                delay(1_000)
+                tick++
+                val url = webView.url
+                val page = when {
+                    url.isNullOrBlank() || url == "about:blank" -> PageKind.OTHER
+                    !SiadinScripts.isTrusted(url, targetUrl) -> PageKind.UNTRUSTED
+                    SiadinScripts.isTargetPage(url, targetUrl) -> PageKind.TARGET
+                    else -> PageKind.OTHER
+                }
+                val probe = Probe.parse(webView.evalString(probeScript))
+                when (val step = brain.next(tick, page, probe)) {
+                    Step.Wait -> Unit
+                    Step.LoadTarget -> {
+                        log("buka halaman presensi")
+                        webView.loadUrl(targetUrl)
                     }
-                    // Form login masih tampil setelah dikirim → NIM/password ditolak; tanpa data login → tak bisa cek.
-                    "LOGIN_PAGE" -> return if (credentials != null && loginAttempts > 0) PresensiState.LOGIN_FAILED
-                    else PresensiState.UNKNOWN
-                }
-
-                if (!SiadinScripts.isTargetPage(url, targetUrl)) {
-                    webView.loadUrl(targetUrl)
-                    return@repeat
-                }
-
-                // Di halaman presensi: tunggu data akun & kartu presensi termuat (maks. ±30 detik).
-                // Setiap status baru dipercaya bila terlihat beberapa kali BERTURUT-TURUT, supaya tampilan
-                // sementara saat memuat (mis. "Belum Ada Presensi" sebelum kartu muncul) tidak menipu.
-                val stateScript = SiadinScripts.presensiStateScript(courseName)
-                var last: String? = null
-                var streak = 0
-                var relogin = false
-                poll@ for (i in 0 until POLL_SECONDS) {
-                    val result = webView.eval(stateScript)
-                    streak = if (result == last) streak + 1 else 1
-                    last = result
-                    when (result) {
-                        "LOGIN" -> {
-                            // Cookie lama tapi sesi sudah habis: login ulang lewat halaman depan, lalu cek lagi.
-                            if (credentials == null) return PresensiState.UNKNOWN
-                            if (loginAttempts >= MAX_LOGIN_ATTEMPTS) return PresensiState.LOGIN_FAILED
-                            loginAttempts++
-                            relogin = true
-                            webView.loadUrl(SiadinScripts.siteRoot(targetUrl))
-                            break@poll
-                        }
-                        "WAITING" -> if (streak >= STABLE_CARD) return PresensiState.WAITING
-                        "BUTTON" -> if (streak >= STABLE_CARD) return PresensiState.OPEN
-                        "DONE" -> if (streak >= STABLE_CARD) return PresensiState.DONE
-                        // Tanpa kartu: tunggu lebih lama, daftar kartu SiAdin sering termuat belakangan.
-                        "EMPTY" -> if (streak >= STABLE_EMPTY) return PresensiState.WAITING
-                        "NO_TEXT" -> if (streak >= STABLE_EMPTY) return PresensiState.UNKNOWN
+                    Step.LoadRoot -> {
+                        log("halaman presensi belum login → login ulang lewat halaman depan")
+                        webView.loadUrl(root)
                     }
-                    delay(1_000)
+                    Step.ClearSessionAndLoadRoot -> {
+                        log("masih belum login → hapus sesi lama, login dari awal")
+                        clearSession()
+                        webView.loadUrl(root)
+                    }
+                    Step.FillLogin -> {
+                        val creds = credentials ?: return CheckResult(PresensiState.UNKNOWN, "tanpa data login")
+                        val r = webView.evalString(SiadinScripts.fillLoginScript(creds.first, creds.second))
+                        log("isi login otomatis → $r")
+                    }
+                    is Step.Finish -> {
+                        val summary = webView.evalString(SiadinScripts.cardsSummaryScript(courseName)).orEmpty()
+                        return CheckResult(step.outcome.toState(), "${step.reason} | $summary | ${brain.summary}")
+                    }
                 }
-                if (!relogin) return PresensiState.UNKNOWN
             }
-            return PresensiState.UNKNOWN
         } finally {
             CookieManager.getInstance().flush()
             webView.stopLoading()
@@ -159,7 +146,28 @@ object SiadinChecker {
         }
     }
 
-    private suspend fun WebView.eval(script: String): String? = suspendCancellableCoroutine { cont ->
-        evaluateJavascript(script) { raw -> if (cont.isActive) cont.resume(raw?.trim('"')) }
+    private fun Outcome.toState() = when (this) {
+        Outcome.WAITING -> PresensiState.WAITING
+        Outcome.OPEN -> PresensiState.OPEN
+        Outcome.DONE -> PresensiState.DONE
+        Outcome.UNKNOWN -> PresensiState.UNKNOWN
+        Outcome.LOGIN_FAILED -> PresensiState.LOGIN_FAILED
+    }
+
+    /** Hapus cookie & penyimpanan situs (sesi rusak). Browser mini akan login otomatis lagi saat dibuka. */
+    private suspend fun clearSession() {
+        suspendCancellableCoroutine { cont ->
+            CookieManager.getInstance().removeAllCookies { if (cont.isActive) cont.resume(Unit) }
+        }
+        WebStorage.getInstance().deleteAllData()
+        CookieManager.getInstance().flush()
+    }
+
+    /** Jalankan skrip dan kembalikan hasil string-nya (sudah di-decode dari JSON), atau null. */
+    private suspend fun WebView.evalString(script: String): String? = suspendCancellableCoroutine { cont ->
+        evaluateJavascript(script) { raw ->
+            val value = runCatching { JSONArray("[$raw]").opt(0) as? String }.getOrNull()
+            if (cont.isActive) cont.resume(value)
+        }
     }
 }

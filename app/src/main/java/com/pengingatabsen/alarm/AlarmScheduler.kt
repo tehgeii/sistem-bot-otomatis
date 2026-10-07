@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import com.pengingatabsen.Graph
+import com.pengingatabsen.data.DiagLog
 import com.pengingatabsen.data.toLocalDateTime
 import com.pengingatabsen.data.toMillis
 import com.pengingatabsen.logic.OccurrenceState
@@ -60,7 +61,14 @@ object AlarmScheduler {
                 OccurrenceState(it.status.finished, it.snoozeUntilMillis?.toLocalDateTime())
             }
         }
-        set(context, courseId, planned)
+        val exact = set(context, courseId, planned)
+        // Hanya catat alarm hari ini (cukup untuk diagnosis, log tidak penuh oleh jadwal minggu depan).
+        if (planned.occurrence.date == now.toLocalDate()) {
+            DiagLog.add(
+                "jadwal: ${course.name} ${planned.event.type.name} pukul ${com.pengingatabsen.logic.Formatters.hms(planned.event.time)}" +
+                    if (exact) "" else " (TIDAK tepat waktu: izin alarm tepat belum ada)",
+            )
+        }
     }
 
     /** Dipanggil saat boot, update aplikasi, perubahan jam/zona waktu, atau aplikasi dibuka. */
@@ -86,7 +94,8 @@ object AlarmScheduler {
         alarmManager(context).cancel(pendingIntent(context, courseId, null))
     }
 
-    private fun set(context: Context, courseId: Long, planned: PlannedAlarm) {
+    /** Pasang alarm; true bila alarm tepat waktu (setAlarmClock). */
+    private fun set(context: Context, courseId: Long, planned: PlannedAlarm): Boolean {
         val pi = pendingIntent(context, courseId, planned)
         val at = planned.event.time.toMillis()
         val am = alarmManager(context)
@@ -102,6 +111,7 @@ object AlarmScheduler {
             // Tanpa izin exact alarm: tetap berbunyi, tapi bisa terlambat beberapa menit.
             am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
         }
+        return canExact
     }
 
     private fun pendingIntent(context: Context, courseId: Long, planned: PlannedAlarm?): PendingIntent {

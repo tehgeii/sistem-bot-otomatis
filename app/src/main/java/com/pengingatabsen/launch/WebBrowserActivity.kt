@@ -104,6 +104,8 @@ class WebBrowserActivity : ComponentActivity() {
     private var autoProofScheduled = false
     /** Pengguna sudah menekan "Presensi Sekarang"; menunggu kartu jadi "Berhasil Presensi". */
     private var awaitingSuccess = false
+    /** Sudah mencoba login ulang otomatis karena halaman presensi tampil belum login. */
+    private var reloginTried = false
     private val reloadWhileWaiting = Runnable { webView?.reload() }
 
     // Izin & upload yang diminta halaman web
@@ -337,18 +339,34 @@ class WebBrowserActivity : ComponentActivity() {
      * dipercaya setelah terlihat [EMPTY_STABLE] kali berturut-turut (bisa tampil sesaat saat memuat).
      * Tombol presensi TIDAK pernah ditekan oleh aplikasi; pengguna yang menekannya.
      */
-    private fun checkPresensi(view: WebView, triesLeft: Int = CARD_LOAD_TRIES, emptyStreak: Int = 0) {
+    private fun checkPresensi(view: WebView, triesLeft: Int = CARD_LOAD_TRIES, last: String? = null, streak: Int = 0) {
         if (isFinishing) return
         view.evaluateJavascript(SiadinScripts.highlightScript(courseName)) { raw ->
             view.removeCallbacks(reloadWhileWaiting)
-            when (val result = raw?.trim('"')) {
-                "LOADING", "EMPTY" -> {
-                    val streak = if (result == "EMPTY") emptyStreak + 1 else 0
+            val result = raw?.trim('"')
+            val sameStreak = if (result == last) streak + 1 else 1
+            when (result) {
+                "NOT_LOGGED" -> {
                     when {
-                        result == "EMPTY" && streak >= EMPTY_STABLE -> onWaiting(view)
+                        // Sesi habis tanpa form login: login ulang lewat halaman depan (sekali per buka browser).
+                        sameStreak >= NOT_LOGGED_STABLE && !reloginTried && credentials != null && autoLogin -> {
+                            reloginTried = true
+                            status = "Sesi SiAdin habis — login ulang otomatis…"
+                            loginAttempts = 0
+                            redirectAfterLogin = true
+                            view.loadUrl(siteRoot())
+                        }
+                        sameStreak >= NOT_LOGGED_STABLE -> status = "Belum login ke SiAdin. Tekan ⟳ atau login manual."
+                        triesLeft > 0 -> view.postDelayed({ checkPresensi(view, triesLeft - 1, result, sameStreak) }, 1_000)
+                        else -> Unit
+                    }
+                }
+                "LOADING", "EMPTY", null -> {
+                    when {
+                        result == "EMPTY" && sameStreak >= EMPTY_STABLE -> onWaiting(view)
                         triesLeft > 0 -> {
                             if (status == null || wasWaiting) status = "Memuat daftar presensi…"
-                            view.postDelayed({ checkPresensi(view, triesLeft - 1, streak) }, 1_000)
+                            view.postDelayed({ checkPresensi(view, triesLeft - 1, result, sameStreak) }, 1_000)
                         }
                         // Kartu tak kunjung muncul: muat ulang berkala seperti saat menunggu.
                         else -> onWaiting(view)
@@ -392,7 +410,7 @@ class WebBrowserActivity : ComponentActivity() {
      */
     private fun healFalseOpen(view: WebView) {
         if (courseId <= 0) return
-        view.evaluateJavascript(SiadinScripts.presensiStateScript(courseName)) { raw ->
+        view.evaluateJavascript(SiadinScripts.probeScript(courseName)) { raw ->
             if (raw?.trim('"') != "WAITING") return@evaluateJavascript
             val context = applicationContext
             lifecycleScope.launch(Dispatchers.IO) {
@@ -528,6 +546,7 @@ class WebBrowserActivity : ComponentActivity() {
         waitingSince = 0L
         autoProofScheduled = false
         awaitingSuccess = false
+        reloginTried = false
         if (started) webView?.loadUrl(targetUrl)
     }
 
@@ -551,6 +570,8 @@ class WebBrowserActivity : ComponentActivity() {
         private const val CARD_LOAD_TRIES = 30
         /** "Belum Ada Presensi" tanpa kartu harus terlihat sekian detik berturut-turut sebelum dipercaya. */
         private const val EMPTY_STABLE = 5
+        /** Halaman belum login harus terlihat sekian detik berturut-turut sebelum login ulang. */
+        private const val NOT_LOGGED_STABLE = 5
         private const val MAX_WAIT_MS = 90 * 60_000L
         private const val AUTO_PROOF_DELAY_MS = 1_500L
         /** Waktu menunggu pengguna menekan "Ya" di kotak konfirmasi (±90 detik, dicek tiap detik). */

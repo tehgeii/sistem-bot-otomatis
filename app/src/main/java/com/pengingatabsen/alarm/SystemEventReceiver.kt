@@ -16,7 +16,10 @@ class SystemEventReceiver : BroadcastReceiver() {
             Intent.ACTION_TIME_CHANGED,
             Intent.ACTION_TIMEZONE_CHANGED,
             "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED",
-            -> runAsync { AlarmScheduler.rescheduleAll(context) }
+            -> runAsync {
+                com.pengingatabsen.data.DiagLog.add("sistem: ${intent.action?.substringAfterLast('.')} → semua alarm dipasang ulang")
+                AlarmScheduler.rescheduleAll(context)
+            }
         }
     }
 }
