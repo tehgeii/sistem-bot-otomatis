@@ -72,6 +72,8 @@ class CheckerBrain(
     /** 0 = belum, 1 = sudah lewat halaman depan, 2 = sesi sudah dihapus. */
     private var reloginStage = 0
     private var targetLoads = 0
+    /** Halaman presensi "kosong" (tanpa kartu & tulisan) sudah pernah dimuat ulang. */
+    private var noTextReloaded = false
 
     /** Catatan singkat untuk log diagnosis. */
     val summary: String
@@ -120,13 +122,27 @@ class CheckerBrain(
             Probe.DONE -> stable(STABLE_CARD, Outcome.DONE, "kartu: Berhasil Presensi")
             Probe.WAITING -> stable(STABLE_CARD, Outcome.WAITING, "kartu: Belum Jadwalnya")
             Probe.EMPTY -> stable(STABLE_EMPTY, Outcome.WAITING, "tanpa kartu: Belum Ada Presensi")
-            Probe.NO_TEXT -> stable(STABLE_EMPTY, Outcome.UNKNOWN, "halaman presensi tanpa kartu/tulisan")
+            Probe.NO_TEXT -> noText(tick)
             Probe.NOT_LOGGED, Probe.NOT_LOGGED_EMPTY -> notLogged(tick)
         }
     }
 
     private fun stable(needed: Int, outcome: Outcome, reason: String): Step =
         if (streak >= needed) Step.Finish(outcome, reason) else Step.Wait
+
+    /**
+     * Sudah login tapi halaman presensi tanpa kartu maupun tulisan: tunggu lebih lama (daftar kartu SiAdin
+     * bisa termuat lambat), muat ulang sekali, baru menyerah sebagai UNKNOWN.
+     */
+    private fun noText(tick: Int): Step {
+        if (streak < STABLE_NO_TEXT) return Step.Wait
+        if (!noTextReloaded) {
+            noTextReloaded = true
+            cooldownUntil = tick + AFTER_LOAD_WAIT
+            return Step.LoadTarget
+        }
+        return Step.Finish(Outcome.UNKNOWN, "halaman presensi tanpa kartu/tulisan (sudah dimuat ulang)")
+    }
 
     /** Halaman presensi termuat tapi belum login: login ulang bertahap, berakhir UNKNOWN (bukan WAITING). */
     private fun notLogged(tick: Int): Step {
@@ -153,6 +169,8 @@ class CheckerBrain(
         const val STABLE_CARD = 3
         /** "Belum Ada Presensi"/tanpa kartu: tunggu lebih lama, kartu sering termuat belakangan. */
         const val STABLE_EMPTY = 10
+        /** Halaman login tanpa kartu & tulisan: tunggu sekian detik sebelum muat ulang / menyerah. */
+        const val STABLE_NO_TEXT = 15
         /** Belum login harus stabil sekian detik (data akun kadang termuat lambat). */
         const val STABLE_NOT_LOGGED = 6
         /** Halaman lain yang sudah termuat harus stabil sekian detik sebelum ditinggalkan. */

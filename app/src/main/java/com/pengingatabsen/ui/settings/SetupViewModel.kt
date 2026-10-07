@@ -201,7 +201,7 @@ class SetupViewModel : ViewModel() {
     fun testCheckNow(context: Context) = viewModelScope.launch {
         if (diagBusy) return@launch
         diagBusy = true
-        diagResult = "Mengecek SiAdin seperti saat kuliah… (bisa sampai ±1 menit)"
+        diagResult = "Mengecek SiAdin seperti saat kuliah… (bisa sampai ±2 menit)"
         val settings = store.current()
         val now = LocalDateTime.now()
         val grace = if (settings.smartModeActive) com.pengingatabsen.logic.ScheduleMath.SMART_GRACE_MINUTES else 0
@@ -215,23 +215,30 @@ class SetupViewModel : ViewModel() {
         }
         val credentials = if (settings.autoLogin) store.siadinLogin() else null
         com.pengingatabsen.data.DiagLog.add("tes manual: ${course.name}")
-        val result = com.pengingatabsen.launch.SiadinChecker.check(
-            context.applicationContext,
-            settings.deepLink ?: TargetApps.SIADIN_PRESENSI_URL,
-            credentials,
-            course.name,
-        ) { com.pengingatabsen.data.DiagLog.add("tes ${course.name}: $it") }
-        com.pengingatabsen.data.DiagLog.add("tes HASIL ${course.name}: ${result.state} — ${result.detail}")
-        val meaning = when (result.state) {
-            com.pengingatabsen.launch.PresensiState.WAITING -> "✅ Berhasil membaca: presensi BELUM dibuka (menunggu)."
-            com.pengingatabsen.launch.PresensiState.OPEN -> "✅ Berhasil membaca: presensi SUDAH DIBUKA."
-            com.pengingatabsen.launch.PresensiState.DONE -> "✅ Berhasil membaca: sudah \"Berhasil Presensi\"."
-            com.pengingatabsen.launch.PresensiState.LOGIN_FAILED -> "❌ Login ditolak SiAdin — cek NIM/password."
-            com.pengingatabsen.launch.PresensiState.UNKNOWN -> "⚠️ Gagal membaca SiAdin."
+        // Dua cara menggambar dibandingkan: layar virtual (dipakai saat kuliah) vs WebView tanpa jendela (cara lama).
+        val lines = mutableListOf("Matkul: ${course.name}")
+        if (credentials == null) lines += "(Data login belum disimpan / login otomatis mati.)"
+        for (mode in listOf(com.pengingatabsen.launch.RenderMode.VIRTUAL_DISPLAY, com.pengingatabsen.launch.RenderMode.DETACHED)) {
+            val label = if (mode == com.pengingatabsen.launch.RenderMode.VIRTUAL_DISPLAY) "Layar virtual (dipakai)" else "Cara lama"
+            diagResult = (lines + "$label: mengecek… (bisa sampai ±1 menit)").joinToString("\n")
+            val result = com.pengingatabsen.launch.SiadinChecker.check(
+                context.applicationContext,
+                settings.deepLink ?: TargetApps.SIADIN_PRESENSI_URL,
+                credentials,
+                course.name,
+                mode,
+            ) { com.pengingatabsen.data.DiagLog.add("tes ${course.name} [$label]: $it") }
+            com.pengingatabsen.data.DiagLog.add("tes HASIL ${course.name} [$label]: ${result.state} — ${result.detail}")
+            val meaning = when (result.state) {
+                com.pengingatabsen.launch.PresensiState.WAITING -> "✅ terbaca: presensi BELUM dibuka"
+                com.pengingatabsen.launch.PresensiState.OPEN -> "✅ terbaca: presensi SUDAH DIBUKA"
+                com.pengingatabsen.launch.PresensiState.DONE -> "✅ terbaca: \"Berhasil Presensi\""
+                com.pengingatabsen.launch.PresensiState.LOGIN_FAILED -> "❌ login ditolak SiAdin — cek NIM/password"
+                com.pengingatabsen.launch.PresensiState.UNKNOWN -> "⚠️ gagal membaca"
+            }
+            lines += "\n$label: $meaning\nDetail: ${result.detail}"
         }
-        diagResult = "Matkul: ${course.name}\n$meaning" +
-            (if (credentials == null) "\n(Data login belum disimpan / login otomatis mati.)" else "") +
-            "\n\nDetail: ${result.detail}"
+        diagResult = lines.joinToString("\n")
         diagBusy = false
     }
 

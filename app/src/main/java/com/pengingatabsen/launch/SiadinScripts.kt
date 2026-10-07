@@ -119,6 +119,11 @@ object SiadinScripts {
           $FIND_LOGIN_JS
           var body = document.body;
           if (!body) return 'LOADING';
+          // Penanda diagnosis: apakah halaman benar-benar digambar (requestAnimationFrame berjalan).
+          if (window.__ngRaf === undefined) {
+            window.__ngRaf = 0;
+            try { requestAnimationFrame(function(){ window.__ngRaf = 1; }); } catch (e) {}
+          }
           if (typeof __findLogin() !== 'string') return 'LOGIN_FORM';
           if (document.readyState !== 'complete') return 'LOADING';
           var text = body.innerText || '';
@@ -145,12 +150,16 @@ object SiadinScripts {
 
     /**
      * Ringkasan isi halaman untuk LOG DIAGNOSIS (hanya membaca), mis.
-     * "login✓ · MANAJEMEN PROYEK TEKNOLOGI INFORMASI=waiting, PEMROGRAMAN SISI KLIEN=open*" (* = cocok jadwal).
+     * "login✓ · MANAJEMEN PROYEK TEKNOLOGI INFORMASI=waiting, PEMROGRAMAN SISI KLIEN=open* · KDMK dom=2 tampil=2 ·
+     * judul✓ · visible · gambar✓ · teks: \"Presensi Kuliah Online …\"" (* = cocok jadwal).
+     * "KDMK dom" vs "tampil" dan "gambar✓/✗" membedakan "halaman memang kosong" dari "halaman tidak digambar".
+     * Deret angka panjang (mis. NIM) disamarkan.
      */
     fun cardsSummaryScript(courseName: String): String = """
         (function(course){
           $CARDS_JS
           var t = document.body ? (document.body.innerText || '') : '';
+          var dom = document.body ? (document.body.textContent || '') : '';
           var p = __pick(course);
           var parts = p.all.map(function(c){
             var name = ((c.card.innerText || '').split(/\n|kdmk/i)[0] || '').trim().slice(0, 40);
@@ -158,7 +167,13 @@ object SiadinScripts {
           });
           var logged = /\d+\s*(th|bl|hr)\b/i.test(t) ? 'login✓' : 'login✗';
           var rest = parts.length ? parts.join(', ') : (/belum ada presensi/i.test(t) ? 'tanpa kartu: Belum Ada Presensi' : 'tanpa kartu');
-          return logged + ' · ' + rest;
+          var kd = 'KDMK dom=' + (dom.match(/kdmk/gi) || []).length + ' tampil=' + (t.match(/kdmk/gi) || []).length;
+          var head = /presensi kuliah online/i.test(t) ? 'judul✓' : (/presensi kuliah online/i.test(dom) ? 'judul(tersembunyi)' : 'judul✗');
+          var raf = window.__ngRaf === 1 ? 'gambar✓' : (window.__ngRaf === 0 ? 'gambar✗' : 'gambar?');
+          var i = t.search(/presensi kuliah online/i);
+          var snip = (i >= 0 ? t.substr(i, 200) : t.substr(0, 200)).replace(/\s+/g, ' ').replace(/\d{5,}/g, '#####');
+          return logged + ' · ' + rest + ' · ' + kd + ' · ' + head + ' · ' + document.visibilityState + ' · ' + raf +
+            ' · ' + location.pathname + ' · teks: "' + snip + '"';
         })(${JSONObject.quote(courseName)});
     """
 

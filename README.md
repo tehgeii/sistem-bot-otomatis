@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 2.4** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 2.5** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -250,8 +250,10 @@ tetap jalan (notifikasi "Cek presensi"), jadi tidak terlewat.
 
 **Cek berjalan & tepat waktu?** Di *Pengaturan → Diagnosis*:
 - **Tes cek sekarang** — menjalankan pengecek SiAdin yang sama persis dengan saat kuliah (login otomatis,
-  buka halaman presensi, baca kartu) dan menampilkan hasilnya, mis. "✅ Berhasil membaca: presensi BELUM
-  dibuka". Coba sebelum kuliah; bila hasilnya ⚠️/❌, ada yang perlu dibereskan dulu.
+  buka halaman presensi, baca kartu) dengan dua cara — **layar virtual** (dipakai saat kuliah: halaman
+  digambar seperti di browser walau tidak tampil di layar) dan **cara lama** — lalu menampilkan hasil
+  keduanya, mis. "✅ terbaca: presensi BELUM dibuka". Coba sebelum kuliah; bila hasilnya ⚠️/❌, ada yang
+  perlu dibereskan dulu.
 - **Log diagnosis** — catatan otomatis: kapan alarm berbunyi, cek dimulai (dan telat berapa detik), apa
   yang terbaca di SiAdin (kartu mana, status apa, sudah login atau belum), dan notifikasi apa yang tampil.
   Bila ada yang meleset di kelas, tekan **Bagikan** — tidak perlu screenshot. Log tidak berisi NIM,

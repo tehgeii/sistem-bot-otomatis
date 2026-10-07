@@ -164,6 +164,28 @@ class CheckerBrainTest {
     }
 
     @Test
+    fun slowCards_over10Seconds_stillDetected() {
+        // 7 Okt 15:07: dulu menyerah setelah 10 dtk "tanpa kartu/tulisan". Kartu yang muncul di detik ke-14 harus terbaca.
+        val brain = CheckerBrain(hasCredentials = true)
+        var step: Step = Step.Wait
+        var tick = 0
+        while (step !is Step.Finish) {
+            val probe = if (tick < 14) Probe.NO_TEXT else Probe.BUTTON
+            step = brain.next(tick++, PageKind.TARGET, probe)
+        }
+        assertEquals(Outcome.OPEN, (step as Step.Finish).outcome)
+    }
+
+    @Test
+    fun emptyPageForever_reloadsOnceThenUnknown() {
+        val site = FakeSiadin(sessionValid = true, cards = Probe.NO_TEXT, placeholder = false)
+        val r = run(site)
+        assertEquals(Outcome.UNKNOWN, r.outcome)
+        assertEquals(1, r.steps.count { it == Step.LoadTarget })
+        assertTrue("terlalu lama: ${r.tick}", r.tick < CheckerBrain.DEADLINE_SECONDS)
+    }
+
+    @Test
     fun untrustedPage_stopsImmediately() {
         val step = CheckerBrain(true).next(0, PageKind.UNTRUSTED, Probe.LOADING)
         assertEquals(Outcome.UNKNOWN, (step as Step.Finish).outcome)

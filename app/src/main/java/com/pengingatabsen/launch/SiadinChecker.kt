@@ -36,6 +36,17 @@ enum class PresensiState {
 /** Hasil satu pengecekan + keterangan untuk log diagnosis (tanpa data rahasia). */
 data class CheckResult(val state: PresensiState, val detail: String)
 
+/** Cara WebView pengecek "digambar". */
+enum class RenderMode {
+    /**
+     * WebView di layar virtual pribadi (tak tampil di layar HP): bagi Android/Chromium halaman dianggap
+     * TERLIHAT, jadi digambar normal seperti di browser. Bawaan; bila gagal dibuat → [DETACHED].
+     */
+    VIRTUAL_DISPLAY,
+    /** WebView tanpa jendela (cara lama). Halaman bisa dianggap tersembunyi sehingga tidak digambar penuh. */
+    DETACHED,
+}
+
 /**
  * Mengecek halaman Presensi Online SiAdin di latar belakang dengan WebView tak terlihat.
  * Memakai cookie/sesi yang sama dengan browser mini dan login otomatis yang sama.
@@ -54,12 +65,68 @@ object SiadinChecker {
         targetUrl: String,
         credentials: Pair<String, String>?,
         courseName: String,
+        mode: RenderMode = RenderMode.VIRTUAL_DISPLAY,
         log: (String) -> Unit = {},
     ): CheckResult {
         if (!hasInternet(context)) return CheckResult(PresensiState.UNKNOWN, "tidak ada internet")
         return withTimeoutOrNull(TOTAL_TIMEOUT_MS) {
-            withContext(Dispatchers.Main) { runCheck(context.applicationContext, targetUrl, credentials, courseName, log) }
+            withContext(Dispatchers.Main) { runCheck(context.applicationContext, targetUrl, credentials, courseName, mode, log) }
         } ?: CheckResult(PresensiState.UNKNOWN, "batas waktu total habis")
+    }
+
+    /** WebView beserta cara membereskannya. */
+    private class Host(val webView: WebView, val label: String, private val release: () -> Unit) {
+        fun close() = runCatching { release() }
+    }
+
+    /**
+     * Buat WebView pengecek. Mode layar virtual: VirtualDisplay pribadi (tanpa izin khusus) + Presentation
+     * berisi WebView, gambar yang dihasilkan langsung dibuang. Gagal dibuat → WebView tanpa jendela.
+     */
+    private fun createHost(context: Context, mode: RenderMode, log: (String) -> Unit): Host {
+        if (mode == RenderMode.VIRTUAL_DISPLAY) {
+            val virtual = runCatching {
+                val reader = android.media.ImageReader.newInstance(WIDTH, HEIGHT, android.graphics.PixelFormat.RGBA_8888, 2)
+                // Buang setiap gambar agar antrean tidak penuh (antrean penuh = halaman berhenti digambar).
+                reader.setOnImageAvailableListener(
+                    { r -> runCatching { r.acquireLatestImage()?.close() } },
+                    android.os.Handler(android.os.Looper.getMainLooper()),
+                )
+                val display = context.getSystemService(android.hardware.display.DisplayManager::class.java)
+                    .createVirtualDisplay("ngibsen-cek", WIDTH, HEIGHT, context.resources.displayMetrics.densityDpi, reader.surface, 0)
+                try {
+                    val presentation = android.app.Presentation(context, display.display)
+                    val webView = WebView(presentation.context)
+                    presentation.setContentView(
+                        webView,
+                        android.view.ViewGroup.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        ),
+                    )
+                    presentation.show()
+                    Host(webView, "layar virtual") {
+                        runCatching { presentation.dismiss() }
+                        display.release()
+                        reader.close()
+                    }
+                } catch (e: Exception) {
+                    display.release()
+                    reader.close()
+                    throw e
+                }
+            }
+            virtual.onSuccess { return it }
+            log("layar virtual gagal dibuat (${virtual.exceptionOrNull()?.javaClass?.simpleName}) → WebView tanpa jendela")
+        }
+        val webView = WebView(context)
+        // WebView tanpa jendela diberi ukuran layar HP: tanpa ukuran, tata letak & deteksi elemen tidak akurat.
+        webView.measure(
+            View.MeasureSpec.makeMeasureSpec(WIDTH, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(HEIGHT, View.MeasureSpec.EXACTLY),
+        )
+        webView.layout(0, 0, WIDTH, HEIGHT)
+        return Host(webView, "tanpa jendela") {}
     }
 
     private fun hasInternet(context: Context): Boolean {
@@ -74,16 +141,12 @@ object SiadinChecker {
         targetUrl: String,
         credentials: Pair<String, String>?,
         courseName: String,
+        mode: RenderMode,
         log: (String) -> Unit,
     ): CheckResult {
-        val webView = WebView(context)
+        val host = createHost(context, mode, log)
+        val webView = host.webView
         try {
-            // WebView tak terlihat diberi ukuran layar HP: tanpa ukuran, tata letak & deteksi elemen tidak akurat.
-            webView.measure(
-                View.MeasureSpec.makeMeasureSpec(WIDTH, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(HEIGHT, View.MeasureSpec.EXACTLY),
-            )
-            webView.layout(0, 0, WIDTH, HEIGHT)
             webView.settings.javaScriptEnabled = true
             webView.settings.domStorageEnabled = true
             webView.settings.userAgentString = webView.settings.userAgentString
@@ -135,7 +198,7 @@ object SiadinChecker {
                     }
                     is Step.Finish -> {
                         val summary = webView.evalString(SiadinScripts.cardsSummaryScript(courseName)).orEmpty()
-                        return CheckResult(step.outcome.toState(), "${step.reason} | $summary | ${brain.summary}")
+                        return CheckResult(step.outcome.toState(), "${step.reason} | $summary | ${brain.summary} | ${host.label}")
                     }
                 }
             }
@@ -143,6 +206,7 @@ object SiadinChecker {
             CookieManager.getInstance().flush()
             webView.stopLoading()
             webView.destroy()
+            host.close()
         }
     }
 
