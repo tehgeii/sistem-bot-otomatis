@@ -26,14 +26,15 @@ object SiadinPresensiRules {
     /** Kode kelas di nama jadwal: deret ≥4 angka, mis. "MPTI 4515" → ["4515"] (= KLPK A11.4515 di kartu). */
     fun codes(courseName: String): List<String> = Regex("\\d{4,}").findAll(courseName).map { it.value }.toList()
 
+    /** Kode kelas di nama jadwal muncul sebagai angka utuh di kartu (KLPK A11.4515 ↔ "MPTI 4515"). */
+    fun codeMatches(cardText: String, courseName: String): Boolean =
+        codes(courseName).any { Regex("(^|[^0-9])$it([^0-9]|$)").containsMatchIn(cardText) }
+
     /**
-     * Apakah [cardText] (teks satu kartu) cocok dengan [courseName] di jadwal:
-     * 1. kode kelas di nama jadwal muncul sebagai angka utuh di kartu (KLPK A11.4515 ↔ "MPTI 4515"); atau
-     * 2. setiap kata (≥2 huruf, bukan angka) ada di kartu — kata 2 huruf harus kata utuh (mis. "II") —
-     *    atau merupakan bagian singkatan nama matkul di kartu ("MPTI", "TI" ↔ Manajemen Proyek Teknologi Informasi).
+     * Setiap kata nama jadwal (≥2 huruf, bukan angka) ada di kartu — kata 2 huruf harus kata utuh (mis. "II") —
+     * atau merupakan bagian singkatan nama matkul di kartu ("MPTI", "TI" ↔ Manajemen Proyek Teknologi Informasi).
      */
-    fun matches(cardText: String, courseName: String): Boolean {
-        if (codes(courseName).any { Regex("(^|[^0-9])$it([^0-9]|$)").containsMatchIn(cardText) }) return true
+    fun wordMatches(cardText: String, courseName: String): Boolean {
         val tokens = norm(courseName).split(' ').filter { it.length >= 2 && !it.all(Char::isDigit) }
         if (tokens.isEmpty()) return false
         val ct = norm(cardText)
@@ -41,6 +42,27 @@ object SiadinPresensiRules {
         return tokens.all { k ->
             val inText = if (k.length >= 3) ct.contains(k) else " $ct ".contains(" $k ")
             inText || (k.all { it in 'a'..'z' } && ini.contains(k))
+        }
+    }
+
+    /** Cocok dengan salah satu cara (untuk satu kartu saja; pemilihan di halaman memakai [pick]). */
+    fun matches(cardText: String, courseName: String): Boolean =
+        codeMatches(cardText, courseName) || wordMatches(cardText, courseName)
+
+    /**
+     * Kartu milik [courseName] di satu halaman (indeks), meniru `__pick` di launch/SiadinScripts.kt.
+     * Urutan: kode + nama cocok → nama saja (kode salah ketik) → kode saja bila hanya SATU kartu berkode itu.
+     * KLPK bukan kode unik per matkul (mis. 4502 dipakai Technopreneurship, Penambangan Data, Kriptografi).
+     */
+    fun pick(cardTexts: List<String>, courseName: String): List<Int> {
+        val code = cardTexts.indices.filter { codeMatches(cardTexts[it], courseName) }
+        val word = cardTexts.indices.filter { wordMatches(cardTexts[it], courseName) }
+        val both = code.filter { it in word }
+        return when {
+            both.isNotEmpty() -> both
+            word.isNotEmpty() -> word
+            code.size == 1 -> code
+            else -> emptyList()
         }
     }
 
@@ -70,7 +92,7 @@ object SiadinPresensiRules {
     ): CardStatus {
         if (!loggedIn) return CardStatus.UNKNOWN
         if (cards.isEmpty()) return if (belumAdaPresensi) CardStatus.WAITING else CardStatus.UNKNOWN
-        val matched = cards.filter { matches(it.cardText, courseName) }
+        val matched = pick(cards.map { it.cardText }, courseName).map { cards[it] }
         val pool = when {
             matched.isNotEmpty() -> matched
             codes(courseName).isEmpty() -> cards

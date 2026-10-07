@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 2.6** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 2.7** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -158,8 +158,10 @@ Di browser mini, tombol "Presensi Sekarang" disorot kuning. Setelah kamu menekan
 konfirmasi **Tidak / Ya**; bukti (screenshot kotak hijau "Berhasil Presensi") baru dikirim **setelah
 kamu menekan "Ya"** dan SiAdin menampilkan "Berhasil Presensi". Menekan "Tidak" tidak mengirim apa pun.
 **Nama matkul di jadwal:** paling pasti tambahkan **kode kelas (KLPK)** di belakang nama, mis. "MPTI 4515"
-untuk kartu *KLPK: A11.4515* — kartu dicocokkan lewat kode itu. Tanpa kode, nama lengkap ("Pemrograman Sisi
-Klien") atau singkatannya ("PSK", "MPTI") juga dikenali. Nama berkode tidak pernah memakai kartu matkul lain,
+untuk kartu *KLPK: A11.4515*. Karena satu KLPK bisa dipakai beberapa matkul (mis. 4502 untuk
+Technopreneurship, Penambangan Data, Kriptografi), kartu dipilih berurutan: kode **dan** nama cocok → nama
+saja → kode saja bila hanya satu kartu berkode itu. Nama lengkap ("Pemrograman Sisi Klien") atau
+singkatannya ("PSK", "MPTI") dikenali. Nama berkode tidak pernah memakai kartu matkul lain,
 jadi presensi matkul lain yang sedang dibuka tidak dikira presensi matkul ini. Jika pengecekan gagal 3 kali berturut-turut (offline,
 login bermasalah), HP bergetar dengan notifikasi **"Cek presensi"**. Jika sampai jam tutup dosen tidak
 membuka presensi, riwayat mencatat **"tidak dibuka"** tanpa pesan ❌ ke Telegram.

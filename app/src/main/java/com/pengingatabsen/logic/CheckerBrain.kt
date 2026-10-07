@@ -18,6 +18,8 @@ enum class Probe {
     NO_TEXT,
     /** Kartu matkul ini "Belum Jadwalnya". */
     WAITING,
+    /** Ada kartu matkul lain, tapi belum ada kartu untuk matkul ini (belum dibuat dosen). */
+    NO_CARD,
     /** Kartu matkul ini "Presensi Sekarang". */
     BUTTON,
     /** Kartu matkul ini "Berhasil Presensi". */
@@ -121,6 +123,7 @@ class CheckerBrain(
             Probe.BUTTON -> stable(STABLE_CARD, Outcome.OPEN, "kartu: Presensi Sekarang")
             Probe.DONE -> stable(STABLE_CARD, Outcome.DONE, "kartu: Berhasil Presensi")
             Probe.WAITING -> stable(STABLE_CARD, Outcome.WAITING, "kartu: Belum Jadwalnya")
+            Probe.NO_CARD -> stable(STABLE_CARD, Outcome.WAITING, "belum ada kartu untuk matkul ini")
             Probe.EMPTY -> stable(STABLE_EMPTY, Outcome.WAITING, "tanpa kartu: Belum Ada Presensi")
             Probe.NO_TEXT -> noText(tick)
             Probe.NOT_LOGGED, Probe.NOT_LOGGED_EMPTY -> notLogged(tick)

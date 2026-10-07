@@ -134,6 +134,7 @@ class CheckerBrainTest {
         assertEquals(Outcome.WAITING, run(FakeSiadin(sessionValid = true, cards = Probe.WAITING)).outcome)
         assertEquals(Outcome.WAITING, run(FakeSiadin(sessionValid = true, cards = Probe.EMPTY)).outcome)
         assertEquals(Outcome.DONE, run(FakeSiadin(sessionValid = true, cards = Probe.DONE)).outcome)
+        assertEquals(Outcome.WAITING, run(FakeSiadin(sessionValid = true, cards = Probe.NO_CARD)).outcome)
     }
 
     @Test

@@ -90,11 +90,14 @@ object SiadinScripts {
           return __norm(title).split(' ').filter(function(w){ return /^[a-z]/.test(w) && ['dan','di','ke','of','and'].indexOf(w) < 0; })
             .map(function(w){ return w.charAt(0); }).join('');
         }
-        function __matches(cardText, course){
+        function __codeMatch(cardText, course){
           var codes = __codes(course);
           for (var i = 0; i < codes.length; i++) {
             if (new RegExp('(^|[^0-9])' + codes[i] + '([^0-9]|$)').test(cardText)) return true;
           }
+          return false;
+        }
+        function __wordMatch(cardText, course){
           var tokens = __norm(course).split(' ').filter(function(t){ return t.length >= 2 && !/^\d+$/.test(t); });
           if (!tokens.length) return false;
           var ct = __norm(cardText);
@@ -121,7 +124,8 @@ object SiadinScripts {
               : /belum\s*jadwal/i.test(t) ? 'waiting' : 'unknown';
             var btn = __leaf(card, /presensi\s*sekarang/i);
             if (btn && btn.closest) btn = btn.closest('button,a,[role=button]') || btn;
-            return { card: card, el: btn, doneEl: __leaf(card, /berhasil\s*presensi|sudah\s*presensi/i), state: state, match: __matches(t, course) };
+            return { card: card, el: btn, doneEl: __leaf(card, /berhasil\s*presensi|sudah\s*presensi/i), state: state,
+              code: __codeMatch(t, course), word: __wordMatch(t, course), match: false };
           });
         }
         // Kartu lain hanya dipakai sebagai cadangan "dibuka" bila nama jadwal TANPA kode kelas tidak cocok
@@ -129,7 +133,13 @@ object SiadinScripts {
         // kartu matkul lain, supaya presensi matkul lain yang masih dibuka tidak dikira matkul ini.
         function __pick(course){
           var all = __cards(course);
-          var matched = all.filter(function(c){ return c.match; });
+          // Urutan: kode + nama cocok → nama saja (kode salah ketik) → kode saja bila kodenya unik di halaman.
+          // (KLPK bukan kode unik per matkul: mis. 4502 dipakai Technopreneurship, Penambangan Data, Kriptografi.)
+          var both = all.filter(function(c){ return c.code && c.word; });
+          var words = all.filter(function(c){ return c.word; });
+          var codes = all.filter(function(c){ return c.code; });
+          var matched = both.length ? both : (words.length ? words : (codes.length === 1 ? codes : []));
+          matched.forEach(function(c){ c.match = true; });
           var fallback = matched.length === 0 && __codes(course).length === 0;
           return { all: all, matched: matched.length > 0, cand: matched.length ? matched : (fallback ? all : []) };
         }
@@ -142,6 +152,7 @@ object SiadinScripts {
      * - LOGIN_FORM        = form login (NIM + password + tombol Masuk) benar-benar tampil
      * - LOADING           = halaman/kartu belum selesai dimuat
      * - WAITING / BUTTON / DONE = kartu matkul ini "Belum Jadwalnya" / "Presensi Sekarang" / "Berhasil Presensi"
+     * - NO_CARD           = ada kartu matkul lain, tapi belum ada kartu untuk matkul ini
      * - EMPTY             = sudah login, tanpa kartu, tertulis "Belum Ada Presensi"
      * - NOT_LOGGED(_EMPTY) = halaman termuat tapi kotak masa studi kosong (belum login; SiAdin tidak selalu
      *                       menampilkan form login saat sesi habis, dan tetap menulis "Belum Ada Presensi")
@@ -173,7 +184,8 @@ object SiadinScripts {
               if (__has(p.cand, 'waiting')) return 'WAITING';
               return 'NO_TEXT';
             }
-            return __has(p.cand, 'open') ? 'BUTTON' : 'WAITING';
+            // Tidak ada kartu untuk matkul ini (kartu matkul lain ada): belum dibuat/dibuka dosen.
+            return __has(p.cand, 'open') ? 'BUTTON' : 'NO_CARD';
           }
           var rendered = /copyright/i.test(text);
           var empty = /belum ada presensi/i.test(text);

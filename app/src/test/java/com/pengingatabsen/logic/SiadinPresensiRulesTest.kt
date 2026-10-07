@@ -114,4 +114,20 @@ class SiadinPresensiRulesTest {
         // Matkul lain (kode 4512) belum punya kartu: presensi Sisi Klien yang dibuka BUKAN miliknya.
         assertEquals(CardStatus.WAITING, SiadinPresensiRules.pageStatus(true, false, cards, "Sistem Terdistribusi 4512"))
     }
+
+    @Test
+    fun pick_sameClassCodeOnDifferentCourses() {
+        // KLPK 4502 dipakai 3 matkul. Bila dua kartu ber-KLPK sama tampil bersamaan, nama yang menentukan.
+        val tekno = "TECHNOPRENEURSHIP KDMK: A11.64601 KLPK: A11.4502 Presensi Sekarang"
+        val kripto = "KRIPTOGRAFI KDMK: A11.64602 KLPK: A11.4502 Belum Jadwalnya"
+        val cards = listOf(tekno, kripto)
+        assertEquals(listOf(1), SiadinPresensiRules.pick(cards, "Kriptografi 4502"))
+        assertEquals(listOf(0), SiadinPresensiRules.pick(cards, "Technopreneurship 4502"))
+        // Kode saja (nama tak dikenali) & kode tidak unik → tidak menebak.
+        assertEquals(emptyList<Int>(), SiadinPresensiRules.pick(cards, "Kelas Pak X 4502"))
+        // Kode saja & unik → dipakai.
+        assertEquals(listOf(0), SiadinPresensiRules.pick(listOf(tekno, mpti), "Kelas Pak X 4502"))
+        // Kode salah ketik tapi nama cocok → nama yang dipakai.
+        assertEquals(listOf(1), SiadinPresensiRules.pick(cards, "Kriptografi 9999"))
+    }
 }
