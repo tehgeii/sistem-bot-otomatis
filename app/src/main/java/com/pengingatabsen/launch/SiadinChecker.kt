@@ -33,8 +33,11 @@ enum class PresensiState {
     LOGIN_FAILED,
 }
 
-/** Hasil satu pengecekan + keterangan untuk log diagnosis (tanpa data rahasia). */
-data class CheckResult(val state: PresensiState, val detail: String)
+/**
+ * Hasil satu pengecekan + keterangan untuk log diagnosis (tanpa data rahasia).
+ * [photoPath]: foto halaman "Berhasil Presensi" (bukti otomatis), bila diminta dan berhasil diambil.
+ */
+data class CheckResult(val state: PresensiState, val detail: String, val photoPath: String? = null)
 
 /** Cara WebView pengecek "digambar". */
 enum class RenderMode {
@@ -66,17 +69,38 @@ object SiadinChecker {
         credentials: Pair<String, String>?,
         courseName: String,
         mode: RenderMode = RenderMode.VIRTUAL_DISPLAY,
+        /** Bila kartu "Berhasil Presensi", potret halamannya sebagai bukti (hanya di layar virtual). */
+        captureProof: Boolean = false,
         log: (String) -> Unit = {},
     ): CheckResult {
         if (!hasInternet(context)) return CheckResult(PresensiState.UNKNOWN, "tidak ada internet")
         return withTimeoutOrNull(TOTAL_TIMEOUT_MS) {
-            withContext(Dispatchers.Main) { runCheck(context.applicationContext, targetUrl, credentials, courseName, mode, log) }
+            withContext(Dispatchers.Main) {
+                runCheck(context.applicationContext, targetUrl, credentials, courseName, mode, captureProof, log)
+            }
         } ?: CheckResult(PresensiState.UNKNOWN, "batas waktu total habis")
     }
 
     /** WebView beserta cara membereskannya. */
-    private class Host(val webView: WebView, val label: String, private val release: () -> Unit) {
+    private class Host(
+        val webView: WebView,
+        val label: String,
+        /** Ambil gambar halaman yang sedang tampil (null bila mode ini tidak bisa memotret). */
+        val capture: (suspend () -> android.graphics.Bitmap?)? = null,
+        private val release: () -> Unit,
+    ) {
         fun close() = runCatching { release() }
+    }
+
+    /** Gambar dari layar virtual (RGBA_8888) → Bitmap seukuran layar. */
+    private fun android.media.Image.toBitmap(): android.graphics.Bitmap {
+        val plane = planes[0]
+        val rowPadding = plane.rowStride - plane.pixelStride * width
+        val padded = android.graphics.Bitmap.createBitmap(
+            width + rowPadding / plane.pixelStride, height, android.graphics.Bitmap.Config.ARGB_8888,
+        )
+        padded.copyPixelsFromBuffer(plane.buffer)
+        return if (rowPadding == 0) padded else android.graphics.Bitmap.createBitmap(padded, 0, 0, width, height)
     }
 
     /**
@@ -88,8 +112,24 @@ object SiadinChecker {
             val virtual = runCatching {
                 val reader = android.media.ImageReader.newInstance(WIDTH, HEIGHT, android.graphics.PixelFormat.RGBA_8888, 2)
                 // Buang setiap gambar agar antrean tidak penuh (antrean penuh = halaman berhenti digambar).
+                // Bila sedang diminta foto bukti, gambar berikutnya diubah jadi Bitmap; selain itu dibuang.
+                var pendingShot: kotlinx.coroutines.CompletableDeferred<android.graphics.Bitmap?>? = null
                 reader.setOnImageAvailableListener(
-                    { r -> runCatching { r.acquireLatestImage()?.close() } },
+                    { r ->
+                        runCatching {
+                            val image = r.acquireLatestImage()
+                            if (image != null) {
+                                try {
+                                    pendingShot?.let { shot ->
+                                        pendingShot = null
+                                        shot.complete(runCatching { image.toBitmap() }.getOrNull())
+                                    }
+                                } finally {
+                                    image.close()
+                                }
+                            }
+                        }
+                    },
                     android.os.Handler(android.os.Looper.getMainLooper()),
                 )
                 val display = context.getSystemService(android.hardware.display.DisplayManager::class.java)
@@ -105,7 +145,15 @@ object SiadinChecker {
                         ),
                     )
                     presentation.show()
-                    Host(webView, "layar virtual") {
+                    val capture: suspend () -> android.graphics.Bitmap? = {
+                        val shot = kotlinx.coroutines.CompletableDeferred<android.graphics.Bitmap?>()
+                        pendingShot = shot
+                        // Paksa halaman digambar ulang supaya layar virtual mengirim gambar baru.
+                        webView.invalidate()
+                        webView.evaluateJavascript("window.scrollBy(0,1);window.scrollBy(0,-1);", null)
+                        withTimeoutOrNull(3_000) { shot.await() }.also { pendingShot = null }
+                    }
+                    Host(webView, "layar virtual", capture) {
                         runCatching { presentation.dismiss() }
                         display.release()
                         reader.close()
@@ -126,7 +174,7 @@ object SiadinChecker {
             View.MeasureSpec.makeMeasureSpec(HEIGHT, View.MeasureSpec.EXACTLY),
         )
         webView.layout(0, 0, WIDTH, HEIGHT)
-        return Host(webView, "tanpa jendela") {}
+        return Host(webView, "tanpa jendela", capture = null) {}
     }
 
     private fun hasInternet(context: Context): Boolean {
@@ -142,6 +190,7 @@ object SiadinChecker {
         credentials: Pair<String, String>?,
         courseName: String,
         mode: RenderMode,
+        captureProof: Boolean,
         log: (String) -> Unit,
     ): CheckResult {
         val host = createHost(context, mode, log)
@@ -198,7 +247,16 @@ object SiadinChecker {
                     }
                     is Step.Finish -> {
                         val summary = webView.evalString(SiadinScripts.cardsSummaryScript(courseName)).orEmpty()
-                        return CheckResult(step.outcome.toState(), "${step.reason} | $summary | ${brain.summary} | ${host.label}")
+                        val photo = if (captureProof && step.outcome == Outcome.DONE) {
+                            captureProofPhoto(context, host, courseName, log)
+                        } else {
+                            null
+                        }
+                        return CheckResult(
+                            step.outcome.toState(),
+                            "${step.reason} | $summary | ${brain.summary} | ${host.label}",
+                            photo,
+                        )
                     }
                 }
             }
@@ -208,6 +266,27 @@ object SiadinChecker {
             webView.destroy()
             host.close()
         }
+    }
+
+    /**
+     * Foto bukti otomatis: gulir kartu "Berhasil Presensi" ke tengah (skrip sorotan, hanya tampilan),
+     * tunggu sebentar, potret layar virtual, simpan JPEG di folder bukti. Null bila tidak bisa.
+     */
+    private suspend fun captureProofPhoto(context: Context, host: Host, courseName: String, log: (String) -> Unit): String? {
+        val capture = host.capture ?: return null
+        return runCatching {
+            host.webView.evalString(SiadinScripts.highlightScript(courseName))
+            delay(1_200)
+            val bitmap = capture() ?: return@runCatching null
+            withContext(Dispatchers.IO) {
+                val dir = java.io.File(context.filesDir, "bukti").apply { mkdirs() }
+                val file = java.io.File(dir, "bukti_otomatis_${System.currentTimeMillis()}.jpg")
+                file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, it) }
+                file.absolutePath
+            }
+        }.onFailure { log("foto bukti gagal: ${it.javaClass.simpleName}") }
+            .getOrNull()
+            .also { log(if (it != null) "foto bukti diambil" else "foto bukti tidak tersedia → bukti teks") }
     }
 
     private fun Outcome.toState() = when (this) {

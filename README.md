@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 2.8** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 2.9** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -20,6 +20,11 @@ Tidak tersedia untuk iPhone.
 ---
 
 ## Cara kerja harian (setelah setup sekali)
+
+**Layar "Hari ini"** (paling atas tab Jadwal): matkul hari ini dengan status langsung — 🕒 Nanti (hitung
+mundur ke jam buka) · ⏳ Menunggu · 🔵 Dibuka! (tombol **Presensi sekarang**) · ✅ Berhasil · 🏖 Libur ·
+❌ Terlewat — plus hasil cek kesiapan dan peringatan alarm terlewat. Hari tanpa kuliah: matkul berikutnya.
+
 
 1. Jam absen dibuka → notifikasi heads-up (getar): **"Waktunya absen: Basis Data"** (mode pintar: **"✅ Presensi sudah dibuka: Basis Data"** begitu dosen membuka presensi)
    (jam buka–tutup dan ruang). Tombol: **Absen sekarang** · **Tunda 5 menit** · **Libur**.
@@ -251,6 +256,12 @@ terlewat (beserta nama matkulnya), libur, dan tidak dibuka dosen. Matikan/coba d
 Bila NIM/password ditolak SiAdin (mis. password baru diganti), muncul notifikasi **"Login SiAdin
 gagal"** sekali sehari. Tap → Pengaturan → SiAdin web, simpan login yang baru. Selama itu pengingat
 tetap jalan (notifikasi "Cek presensi"), jadi tidak terlewat.
+
+**Bukti foto otomatis:** bila kamu presensi lewat Chrome/Dinusverse, pengecek melihat kartu hijau
+"Berhasil Presensi", memotretnya, dan mengirimkannya ke Telegram sebagai foto (bila gagal: bukti teks).
+
+**Pengaturan:** paling atas ada ringkasan **"✅ Semua siap"** atau daftar yang perlu dibereskan dengan tombol
+**Perbaiki**; bagian teknis (diagnosis, aplikasi tujuan) dilipat di **Lanjutan**.
 
 **Cek kesiapan otomatis:** ±30 menit sebelum kuliah pertama tiap hari, NgiBsen diam-diam mengetes izin
 penting (notifikasi, alarm tepat, baterai, layar penuh) dan pengecekan SiAdin untuk matkul berikutnya.

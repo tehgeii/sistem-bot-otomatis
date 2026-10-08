@@ -173,7 +173,7 @@ private fun ImportDialog(vm: MainViewModel, onClose: () -> Unit) {
 }
 
 @Composable
-fun ScheduleScreen(vm: MainViewModel, contentPadding: PaddingValues) {
+fun ScheduleScreen(vm: MainViewModel, contentPadding: PaddingValues, onOpenSettings: () -> Unit = {}) {
     val courses by vm.courses.collectAsState()
     var editing by remember { mutableStateOf<Course?>(null) }
     var deleting by remember { mutableStateOf<Course?>(null) }
@@ -202,6 +202,7 @@ fun ScheduleScreen(vm: MainViewModel, contentPadding: PaddingValues) {
                 modifier = Modifier.fillMaxSize().padding(inner),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
             ) {
+                item(key = "today") { TodayCard(vm, onOpenSettings) }
                 val pausedUntil = ScheduleMath.allPausedUntil(list.filter { it.active }.map { it.skipUntil }, LocalDate.now())
                 if (pausedUntil != null) {
                     item(key = "paused") {

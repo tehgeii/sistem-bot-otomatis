@@ -156,6 +156,7 @@ object PresensiCheck {
             settings.deepLink ?: TargetApps.SIADIN_PRESENSI_URL,
             if (settings.autoLogin) store.siadinLogin() else null,
             course.name,
+            captureProof = true,
         ) { DiagLog.add("cek ${course.name}: $it") }
         val state = result.state
         val rxAfter = android.net.TrafficStats.getUidRxBytes(uid)
@@ -187,7 +188,8 @@ object PresensiCheck {
                 store.setPresensiUnknownStreak(courseId, epochDay, 0)
                 DiagLog.add("selesai: Berhasil Presensi terdeteksi → bukti dikirim, pengingat berhenti")
                 Notifications.cancel(ctx, courseId)
-                Graph.repository.confirmDone(record, LocalDateTime.now())
+                // Bukti foto otomatis (kartu hijau dipotret pengecek) bila ada; kalau tidak, bukti teks.
+                Graph.repository.confirmDone(record.copy(photoPath = result.photoPath ?: record.photoPath), LocalDateTime.now())
                 AlarmScheduler.reschedule(ctx, courseId)
             }
             PresensiState.OPEN -> {

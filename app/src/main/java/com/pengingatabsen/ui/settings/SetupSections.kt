@@ -483,3 +483,78 @@ fun DiagnosisSection(vm: SetupViewModel) {
         )
     }
 }
+
+/**
+ * Ringkasan di paling atas Pengaturan: "Semua siap ✅" atau daftar yang belum beres + tombol perbaikannya.
+ * Dicek ulang setiap layar kembali tampil (setelah pengguna mengubah izin di pengaturan HP).
+ */
+@Composable
+fun StatusSummary(vm: SetupViewModel) {
+    val context = LocalContext.current
+    val tick = rememberResumeTick()
+    val settings by vm.settings.collectAsState()
+    val s = settings ?: return
+
+    data class Item(val ok: Boolean, val label: String, val fix: (() -> Unit)?)
+    val items = remember(tick, s) {
+        listOf(
+            Item(s.smartModeActive, "Mode pintar SiAdin (login tersimpan)", null),
+            Item(
+                Permissions.notificationsGranted(context) &&
+                    androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled(),
+                "Notifikasi",
+            ) { runCatching { context.startActivity(Permissions.notificationSettingsIntent(context)) } },
+            Item(Permissions.exactAlarmGranted(context), "Alarm tepat waktu") {
+                runCatching { context.startActivity(Permissions.exactAlarmIntent(context)) }
+            },
+            Item(!s.fullScreenAlert || Notifications.canUseFullScreen(context), "Layar penuh saat dibuka") {
+                runCatching { context.startActivity(Permissions.fullScreenIntent(context)) }
+                    .onFailure { context.startActivity(Permissions.appDetailsIntent(context)) }
+            },
+            Item(Permissions.batteryUnrestricted(context), "Tanpa optimasi baterai") {
+                runCatching { context.startActivity(Permissions.batteryIntent(context)) }
+                    .onFailure { context.startActivity(Permissions.appDetailsIntent(context)) }
+            },
+            Item(s.telegramReady, "Telegram untuk bukti (opsional)", null),
+        )
+    }
+    val problems = items.filter { !it.ok }
+    val readinessBad = s.smartModeActive && s.readinessOk == false
+
+    androidx.compose.material3.Card(
+        Modifier.fillMaxWidth().padding(top = 8.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = if (problems.isEmpty() && !readinessBad) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.errorContainer,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                if (problems.isEmpty() && !readinessBad) "✅ Semua siap" else "⚠️ Ada yang perlu dibereskan",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            problems.forEach { item ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("• ${item.label}", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    item.fix?.let { fix -> TextButton(onClick = fix) { Text("Perbaiki") } }
+                }
+            }
+            if (problems.any { it.fix == null && !it.ok && it.label.startsWith("Mode pintar") }) {
+                Text("Simpan NIM & password di bagian SiAdin web di bawah.", style = MaterialTheme.typography.bodySmall)
+            }
+            s.readinessText?.takeIf { s.smartModeActive }?.let {
+                Text(
+                    (if (s.readinessOk == true) "Kesiapan terakhir: " else "⚠️ Kesiapan terakhir: ") + it,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(enabled = !vm.diagBusy, onClick = { vm.testCheckNow(context) }) {
+                    Text(if (vm.diagBusy) "Mengecek…" else "Tes cek sekarang")
+                }
+                TextButton(onClick = { Permissions.openAutostart(context) }) { Text("Autostart") }
+            }
+            vm.diagResult?.let { Text(it.lineSequence().take(4).joinToString("\n"), style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+}

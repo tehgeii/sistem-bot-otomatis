@@ -51,6 +51,8 @@ data class AppSettings(
     val readinessOk: Boolean? = null,
     /** Keterangan cek kesiapan terakhir, mis. "09.00 · siap untuk Pemrograman Sisi Klien 09:30". */
     val readinessText: String? = null,
+    /** Kemunculan ("courseId:epochDay") yang presensinya sudah terlihat dibuka dosen. */
+    val presensiOpenKeys: Set<String> = emptySet(),
 ) {
     /** Mode pintar hanya berlaku untuk SiAdin web dengan login tersimpan. */
     val smartModeActive: Boolean
@@ -120,6 +122,7 @@ class SettingsStore(private val context: Context) {
         readinessCheck = this[Keys.READINESS_CHECK] ?: true,
         readinessOk = this[Keys.READINESS_OK],
         readinessText = this[Keys.READINESS_TEXT],
+        presensiOpenKeys = this[Keys.PRESENSI_OPEN] ?: emptySet(),
     )
 
     suspend fun setReadinessCheck(enabled: Boolean) = context.dataStore.edit { it[Keys.READINESS_CHECK] = enabled }

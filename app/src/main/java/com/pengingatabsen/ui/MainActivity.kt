@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
                     },
                 ) { padding ->
                     when (tab) {
-                        0 -> ScheduleScreen(vm, padding)
+                        0 -> ScheduleScreen(vm, padding, onOpenSettings = { tab = TAB_SETTINGS })
                         1 -> HistoryScreen(vm, padding)
                         else -> SettingsScreen(setupVm, padding)
                     }

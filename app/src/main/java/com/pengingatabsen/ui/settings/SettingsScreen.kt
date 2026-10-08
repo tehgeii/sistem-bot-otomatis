@@ -11,7 +11,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -24,7 +28,8 @@ fun SettingsScreen(vm: SetupViewModel, contentPadding: PaddingValues) {
     ) {
         val settings by vm.settings.collectAsState()
         val smart = settings?.smartModeActive == true
-        // Urutan: yang paling sering dipakai di atas, izin & opsi lanjutan di bawah.
+        // Urutan: ringkasan status, yang sering dipakai, izin; bagian teknis dilipat di "Lanjutan".
+        StatusSummary(vm)
         SectionTitle("SiAdin web")
         SiadinWebSection(vm)
         HorizontalDivider(Modifier.padding(top = 8.dp))
@@ -50,11 +55,17 @@ fun SettingsScreen(vm: SetupViewModel, contentPadding: PaddingValues) {
         SectionTitle("Izin HP")
         PermissionsSection()
         HorizontalDivider()
-        SectionTitle("Diagnosis")
-        DiagnosisSection(vm)
-        HorizontalDivider(Modifier.padding(top = 8.dp))
-        SectionTitle("Lanjutan: aplikasi tujuan")
-        TargetAppSection(vm)
+        var advanced by rememberSaveable { mutableStateOf(false) }
+        TextButton(onClick = { advanced = !advanced }, modifier = Modifier.padding(top = 8.dp)) {
+            Text(if (advanced) "▲ Sembunyikan lanjutan" else "▼ Lanjutan: diagnosis & aplikasi tujuan")
+        }
+        if (advanced) {
+            SectionTitle("Diagnosis")
+            DiagnosisSection(vm)
+            HorizontalDivider(Modifier.padding(top = 8.dp))
+            SectionTitle("Aplikasi tujuan")
+            TargetAppSection(vm)
+        }
         Spacer(Modifier.height(32.dp))
     }
 }

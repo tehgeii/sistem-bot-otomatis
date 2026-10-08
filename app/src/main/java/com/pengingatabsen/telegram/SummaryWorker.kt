@@ -13,9 +13,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.pengingatabsen.Graph
-import com.pengingatabsen.data.RecordStatus
 import com.pengingatabsen.logic.SummaryItem
-import com.pengingatabsen.logic.SummaryKind
 import com.pengingatabsen.logic.WeeklySummary
 import java.time.Duration
 import java.time.LocalDate
@@ -44,7 +42,7 @@ class SummaryWorker(context: Context, params: WorkerParameters) : CoroutineWorke
 
         val items = Graph.db.recordDao()
             .between(weekStart.toEpochDay(), weekStart.plusDays(6).toEpochDay())
-            .map { SummaryItem(it.courseName, LocalDate.ofEpochDay(it.epochDay), kindOf(it.status)) }
+            .map { SummaryItem(it.courseName, LocalDate.ofEpochDay(it.epochDay), it.status.toSummaryKind()) }
         val text = WeeklySummary.build(weekStart, items)
             ?: if (manual) "📊 Belum ada jadwal minggu ini." else null
         if (text == null) {
@@ -59,15 +57,6 @@ class SummaryWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             }
             is TgResult.Error -> if (result.retryable && runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
         }
-    }
-
-    private fun kindOf(status: RecordStatus) = when (status) {
-        RecordStatus.SENT, RecordStatus.QUEUED -> SummaryKind.DONE
-        RecordStatus.FAILED -> SummaryKind.FAILED
-        RecordStatus.MISSED -> SummaryKind.MISSED
-        RecordStatus.NO_SESSION -> SummaryKind.NO_SESSION
-        RecordStatus.HOLIDAY -> SummaryKind.HOLIDAY
-        RecordStatus.ACTIVE -> SummaryKind.ACTIVE
     }
 
     companion object {

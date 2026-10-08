@@ -17,6 +17,16 @@ enum class RecordStatus(val label: String) {
 
     /** Tidak perlu diingatkan lagi. */
     val finished: Boolean get() = this != ACTIVE
+
+    /** Jenis hasil untuk ringkasan mingguan & layar Hari ini. */
+    fun toSummaryKind(): com.pengingatabsen.logic.SummaryKind = when (this) {
+        SENT, QUEUED -> com.pengingatabsen.logic.SummaryKind.DONE
+        FAILED -> com.pengingatabsen.logic.SummaryKind.FAILED
+        MISSED -> com.pengingatabsen.logic.SummaryKind.MISSED
+        NO_SESSION -> com.pengingatabsen.logic.SummaryKind.NO_SESSION
+        HOLIDAY -> com.pengingatabsen.logic.SummaryKind.HOLIDAY
+        ACTIVE -> com.pengingatabsen.logic.SummaryKind.ACTIVE
+    }
 }
 
 /** Satu baris riwayat = satu kemunculan matkul pada satu tanggal. */
