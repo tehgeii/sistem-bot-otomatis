@@ -6,12 +6,18 @@
     android:background="@drawable/widget_background"
     android:gravity="center_vertical"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:paddingStart="14dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="14dp"
+    android:paddingBottom="10dp">
 
     <TextView
-        android:layout_width="wrap_content"
+        android:id="@+id/widget_label"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:alpha="0.8"
+        android:ellipsize="end"
+        android:maxLines="1"
         android:text="@string/widget_label"
         android:textColor="@color/widget_text"
         android:textSize="12sp" />
@@ -32,7 +38,33 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:ellipsize="end"
-        android:maxLines="1"
+        android:maxLines="2"
         android:textColor="@color/widget_text"
         android:textSize="14sp" />
+
+    <LinearLayout
+        android:id="@+id/widget_countdown_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:alpha="0.8"
+            android:text="@string/widget_countdown_prefix"
+            android:textColor="@color/widget_text"
+            android:textSize="13sp" />
+
+        <Chronometer
+            android:id="@+id/widget_countdown"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:countDown="true"
+            android:textColor="@color/widget_text"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 </LinearLayout>

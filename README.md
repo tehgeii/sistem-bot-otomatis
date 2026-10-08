@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 2.9** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 2.10** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -287,16 +287,17 @@ ulang sendiri lewat halaman depan; bila masih gagal, sesi lama dihapus lalu logi
 
 ## Widget
 
-Tahan layar utama → **Widget** → **NgiBsen UDINUS**. Widget menampilkan matkul berikutnya dan jam
-absennya. Tap widget = buka halaman presensi (SiAdin web) atau Dinusverse, sesuai pengaturan.
+Tambahkan widget **NgiBsen** di layar utama (bisa diubah ukurannya): matkul hari ini atau berikutnya,
+status presensi (🕒 dibuka jam berapa · ⏳ menunggu · 🔵 DIBUKA — tap! · ✅ sudah presensi), dan **hitung mundur
+langsung** ke jam buka (berjalan sendiri, < 24 jam). Tap widget = buka halaman presensi matkul itu.
 
 ## Riwayat
 
-Tab **Riwayat** menampilkan setiap absen: matkul, waktu, dan status
-**terkirim / antre / gagal / terlewat / libur / tidak dibuka**. Bukti yang gagal bisa **Kirim ulang**
-(juga tersedia sebagai tombol di notifikasi "Gagal kirim bukti").
-
----
+Paling atas: **kehadiran** keseluruhan dan per matkul (persentase hadir, mis. "90% · 9/10", dengan bilah
+warna: hijau ≥75%, kuning ≥50%, merah di bawahnya). Libur dan "tidak dibuka dosen" tidak dihitung;
+bukti yang gagal terkirim tetap dihitung hadir. Tap nama matkul atau chip filter untuk melihat riwayat
+matkul itu saja. Tiap baris punya ikon status (✅ terkirim · 📤 antre · ⚠️ gagal · ❌ terlewat · 🏖 libur ·
+⏸ tidak dibuka); yang gagal bisa **Kirim ulang**.
 
 ## Bagikan ke teman
 

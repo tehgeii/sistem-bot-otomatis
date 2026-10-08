@@ -2,7 +2,8 @@
 <resources>
     <string name="app_name">NgiBsen UDINUS</string>
     <string name="share_label">Kirim bukti (NgiBsen)</string>
-    <string name="widget_label">Absen berikutnya</string>
+    <string name="widget_label">NgiBsen · Hari ini</string>
+    <string name="widget_countdown_prefix">dibuka dalam</string>
     <string name="widget_loading">Memuat…</string>
-    <string name="widget_description">Matkul berikutnya dan jam absennya. Tap untuk membuka Dinusverse.</string>
+    <string name="widget_description">Matkul hari ini/berikutnya, status presensi, dan hitung mundur. Tap untuk membuka halaman presensi.</string>
 </resources>
