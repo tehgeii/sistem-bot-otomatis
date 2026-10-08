@@ -50,8 +50,26 @@ class PresensiCheckService : Service() {
             DiagLog.add("cek: startForeground DITOLAK (${foreground.exceptionOrNull()?.javaClass?.simpleName}) → cadangan WorkManager")
             // enqueue() membaca status antrean (memblokir sebentar): jangan di main thread.
             val app = applicationContext
-            if (courseId >= 0) Thread { PresensiCheckWorker.enqueue(app, courseId, epochDay, type, startedAt) }.start()
+            if (courseId >= 0 || courseId == PresensiCheck.PREFLIGHT_ID) {
+                Thread { PresensiCheckWorker.enqueue(app, courseId, epochDay, type, startedAt) }.start()
+            }
             if (running.isEmpty()) stopSelf()
+            return START_NOT_STICKY
+        }
+
+        if (courseId == PresensiCheck.PREFLIGHT_ID) {
+            if (!running.add("preflight")) return START_NOT_STICKY
+            scope.launch {
+                try {
+                    PresensiCheck.preflight(applicationContext)
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    DiagLog.add("kesiapan ERROR: ${e.javaClass.simpleName}: ${e.message}")
+                } finally {
+                    running.remove("preflight")
+                    stopIfIdle()
+                }
+            }
             return START_NOT_STICKY
         }
 

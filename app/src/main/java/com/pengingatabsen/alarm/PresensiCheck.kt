@@ -24,6 +24,98 @@ import java.time.LocalDateTime
  */
 object PresensiCheck {
     private const val UNKNOWN_ESCALATE_AFTER = 3
+    /** courseId khusus untuk service/worker: jalankan cek kesiapan, bukan cek satu matkul. */
+    const val PREFLIGHT_ID = -100L
+
+    /** Mulai cek kesiapan sekarang (foreground service; cadangan WorkManager). */
+    fun startPreflight(context: Context) {
+        val app = context.applicationContext
+        val now = System.currentTimeMillis()
+        val started = runCatching {
+            ContextCompat.startForegroundService(app, PresensiCheckService.intent(app, PREFLIGHT_ID, 0L, EventType.REMIND, now))
+        }
+        if (started.isFailure) {
+            DiagLog.add("kesiapan: service DITOLAK (${started.exceptionOrNull()?.javaClass?.simpleName}) → cadangan WorkManager")
+            PresensiCheckWorker.enqueue(app, PREFLIGHT_ID, 0L, EventType.REMIND, now)
+        }
+    }
+
+    /**
+     * Cek kesiapan ±30 menit sebelum kuliah pertama: izin penting + pengecek SiAdin yang sama dengan saat
+     * kuliah dijalankan untuk matkul berikutnya. Hanya MEMBACA; notifikasi muncul HANYA bila ada masalah,
+     * supaya bisa dibereskan sebelum kelas. Hasilnya juga tampil di layar Hari ini & Pengaturan.
+     */
+    suspend fun preflight(context: Context) {
+        val ctx = context.applicationContext
+        val store = Graph.settings
+        val settings = store.current()
+        val now = LocalDateTime.now()
+        checkMissedAlarms(ctx)
+        if (!settings.smartModeActive) return
+        val target = Graph.repository.allCourses().filter { it.active }
+            .map { it to com.pengingatabsen.logic.ScheduleMath.nextOccurrence(it.toSlot(), now.minusMinutes(1)) }
+            .minByOrNull { it.second.open } ?: return
+        val (course, occ) = target
+        val label = "${course.name} ${Formatters.hm(occ.open)}"
+        DiagLog.add("kesiapan: cek untuk $label")
+
+        val problems = mutableListOf<String>()
+        val notificationsOn = Permissions.notificationsGranted(ctx) &&
+            androidx.core.app.NotificationManagerCompat.from(ctx).areNotificationsEnabled()
+        if (!notificationsOn) problems += "notifikasi NgiBsen mati"
+        if (!Permissions.exactAlarmGranted(ctx)) problems += "izin alarm tepat waktu belum ada"
+        if (!Permissions.batteryUnrestricted(ctx)) problems += "optimasi baterai masih aktif"
+        if (settings.fullScreenAlert && !Notifications.canUseFullScreen(ctx)) problems += "izin layar penuh belum ada"
+
+        val result = SiadinChecker.check(
+            ctx,
+            settings.deepLink ?: TargetApps.SIADIN_PRESENSI_URL,
+            if (settings.autoLogin) store.siadinLogin() else null,
+            course.name,
+        ) { DiagLog.add("kesiapan ${course.name}: $it") }
+        DiagLog.add("kesiapan HASIL ${course.name}: ${result.state} — ${result.detail}")
+        when (result.state) {
+            PresensiState.WAITING, PresensiState.OPEN, PresensiState.DONE -> Unit
+            PresensiState.LOGIN_FAILED -> problems.add(0, "login SiAdin ditolak — perbarui NIM/password")
+            PresensiState.UNKNOWN -> problems.add(0, "SiAdin tidak terbaca (${result.detail.substringBefore(" |")})")
+        }
+
+        val time = Formatters.hm(now)
+        if (problems.isEmpty()) {
+            store.setReadiness(true, "$time · siap untuk $label")
+            Notifications.cancelId(ctx, Notifications.READINESS_ID)
+            DiagLog.add("kesiapan: SIAP")
+        } else {
+            store.setReadiness(false, "$time · ${problems.joinToString("; ")}")
+            Notifications.showReadinessProblem(ctx, label, problems)
+            DiagLog.add("kesiapan: MASALAH — ${problems.joinToString("; ")}")
+        }
+        NextCourseWidget.updateAll(ctx)
+    }
+
+    /**
+     * Alarm jam buka yang pernah dipasang tapi tidak pernah berbunyi (HP mati / NgiBsen ditahan sistem).
+     * Diberitahukan sekali per kemunculan. Mengembalikan semua yang terlewat (untuk layar Hari ini).
+     */
+    suspend fun checkMissedAlarms(context: Context): List<String> {
+        val ctx = context.applicationContext
+        val store = Graph.settings
+        val courses = Graph.repository.allCourses().filter { it.active }
+        val slots = courses.associate { it.id to it.toSlot() }
+        val names = courses.associate { it.id to it.name }
+        val dao = Graph.db.recordDao()
+        val armed = store.armed()
+        val withRecord = armed.filter { dao.find(it.courseId, it.epochDay) != null }.toSet()
+        val missed = com.pengingatabsen.logic.Readiness.missedAlarms(armed, slots, { it in withRecord }, LocalDateTime.now())
+        return missed.map { (a, occ) ->
+            val text = "${names[a.courseId]} ${Formatters.hm(occ.open)}"
+            if (store.claimMissedReport(a.courseId, a.epochDay)) {
+                DiagLog.add("ALARM TERLEWAT: $text (tidak pernah berbunyi)")
+                Notifications.showMissedAlarm(ctx, text)
+            }
+            text
+        }
+    }
 
     /** Mulai pengecekan sekarang: foreground service, atau WorkManager bila sistem menolak. */
     fun start(context: Context, courseId: Long, epochDay: Long, type: EventType) {

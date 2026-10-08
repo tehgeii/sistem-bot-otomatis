@@ -25,7 +25,11 @@ class PresensiCheckWorker(context: Context, params: WorkerParameters) : Coroutin
             ?: EventType.REMIND
         com.pengingatabsen.data.DiagLog.add("cek: berjalan lewat WorkManager (cadangan)")
         try {
-            PresensiCheck.run(applicationContext, courseId, epochDay, type, inputData.getLong(KEY_ENQUEUED_AT, 0L))
+            if (courseId == PresensiCheck.PREFLIGHT_ID) {
+                PresensiCheck.preflight(applicationContext)
+            } else {
+                PresensiCheck.run(applicationContext, courseId, epochDay, type, inputData.getLong(KEY_ENQUEUED_AT, 0L))
+            }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             com.pengingatabsen.data.DiagLog.add("cek ERROR (WorkManager): ${e.javaClass.simpleName}: ${e.message}")

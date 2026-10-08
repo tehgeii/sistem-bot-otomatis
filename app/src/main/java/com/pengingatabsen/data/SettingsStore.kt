@@ -45,6 +45,12 @@ data class AppSettings(
     val weeklySummary: Boolean = true,
     /** Catatan pengecekan SiAdin terakhir, mis. "10.14 · Pemrograman Sisi Klien · presensi DIBUKA". */
     val lastCheck: String? = null,
+    /** Cek kesiapan otomatis ±30 menit sebelum kuliah pertama tiap hari. */
+    val readinessCheck: Boolean = true,
+    /** Hasil cek kesiapan terakhir: true = siap, false = ada masalah, null = belum pernah. */
+    val readinessOk: Boolean? = null,
+    /** Keterangan cek kesiapan terakhir, mis. "09.00 · siap untuk Pemrograman Sisi Klien 09:30". */
+    val readinessText: String? = null,
 ) {
     /** Mode pintar hanya berlaku untuk SiAdin web dengan login tersimpan. */
     val smartModeActive: Boolean
@@ -80,6 +86,13 @@ class SettingsStore(private val context: Context) {
         /** Hari (epoch day) notifikasi "login gagal" terakhir ditampilkan. */
         val LOGIN_FAILED_DAY = longPreferencesKey("login_failed_day")
         val LAST_CHECK = stringPreferencesKey("last_check")
+        val READINESS_CHECK = booleanPreferencesKey("readiness_check")
+        val READINESS_OK = booleanPreferencesKey("readiness_ok")
+        val READINESS_TEXT = stringPreferencesKey("readiness_text")
+        /** Kemunculan ("courseId:epochDay") yang alarm jam bukanya sudah dipasang. */
+        val ARMED = stringSetPreferencesKey("armed_open")
+        /** Kemunculan yang alarm terlewatnya sudah diberitahukan (agar tidak berulang). */
+        val MISSED_REPORTED = stringSetPreferencesKey("missed_reported")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -104,7 +117,50 @@ class SettingsStore(private val context: Context) {
         lastCheckDelaySec = this[Keys.LAST_CHECK_DELAY],
         weeklySummary = this[Keys.WEEKLY_SUMMARY] ?: true,
         lastCheck = this[Keys.LAST_CHECK],
+        readinessCheck = this[Keys.READINESS_CHECK] ?: true,
+        readinessOk = this[Keys.READINESS_OK],
+        readinessText = this[Keys.READINESS_TEXT],
     )
+
+    suspend fun setReadinessCheck(enabled: Boolean) = context.dataStore.edit { it[Keys.READINESS_CHECK] = enabled }
+
+    suspend fun setReadiness(ok: Boolean, text: String) = context.dataStore.edit {
+        it[Keys.READINESS_OK] = ok
+        it[Keys.READINESS_TEXT] = text
+    }
+
+    /** Catat bahwa alarm jam buka kemunculan ini sudah dipasang (dibersihkan otomatis setelah 7 hari). */
+    suspend fun markArmed(courseId: Long, epochDay: Long) {
+        val key = "$courseId:$epochDay"
+        if (context.dataStore.data.first()[Keys.ARMED]?.contains(key) == true) return
+        context.dataStore.edit { prefs -> prefs[Keys.ARMED] = recent(prefs[Keys.ARMED], epochDay) + key }
+    }
+
+    suspend fun armed(): List<com.pengingatabsen.logic.ArmedOccurrence> =
+        (context.dataStore.data.first()[Keys.ARMED] ?: emptySet()).mapNotNull { entry ->
+            val (c, d) = entry.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+            val courseId = c.toLongOrNull() ?: return@mapNotNull null
+            val day = d.toLongOrNull() ?: return@mapNotNull null
+            com.pengingatabsen.logic.ArmedOccurrence(courseId, day)
+        }
+
+    /** True bila alarm terlewat ini BELUM pernah diberitahukan (lalu ditandai sudah). */
+    suspend fun claimMissedReport(courseId: Long, epochDay: Long): Boolean {
+        val key = "$courseId:$epochDay"
+        var claimed = false
+        context.dataStore.edit { prefs ->
+            val set = prefs[Keys.MISSED_REPORTED] ?: emptySet()
+            if (key !in set) {
+                prefs[Keys.MISSED_REPORTED] = recent(set, epochDay) + key
+                claimed = true
+            }
+        }
+        return claimed
+    }
+
+    /** Buang entri "courseId:epochDay" yang lebih tua dari 7 hari sebelum [epochDay]. */
+    private fun recent(set: Set<String>?, epochDay: Long): Set<String> =
+        (set ?: emptySet()).filter { (it.substringAfter(':').toLongOrNull() ?: 0L) >= epochDay - 7 }.toSet()
 
     suspend fun setLastCheck(text: String) = context.dataStore.edit { it[Keys.LAST_CHECK] = text }
 

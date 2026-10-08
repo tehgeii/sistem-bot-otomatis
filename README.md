@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 2.7** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 2.8** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -251,6 +251,13 @@ terlewat (beserta nama matkulnya), libur, dan tidak dibuka dosen. Matikan/coba d
 Bila NIM/password ditolak SiAdin (mis. password baru diganti), muncul notifikasi **"Login SiAdin
 gagal"** sekali sehari. Tap → Pengaturan → SiAdin web, simpan login yang baru. Selama itu pengingat
 tetap jalan (notifikasi "Cek presensi"), jadi tidak terlewat.
+
+**Cek kesiapan otomatis:** ±30 menit sebelum kuliah pertama tiap hari, NgiBsen diam-diam mengetes izin
+penting (notifikasi, alarm tepat, baterai, layar penuh) dan pengecekan SiAdin untuk matkul berikutnya.
+Notifikasi **"⚠️ NgiBsen belum siap"** hanya muncul bila ada masalah — jadi bisa dibereskan sebelum kelas.
+
+**Alarm terlewat:** bila alarm jam buka tidak pernah berbunyi (HP mati, aplikasi baru diperbarui, atau NgiBsen
+ditahan sistem), NgiBsen memberi tahu saat dibuka lagi / HP menyala, lengkap dengan izin yang perlu diaktifkan.
 
 **Cek berjalan & tepat waktu?** Di *Pengaturan → Diagnosis*:
 - **Tes cek sekarang** — menjalankan pengecek SiAdin yang sama persis dengan saat kuliah (login otomatis,

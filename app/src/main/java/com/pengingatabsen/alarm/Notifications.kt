@@ -171,6 +171,49 @@ object Notifications {
 
     private const val PRESENSI_OPEN_ID = 777
     private const val LOGIN_FAILED_ID = 779
+    const val READINESS_ID = 780
+    private const val MISSED_ALARM_ID = 781
+
+    /** Intent ke tab Pengaturan (untuk memperbaiki izin/login). */
+    private fun settingsIntent(context: Context, requestCode: Int): PendingIntent =
+        PendingIntent.getActivity(
+            context, requestCode,
+            Intent(context, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
+    /** Cek kesiapan menemukan masalah sebelum kuliah [target] (mis. "MPTI 4515 12:30"). */
+    fun showReadinessProblem(context: Context, target: String, problems: List<String>) {
+        val text = problems.joinToString("\n• ", prefix = "• ") + "\nPerbaiki sekarang supaya pengingat presensi tetap jalan."
+        val open = settingsIntent(context, 4)
+        val builder = base(context, absenChannel(), silent = false)
+            .setOngoing(false)
+            .setAutoCancel(true)
+            .setContentTitle("⚠️ NgiBsen belum siap: $target")
+            .setContentText(problems.first())
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setContentIntent(open)
+            .addAction(0, "Perbaiki", open)
+        notify(context, READINESS_ID, builder)
+    }
+
+    /** Alarm jam buka [what] (mis. "MPTI 4515 12:30") tidak pernah berbunyi. */
+    fun showMissedAlarm(context: Context, what: String) {
+        val text = "Alarm $what tidak berbunyi — HP mati, aplikasi baru diperbarui, atau NgiBsen ditahan sistem. " +
+            "Aktifkan Autostart & izin baterai (Pengaturan → Izin HP), dan kunci NgiBsen di Recent apps."
+        val open = settingsIntent(context, 5)
+        val builder = NotificationCompat.Builder(context, CHANNEL_INFO)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("⚠️ Alarm terlewat: $what")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(open)
+            .addAction(0, "Buka Izin HP", open)
+        notify(context, MISSED_ALARM_ID, builder)
+    }
 
     /** Info non-heads-up, mis. gagal mengirim bukti. */
     fun showInfo(context: Context, id: Int, title: String, text: String, action: Pair<String, PendingIntent>? = null) {

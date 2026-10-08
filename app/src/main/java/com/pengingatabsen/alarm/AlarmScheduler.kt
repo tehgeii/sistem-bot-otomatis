@@ -24,6 +24,7 @@ import java.time.LocalDateTime
  */
 object AlarmScheduler {
     const val ACTION_ALARM = "com.pengingatabsen.ALARM"
+    const val ACTION_PREFLIGHT = "com.pengingatabsen.PREFLIGHT"
     const val EXTRA_COURSE_ID = "course_id"
     const val EXTRA_EPOCH_DAY = "epoch_day"
     const val EXTRA_TYPE = "type"
@@ -62,6 +63,10 @@ object AlarmScheduler {
             }
         }
         val exact = set(context, courseId, planned)
+        // Ingat alarm jam buka yang sudah dipasang, untuk mendeteksi alarm yang tidak pernah berbunyi.
+        if (planned.event.type == com.pengingatabsen.logic.EventType.OPEN) {
+            Graph.settings.markArmed(courseId, planned.occurrence.date.toEpochDay())
+        }
         // Hanya catat alarm hari ini (cukup untuk diagnosis, log tidak penuh oleh jadwal minggu depan).
         if (planned.occurrence.date == now.toLocalDate()) {
             DiagLog.add(
@@ -77,7 +82,41 @@ object AlarmScheduler {
         for (course in Graph.repository.allCourses()) reschedule(context, course.id)
         NextCourseWidget.updateAll(context)
         SummaryWorker.schedule(context, Graph.settings.current().weeklySummary)
+        schedulePreflight(context)
     }
+
+    /**
+     * Pasang alarm "cek kesiapan" ±30 menit sebelum matkul pertama hari berikutnya yang ada kuliah
+     * (hanya mode pintar & bila diaktifkan). Dipasang ulang tiap kali jadwal dihitung ulang dan setelah berjalan.
+     */
+    suspend fun schedulePreflight(context: Context, now: LocalDateTime = LocalDateTime.now()) {
+        val settings = Graph.settings.current()
+        val pi = preflightIntent(context)
+        if (!settings.smartModeActive || !settings.readinessCheck) {
+            alarmManager(context).cancel(pi)
+            return
+        }
+        val slots = Graph.repository.allCourses().filter { it.active }.map { it.toSlot() }
+        val at = com.pengingatabsen.logic.Readiness.nextPreflight(slots, now)
+        if (at == null) {
+            alarmManager(context).cancel(pi)
+            return
+        }
+        val am = alarmManager(context)
+        val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
+        if (canExact) {
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toMillis(), pi)
+        } else {
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toMillis(), pi)
+        }
+    }
+
+    private fun preflightIntent(context: Context): PendingIntent =
+        PendingIntent.getBroadcast(
+            context, 1,
+            Intent(context, PreflightReceiver::class.java).setAction(ACTION_PREFLIGHT),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
 
     /** Jendela yang sudah lewat tapi masih ACTIVE (mis. HP mati) dicatat sebagai terlewat. */
     private suspend fun expireStale(context: Context) {

@@ -242,6 +242,11 @@ class SetupViewModel : ViewModel() {
         diagBusy = false
     }
 
+    fun setReadinessCheck(enabled: Boolean, context: Context) = viewModelScope.launch {
+        store.setReadinessCheck(enabled)
+        AlarmScheduler.schedulePreflight(context.applicationContext)
+    }
+
     fun readLog(): String = com.pengingatabsen.data.DiagLog.read()
 
     fun clearLog() = com.pengingatabsen.data.DiagLog.clear()

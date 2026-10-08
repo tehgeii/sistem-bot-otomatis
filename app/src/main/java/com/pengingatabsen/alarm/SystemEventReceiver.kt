@@ -19,6 +19,8 @@ class SystemEventReceiver : BroadcastReceiver() {
             -> runAsync {
                 com.pengingatabsen.data.DiagLog.add("sistem: ${intent.action?.substringAfterLast('.')} → semua alarm dipasang ulang")
                 AlarmScheduler.rescheduleAll(context)
+                // Setelah HP menyala lagi: beri tahu bila ada alarm jam buka yang terlewat saat HP mati.
+                if (intent.action == Intent.ACTION_BOOT_COMPLETED) PresensiCheck.checkMissedAlarms(context)
             }
         }
     }

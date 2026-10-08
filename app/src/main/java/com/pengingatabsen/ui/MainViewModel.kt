@@ -24,6 +24,10 @@ class MainViewModel : ViewModel() {
     val settings: StateFlow<AppSettings?> =
         store.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    /** Alarm jam buka yang terlewat (tampil di layar Hari ini). */
+    val missedAlarms = kotlinx.coroutines.flow.MutableStateFlow<List<String>>(emptyList())
+    fun setMissedAlarms(list: List<String>) { missedAlarms.value = list }
+
     fun save(course: Course) = viewModelScope.launch { repo.saveCourse(course) }
     fun delete(course: Course) = viewModelScope.launch { repo.deleteCourse(course) }
     fun setActive(course: Course, active: Boolean) = viewModelScope.launch { repo.setActive(course, active) }

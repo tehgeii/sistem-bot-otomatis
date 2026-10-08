@@ -117,6 +117,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".alarm.PreflightReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".alarm.SystemEventReceiver"
             android:exported="true">
             <intent-filter>

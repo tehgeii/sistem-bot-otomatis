@@ -420,10 +420,28 @@ fun DiagnosisSection(vm: SetupViewModel) {
     val context = LocalContext.current
     var showLog by remember { mutableStateOf<String?>(null) }
 
+    val settings by vm.settings.collectAsState()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Cek kesiapan otomatis")
+                Text(
+                    "±30 menit sebelum kuliah pertama tiap hari, NgiBsen mengetes login & pembacaan SiAdin. " +
+                        "Notifikasi hanya muncul bila ada masalah.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Switch(checked = settings?.readinessCheck ?: true, onCheckedChange = { vm.setReadinessCheck(it, context) })
+        }
+        settings?.readinessText?.let { text ->
+            Text(
+                (if (settings?.readinessOk == true) "✅ " else "⚠️ ") + "Kesiapan terakhir: $text",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         Text(
-            "Pastikan pengecekan SiAdin jalan sebelum kuliah: tekan Tes cek sekarang. Bila ada yang meleset di " +
-                "kelas, tekan Bagikan log — tidak perlu screenshot.",
+            "Bisa juga dites manual kapan saja: tekan Tes cek sekarang. Bila ada yang meleset di kelas, tekan " +
+                "Bagikan log — tidak perlu screenshot.",
             style = MaterialTheme.typography.bodySmall,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

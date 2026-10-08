@@ -105,7 +105,11 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // Jaga-jaga: pastikan semua alarm terpasang setiap aplikasi dibuka.
         val context = applicationContext
-        lifecycleScope.launch { AlarmScheduler.rescheduleAll(context) }
+        lifecycleScope.launch {
+            AlarmScheduler.rescheduleAll(context)
+            // Alarm jam buka yang tak pernah berbunyi (NgiBsen sempat ditahan sistem) → beri tahu.
+            vm.setMissedAlarms(com.pengingatabsen.alarm.PresensiCheck.checkMissedAlarms(context))
+        }
     }
 
     companion object {
