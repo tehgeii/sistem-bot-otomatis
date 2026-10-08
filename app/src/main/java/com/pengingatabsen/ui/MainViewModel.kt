@@ -28,6 +28,58 @@ class MainViewModel : ViewModel() {
     val missedAlarms = kotlinx.coroutines.flow.MutableStateFlow<List<String>>(emptyList())
     fun setMissedAlarms(list: List<String>) { missedAlarms.value = list }
 
+    // ---------- Impor jadwal dari KRS SiAdin ----------
+
+    sealed class KrsImport {
+        data object Idle : KrsImport()
+        data object Loading : KrsImport()
+        data class Ready(val all: List<com.pengingatabsen.logic.CourseData>, val fresh: List<com.pengingatabsen.logic.CourseData>) : KrsImport()
+        data class Failed(val message: String) : KrsImport()
+        data class Done(val added: Int) : KrsImport()
+    }
+
+    val krsImport = kotlinx.coroutines.flow.MutableStateFlow<KrsImport>(KrsImport.Idle)
+
+    /** Buka halaman Akademik → KRS SiAdin di latar (login otomatis yang sama), baca kartu, susun jadwal. */
+    fun readKrs() = viewModelScope.launch {
+        if (krsImport.value is KrsImport.Loading) return@launch
+        krsImport.value = KrsImport.Loading
+        val settings = store.current()
+        val credentials = if (settings.autoLogin) store.siadinLogin() else null
+        com.pengingatabsen.data.DiagLog.add("impor KRS: mulai")
+        val result = com.pengingatabsen.launch.SiadinChecker.check(
+            Graph.appContext,
+            com.pengingatabsen.launch.TargetApps.SIADIN_ORIGIN + "/akademik",
+            credentials,
+            courseName = "",
+            extractScript = com.pengingatabsen.launch.SiadinScripts.CARD_TEXTS_SCRIPT,
+        ) { com.pengingatabsen.data.DiagLog.add("impor KRS: $it") }
+        val texts = result.extracted?.let { raw ->
+            runCatching {
+                val arr = org.json.JSONArray(raw)
+                (0 until arr.length()).map { arr.optString(it) }
+            }.getOrNull()
+        }.orEmpty()
+        val parsed = com.pengingatabsen.logic.KrsParser.parse(texts)
+        com.pengingatabsen.data.DiagLog.add("impor KRS: ${texts.size} kartu → ${parsed.size} jadwal (${result.state})")
+        krsImport.value = when {
+            parsed.isNotEmpty() -> KrsImport.Ready(parsed, repo.newFromKrs(parsed))
+            result.state == com.pengingatabsen.launch.PresensiState.LOGIN_FAILED ->
+                KrsImport.Failed("Login SiAdin ditolak. Perbarui NIM/password di Pengaturan → SiAdin web.")
+            credentials == null -> KrsImport.Failed("Simpan NIM & password SiAdin dulu di Pengaturan → SiAdin web.")
+            else -> KrsImport.Failed("KRS tidak terbaca (${result.detail.substringBefore(" |")}). Coba lagi sebentar lagi.")
+        }
+    }
+
+    fun importKrs(replaceAll: Boolean) = viewModelScope.launch {
+        val ready = krsImport.value as? KrsImport.Ready ?: return@launch
+        val added = repo.importFromKrs(ready.all, replaceAll)
+        com.pengingatabsen.data.DiagLog.add("impor KRS: ${if (replaceAll) "ganti semua" else "tambah"} → $added jadwal")
+        krsImport.value = KrsImport.Done(added)
+    }
+
+    fun closeKrs() { krsImport.value = KrsImport.Idle }
+
     fun save(course: Course) = viewModelScope.launch { repo.saveCourse(course) }
     fun delete(course: Course) = viewModelScope.launch { repo.deleteCourse(course) }
     fun setActive(course: Course, active: Boolean) = viewModelScope.launch { repo.setActive(course, active) }

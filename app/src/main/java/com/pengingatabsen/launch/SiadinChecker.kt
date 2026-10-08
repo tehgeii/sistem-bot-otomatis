@@ -37,7 +37,13 @@ enum class PresensiState {
  * Hasil satu pengecekan + keterangan untuk log diagnosis (tanpa data rahasia).
  * [photoPath]: foto halaman "Berhasil Presensi" (bukti otomatis), bila diminta dan berhasil diambil.
  */
-data class CheckResult(val state: PresensiState, val detail: String, val photoPath: String? = null)
+data class CheckResult(
+    val state: PresensiState,
+    val detail: String,
+    val photoPath: String? = null,
+    /** Hasil skrip ekstraksi (mis. teks kartu KRS) bila diminta dan halaman berhasil dibaca. */
+    val extracted: String? = null,
+)
 
 /** Cara WebView pengecek "digambar". */
 enum class RenderMode {
@@ -71,12 +77,14 @@ object SiadinChecker {
         mode: RenderMode = RenderMode.VIRTUAL_DISPLAY,
         /** Bila kartu "Berhasil Presensi", potret halamannya sebagai bukti (hanya di layar virtual). */
         captureProof: Boolean = false,
+        /** Skrip yang dijalankan setelah halaman berhasil dibaca; hasilnya di [CheckResult.extracted]. */
+        extractScript: String? = null,
         log: (String) -> Unit = {},
     ): CheckResult {
         if (!hasInternet(context)) return CheckResult(PresensiState.UNKNOWN, "tidak ada internet")
         return withTimeoutOrNull(TOTAL_TIMEOUT_MS) {
             withContext(Dispatchers.Main) {
-                runCheck(context.applicationContext, targetUrl, credentials, courseName, mode, captureProof, log)
+                runCheck(context.applicationContext, targetUrl, credentials, courseName, mode, captureProof, extractScript, log)
             }
         } ?: CheckResult(PresensiState.UNKNOWN, "batas waktu total habis")
     }
@@ -191,6 +199,7 @@ object SiadinChecker {
         courseName: String,
         mode: RenderMode,
         captureProof: Boolean,
+        extractScript: String?,
         log: (String) -> Unit,
     ): CheckResult {
         val host = createHost(context, mode, log)
@@ -252,10 +261,13 @@ object SiadinChecker {
                         } else {
                             null
                         }
+                        val readOk = step.outcome == Outcome.WAITING || step.outcome == Outcome.OPEN || step.outcome == Outcome.DONE
+                        val extracted = if (extractScript != null && readOk) webView.evalString(extractScript) else null
                         return CheckResult(
                             step.outcome.toState(),
                             "${step.reason} | $summary | ${brain.summary} | ${host.label}",
                             photo,
+                            extracted,
                         )
                     }
                 }

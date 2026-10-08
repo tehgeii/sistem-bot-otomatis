@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 2.10** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 3.0** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -225,7 +225,14 @@ Token disimpan **terenkripsi** di HP kamu saja.
 
 ## Mengisi jadwal
 
-Tab **Jadwal** → **Tambah**. Isi nama matkul, hari, jam absen dibuka, jam ditutup (opsional),
+**Paling cepat — Impor dari SiAdin (KRS):** tab **Jadwal** → menu **⋮** → **Impor dari SiAdin (KRS)**. NgiBsen
+membuka halaman *Akademik → KRS* dengan login otomatis yang sama, membaca setiap kartu matkul (nama, KLPK,
+hari, jam, ruang), lalu menampilkan pratinjau: **Tambah yang baru** (yang sudah ada dilewati — termasuk nama
+buatan sendiri seperti "MPTI 4515" selama hari, jam, dan kode kelasnya sama) atau **Ganti semua** (untuk
+semester baru; riwayat tetap tersimpan). Nama jadwal otomatis = nama matkul + kode kelas, mis.
+"Sistem Terdistribusi 4512". Hanya membaca KRS — tidak mengubah apa pun di SiAdin.
+
+Manual: tab **Jadwal** → **Tambah**. Isi nama matkul, hari, jam absen dibuka, jam ditutup (opsional),
 ruang (opsional). Jadwal berulang tiap minggu dan dikelompokkan per hari.
 
 - **Simpan & tambah lagi**: simpan lalu langsung buka isian baru (hari sama, jam lanjut dari jam

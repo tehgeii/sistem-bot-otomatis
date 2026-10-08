@@ -1,6 +1,9 @@
 package com.pengingatabsen.ui.schedule
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -80,13 +83,15 @@ fun ScheduleMenu(vm: MainViewModel) {
                     }
                 }
             })
-            DropdownMenuItem(text = { Text("Impor jadwal") }, onClick = { menu = false; importing = true })
+            DropdownMenuItem(text = { Text("Impor dari SiAdin (KRS)") }, onClick = { menu = false; vm.readKrs() })
+            DropdownMenuItem(text = { Text("Impor jadwal (teks)") }, onClick = { menu = false; importing = true })
             DropdownMenuItem(text = { Text("Liburkan semua sampai…") }, onClick = { menu = false; pausing = true })
             DropdownMenuItem(text = { Text("Aktifkan semua lagi") }, onClick = { menu = false; resuming = true })
         }
     }
 
     if (importing) ImportDialog(vm) { importing = false }
+    KrsImportDialog(vm)
     if (pausing) PauseAllDialog(vm) { pausing = false }
     if (resuming) {
         AlertDialog(
@@ -312,5 +317,71 @@ private fun CourseCard(
                 }
             }
         }
+    }
+}
+
+/** Impor jadwal dari KRS SiAdin: membaca → pratinjau → tambah yang baru / ganti semua. */
+@Composable
+private fun KrsImportDialog(vm: MainViewModel) {
+    val state by vm.krsImport.collectAsState()
+    when (val st = state) {
+        MainViewModel.KrsImport.Idle -> Unit
+        MainViewModel.KrsImport.Loading -> AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Membaca KRS SiAdin…") },
+            text = { Text("Login otomatis & membaca halaman Akademik → KRS. Bisa sampai ±1 menit.") },
+            confirmButton = {},
+        )
+        is MainViewModel.KrsImport.Failed -> AlertDialog(
+            onDismissRequest = { vm.closeKrs() },
+            title = { Text("Gagal membaca KRS") },
+            text = { Text(st.message) },
+            confirmButton = { TextButton(onClick = { vm.readKrs() }) { Text("Coba lagi") } },
+            dismissButton = { TextButton(onClick = { vm.closeKrs() }) { Text("Tutup") } },
+        )
+        is MainViewModel.KrsImport.Done -> AlertDialog(
+            onDismissRequest = { vm.closeKrs() },
+            title = { Text("Impor selesai") },
+            text = { Text(if (st.added == 0) "Tidak ada jadwal baru — semuanya sudah ada." else "${st.added} jadwal ditambahkan. Alarm sudah dipasang.") },
+            confirmButton = { TextButton(onClick = { vm.closeKrs() }) { Text("OK") } },
+        )
+        is MainViewModel.KrsImport.Ready -> AlertDialog(
+            onDismissRequest = { vm.closeKrs() },
+            title = { Text("Jadwal dari KRS") },
+            text = {
+                Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                    Text(
+                        "${st.all.size} jadwal terbaca, ${st.fresh.size} belum ada di NgiBsen.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    st.all.sortedWith(compareBy({ it.dayOfWeek }, { it.openMinute })).forEach { c ->
+                        val isNew = c in st.fresh
+                        Text(
+                            (if (isNew) "➕ " else "✓ ") + "${c.name} · ${Formatters.dayName(c.dayOfWeek)} " +
+                                Formatters.window(c.openMinute, c.closeMinute) + (c.room?.let { " · $it" } ?: ""),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                    Text(
+                        "➕ = akan ditambah · ✓ = sudah ada. \"Ganti semua\" menghapus jadwal lama (untuk semester baru); " +
+                            "riwayat tetap tersimpan.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = st.fresh.isNotEmpty(), onClick = { vm.importKrs(replaceAll = false) }) {
+                    Text("Tambah ${st.fresh.size} baru")
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { vm.importKrs(replaceAll = true) }) { Text("Ganti semua") }
+                    TextButton(onClick = { vm.closeKrs() }) { Text("Batal") }
+                }
+            },
+        )
     }
 }

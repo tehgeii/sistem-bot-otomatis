@@ -63,6 +63,29 @@ class Repository(private val db: AppDatabase) {
         return added
     }
 
+    /** Jadwal yang sekarang ada, dalam bentuk [CourseData]. */
+    private suspend fun currentData(): List<CourseData> =
+        courseDao.getAll().map { CourseData(it.name, it.dayOfWeek, it.openMinute, it.closeMinute, it.room, it.active) }
+
+    /** Jadwal hasil baca KRS yang BELUM ada (lihat [com.pengingatabsen.logic.KrsParser.alreadyExists]). */
+    suspend fun newFromKrs(fromKrs: List<CourseData>): List<CourseData> {
+        val existing = currentData()
+        return fromKrs.filterNot { com.pengingatabsen.logic.KrsParser.alreadyExists(it, existing) }
+    }
+
+    /**
+     * Simpan jadwal hasil baca KRS. [replaceAll] = hapus semua jadwal lama dulu (semester baru; riwayat tetap
+     * tersimpan), selain itu hanya menambah yang belum ada. Mengembalikan jumlah jadwal yang ditambah.
+     */
+    suspend fun importFromKrs(fromKrs: List<CourseData>, replaceAll: Boolean): Int {
+        if (replaceAll) courseDao.getAll().forEach { deleteCourse(it) }
+        val toAdd = if (replaceAll) fromKrs.distinct() else newFromKrs(fromKrs)
+        toAdd.forEach {
+            saveCourse(Course(name = it.name, dayOfWeek = it.dayOfWeek, openMinute = it.openMinute, closeMinute = it.closeMinute, room = it.room))
+        }
+        return toAdd.size
+    }
+
     /** Berapa matkul yang akan ditambah bila teks ini diimpor (untuk pratinjau). */
     suspend fun previewImport(text: String): Int {
         val incoming = ScheduleCodec.decode(text)

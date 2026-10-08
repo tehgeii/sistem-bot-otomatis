@@ -198,6 +198,14 @@ object SiadinScripts {
         })(${JSONObject.quote(courseName)});
     """
 
+    /** Teks setiap kartu (berlabel KDMK) di halaman, sebagai JSON array — untuk impor jadwal dari KRS (hanya membaca). */
+    val CARD_TEXTS_SCRIPT = """
+        (function(){
+          $CARDS_JS
+          return JSON.stringify(__cards('').map(function(c){ return c.card.innerText || c.card.textContent || ''; }));
+        })();
+    """
+
     /**
      * Ringkasan isi halaman untuk LOG DIAGNOSIS (hanya membaca), mis.
      * "login✓ · MANAJEMEN PROYEK TEKNOLOGI INFORMASI=waiting, PEMROGRAMAN SISI KLIEN=open* · KDMK dom=2 tampil=2 ·
