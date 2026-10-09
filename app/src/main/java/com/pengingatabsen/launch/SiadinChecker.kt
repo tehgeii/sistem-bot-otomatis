@@ -43,6 +43,8 @@ data class CheckResult(
     val photoPath: String? = null,
     /** Hasil skrip ekstraksi (mis. teks kartu KRS) bila diminta dan halaman berhasil dibaca. */
     val extracted: String? = null,
+    /** Halaman SiAdin termuat tapi isinya tidak dikenali (lihat [com.pengingatabsen.logic.LayoutWatch]). */
+    val layoutSuspect: Boolean = false,
 )
 
 /** Cara WebView pengecek "digambar". */
@@ -268,6 +270,7 @@ object SiadinChecker {
                             "${step.reason} | $summary | ${brain.summary} | ${host.label}",
                             photo,
                             extracted,
+                            step.layoutSuspect,
                         )
                     }
                 }

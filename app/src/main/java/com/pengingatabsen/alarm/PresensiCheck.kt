@@ -74,6 +74,7 @@ object PresensiCheck {
             course.name,
         ) { DiagLog.add("kesiapan ${course.name}: $it") }
         DiagLog.add("kesiapan HASIL ${course.name}: ${result.state} — ${result.detail}")
+        SiadinHealth.record(ctx, course.id, occ.date.toEpochDay(), result)
         when (result.state) {
             PresensiState.WAITING, PresensiState.OPEN, PresensiState.DONE -> Unit
             PresensiState.LOGIN_FAILED -> problems.add(0, "login SiAdin ditolak — perbarui NIM/password")
@@ -167,6 +168,7 @@ object PresensiCheck {
         // Catatan diagnosis (tampil di Pengaturan): kapan cek terakhir, matkul apa, hasilnya apa.
         store.setLastCheck("${Formatters.hm(LocalDateTime.now())} · ${course.name} · ${describe(state)}")
         DiagLog.add("HASIL ${course.name}: ${describe(state)} — ${result.detail}")
+        SiadinHealth.record(ctx, courseId, epochDay, result)
 
         // Baca ulang: pengguna mungkin sudah menekan tombol selama pengecekan berjalan.
         val record = dao.find(courseId, epochDay) ?: return

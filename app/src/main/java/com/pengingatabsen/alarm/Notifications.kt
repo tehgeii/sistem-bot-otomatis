@@ -173,6 +173,7 @@ object Notifications {
     private const val LOGIN_FAILED_ID = 779
     const val READINESS_ID = 780
     private const val MISSED_ALARM_ID = 781
+    private const val LAYOUT_CHANGED_ID = 782
 
     /** Intent ke tab Pengaturan (untuk memperbaiki izin/login). */
     private fun settingsIntent(context: Context, requestCode: Int): PendingIntent =
@@ -213,6 +214,20 @@ object Notifications {
             .setContentIntent(open)
             .addAction(0, "Buka Izin HP", open)
         notify(context, MISSED_ALARM_ID, builder)
+    }
+
+    /** Halaman SiAdin termuat tapi berkali-kali tidak dikenali: kemungkinan tampilannya berubah. */
+    fun showLayoutChanged(context: Context, text: String) {
+        val open = settingsIntent(context, 6)
+        val builder = NotificationCompat.Builder(context, CHANNEL_INFO)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("⚠️ Tampilan SiAdin sepertinya berubah")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(open)
+            .addAction(0, "Buka Diagnosis", open)
+        notify(context, LAYOUT_CHANGED_ID, builder)
     }
 
     /** Info non-heads-up, mis. gagal mengirim bukti. */

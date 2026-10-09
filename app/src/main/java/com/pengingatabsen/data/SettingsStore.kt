@@ -95,6 +95,10 @@ class SettingsStore(private val context: Context) {
         val ARMED = stringSetPreferencesKey("armed_open")
         /** Kemunculan yang alarm terlewatnya sudah diberitahukan (agar tidak berulang). */
         val MISSED_REPORTED = stringSetPreferencesKey("missed_reported")
+        /** Pengecekan berturut-turut yang halamannya termuat tapi tidak dikenali ("courseId:epochDay,..."). */
+        val LAYOUT_SUSPECTS = stringPreferencesKey("layout_suspects")
+        /** Hari (epoch day) peringatan "tampilan SiAdin berubah" terakhir dikirim. */
+        val LAYOUT_WARNED_DAY = longPreferencesKey("layout_warned_day")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -131,6 +135,7 @@ class SettingsStore(private val context: Context) {
         p.remove(Keys.PRESENSI_OPEN)
         p.remove(Keys.ARMED)
         p.remove(Keys.MISSED_REPORTED)
+        p.remove(Keys.LAYOUT_SUSPECTS)
         p.asMap().keys.map { it.name }.filter { it.startsWith("presensi_unknown_") }
             .forEach { p.remove(intPreferencesKey(it)) }
     }
@@ -218,6 +223,25 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit {
             if (it[Keys.LOGIN_FAILED_DAY] != today) {
                 it[Keys.LOGIN_FAILED_DAY] = today
+                claimed = true
+            }
+        }
+        return claimed
+    }
+
+    suspend fun layoutSuspects(): String? = context.dataStore.data.first()[Keys.LAYOUT_SUSPECTS]
+
+    suspend fun setLayoutSuspects(value: String) = context.dataStore.edit {
+        if (value.isEmpty()) it.remove(Keys.LAYOUT_SUSPECTS) else it[Keys.LAYOUT_SUSPECTS] = value
+    }
+
+    /** True bila peringatan "tampilan SiAdin berubah" belum dikirim hari ini (lalu menandainya sudah). */
+    suspend fun claimLayoutWarning(): Boolean {
+        val today = todayEpochDay()
+        var claimed = false
+        context.dataStore.edit {
+            if (it[Keys.LAYOUT_WARNED_DAY] != today) {
+                it[Keys.LAYOUT_WARNED_DAY] = today
                 claimed = true
             }
         }

@@ -45,7 +45,11 @@ sealed class Step {
     /** Sesi rusak: hapus cookie & penyimpanan situs, lalu buka halaman depan (form login pasti muncul). */
     data object ClearSessionAndLoadRoot : Step()
     data object FillLogin : Step()
-    data class Finish(val outcome: Outcome, val reason: String) : Step()
+    /**
+     * [layoutSuspect]: halaman SiAdin sudah termuat tapi isinya tidak dikenali (kemungkinan tampilan/alamat SiAdin
+     * berubah). Bukan untuk masalah internet, login ditolak, atau data login kosong.
+     */
+    data class Finish(val outcome: Outcome, val reason: String, val layoutSuspect: Boolean = false) : Step()
 }
 
 /**
@@ -83,7 +87,10 @@ class CheckerBrain(
 
     fun next(tick: Int, page: PageKind, probe: Probe): Step {
         if (tick >= deadline) {
-            return Step.Finish(Outcome.UNKNOWN, "waktu habis ($deadline dtk), terakhir terbaca: $lastKey")
+            // Halaman presensi sudah terbuka tapi statusnya tak pernah terbaca stabil → curiga tampilan berubah.
+            // Masih di halaman lain/memuat (internet lambat) → bukan.
+            val suspect = lastKey?.startsWith("${PageKind.TARGET}/") == true
+            return Step.Finish(Outcome.UNKNOWN, "waktu habis ($deadline dtk), terakhir terbaca: $lastKey", suspect)
         }
         if (page == PageKind.UNTRUSTED) return Step.Finish(Outcome.UNKNOWN, "halaman di luar SiAdin")
 
@@ -110,7 +117,13 @@ class CheckerBrain(
             val ready = if (probe == Probe.LOADING) streak >= STABLE_OTHER_LOADING else streak >= STABLE_OTHER
             if (!ready) return Step.Wait
             if (targetLoads >= MAX_TARGET_LOADS) {
-                return Step.Finish(Outcome.UNKNOWN, "halaman presensi tidak bisa dibuka (dialihkan terus)")
+                // Halaman lain sudah termuat penuh tapi halaman presensi selalu dialihkan: kemungkinan alamatnya berubah.
+                // Masih "memuat" (internet lambat) → bukan tanda tampilan berubah.
+                return Step.Finish(
+                    Outcome.UNKNOWN,
+                    "halaman presensi tidak bisa dibuka (dialihkan terus)",
+                    layoutSuspect = probe != Probe.LOADING,
+                )
             }
             targetLoads++
             cooldownUntil = tick + AFTER_LOAD_WAIT
@@ -144,7 +157,7 @@ class CheckerBrain(
             cooldownUntil = tick + AFTER_LOAD_WAIT
             return Step.LoadTarget
         }
-        return Step.Finish(Outcome.UNKNOWN, "halaman presensi tanpa kartu/tulisan (sudah dimuat ulang)")
+        return Step.Finish(Outcome.UNKNOWN, "halaman presensi tanpa kartu/tulisan (sudah dimuat ulang)", layoutSuspect = true)
     }
 
     /** Halaman presensi termuat tapi belum login: login ulang bertahap, berakhir UNKNOWN (bukan WAITING). */
@@ -160,7 +173,7 @@ class CheckerBrain(
                 reloginStage = 2
                 Step.ClearSessionAndLoadRoot
             }
-            else -> Step.Finish(Outcome.UNKNOWN, "tetap belum login setelah login ulang (data akun tidak tampil)")
+            else -> Step.Finish(Outcome.UNKNOWN, "tetap belum login setelah login ulang (data akun tidak tampil)", layoutSuspect = true)
         }
     }
 

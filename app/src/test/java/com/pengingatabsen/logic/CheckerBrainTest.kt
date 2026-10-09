@@ -1,6 +1,7 @@
 package com.pengingatabsen.logic
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -54,7 +55,7 @@ class CheckerBrainTest {
         }
     }
 
-    private data class Run(val outcome: Outcome, val reason: String, val tick: Int, val steps: List<Step>)
+    private data class Run(val outcome: Outcome, val reason: String, val tick: Int, val steps: List<Step>, val suspect: Boolean)
 
     private fun run(site: FakeSiadin, hasCredentials: Boolean = true): Run {
         val brain = CheckerBrain(hasCredentials)
@@ -63,7 +64,7 @@ class CheckerBrainTest {
             val (page, probe) = site.observe(tick)
             val step = brain.next(tick, page, probe)
             if (step != Step.Wait) steps += step
-            if (step is Step.Finish) return Run(step.outcome, step.reason, tick, steps)
+            if (step is Step.Finish) return Run(step.outcome, step.reason, tick, steps, step.layoutSuspect)
             site.apply(step, tick)
         }
         error("tidak selesai")
@@ -184,6 +185,37 @@ class CheckerBrainTest {
         assertEquals(Outcome.UNKNOWN, r.outcome)
         assertEquals(1, r.steps.count { it == Step.LoadTarget })
         assertTrue("terlalu lama: ${r.tick}", r.tick < CheckerBrain.DEADLINE_SECONDS)
+    }
+
+    @Test
+    fun layoutSuspect_onlyWhenSiadinLoadedButUnreadable() {
+        // Terbaca normal → bukan tanda tampilan berubah.
+        assertFalse(run(FakeSiadin(sessionValid = true, cards = Probe.BUTTON)).suspect)
+        assertFalse(run(FakeSiadin(sessionValid = true, cards = Probe.NO_CARD)).suspect)
+        assertFalse(run(FakeSiadin(sessionValid = false)).suspect)
+        // Login ditolak / tanpa data login / halaman di luar SiAdin → masalah lain, bukan tampilan.
+        assertFalse(run(FakeSiadin(sessionValid = false, passwordOk = false)).suspect)
+        assertFalse(run(FakeSiadin(sessionValid = false).apply { onTarget = false }, hasCredentials = false).suspect)
+        assertFalse((CheckerBrain(true).next(0, PageKind.UNTRUSTED, Probe.LOADING) as Step.Finish).layoutSuspect)
+        // Internet lambat: halaman depan tak kunjung termuat → bukan.
+        var step: Step = Step.Wait
+        var tick = 0
+        var brain = CheckerBrain(true)
+        while (step !is Step.Finish) step = brain.next(tick++, PageKind.OTHER, Probe.LOADING).let { if (it == Step.LoadTarget) Step.Wait else it }
+        assertFalse((step as Step.Finish).layoutSuspect)
+        // Halaman presensi termuat tapi kosong / tak pernah selesai / data akun tak pernah tampil / dialihkan terus → curiga.
+        assertTrue(run(FakeSiadin(sessionValid = true, cards = Probe.NO_TEXT, placeholder = false)).suspect)
+        assertTrue(run(FakeSiadin(sessionValid = true, redirectsAway = true).apply { onTarget = false }).suspect)
+        step = Step.Wait
+        tick = 0
+        brain = CheckerBrain(true)
+        while (step !is Step.Finish) step = brain.next(tick++, PageKind.TARGET, Probe.LOADING)
+        assertTrue((step as Step.Finish).layoutSuspect)
+        step = Step.Wait
+        tick = 0
+        brain = CheckerBrain(true)
+        while (step !is Step.Finish) step = brain.next(tick++, PageKind.TARGET, Probe.NOT_LOGGED_EMPTY)
+        assertTrue((step as Step.Finish).layoutSuspect)
     }
 
     @Test
