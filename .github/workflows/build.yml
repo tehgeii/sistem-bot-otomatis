@@ -12,7 +12,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      APK_NAME: Pengingat Absen UDINUS.apk
+      APK_NAME: NgiBsen-UDINUS.apk
     steps:
       - uses: actions/checkout@v4
 
@@ -47,14 +47,31 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: ./gradlew --no-daemon assembleRelease
 
-      - name: Periksa tanda tangan & beri nama file
+      # Sidik jari SHA-256 sertifikat = identitas kunci tanda tangan (publik, bukan rahasia). Dipakai untuk
+      # memastikan APK asli & untuk pendaftaran verifikasi developer Google. versi.json dibaca aplikasi
+      # untuk memberi tahu bila ada versi baru.
+      - name: Periksa tanda tangan, versi & beri nama file
         if: github.event_name != 'pull_request'
         run: |
           APK=$(ls app/build/outputs/apk/release/*.apk | head -n1)
-          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n1)
-          "$APKSIGNER" verify --print-certs "$APK" | grep -i "certificate DN"
+          TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n1)
+          CERTS=$("$TOOLS/apksigner" verify --print-certs "$APK")
+          echo "$CERTS" | grep -i -E "certificate (DN|SHA-256)"
+          SHA256=$(echo "$CERTS" | grep -i "certificate SHA-256 digest" | sed -n '1s/.*: *//p' | tr -d ' ')
+          # Tanpa "| head": pipefail + SIGPIPE bisa menggagalkan langkah.
+          BADGING=$("$TOOLS/aapt2" dump badging "$APK")
+          CODE=$(echo "$BADGING" | sed -n "1s/.*versionCode='\([0-9]*\)'.*/\1/p")
+          NAME=$(echo "$BADGING" | sed -n "1s/.*versionName='\([^']*\)'.*/\1/p")
+          if [ -z "$SHA256" ] || [ -z "$CODE" ] || [ -z "$NAME" ]; then
+            echo "::error::Gagal membaca sidik jari/versi APK"; exit 1
+          fi
+          echo "Versi $NAME ($CODE) · SHA-256 sertifikat: $SHA256"
           mkdir -p dist
           cp "$APK" "dist/$APK_NAME"
+          printf '{"versionCode":%s,"versionName":"%s","apk":"%s","certSha256":"%s","commit":"%s"}\n' \
+            "$CODE" "$NAME" "$APK_NAME" "$SHA256" "$GITHUB_SHA" > dist/versi.json
+          cat dist/versi.json
+          { echo "APK_VERSION=$NAME"; echo "APK_CERT_SHA256=$SHA256"; } >> "$GITHUB_ENV"
           rm -f "$RUNNER_TEMP/release.jks"
 
       - name: Unggah APK (artifact)
@@ -71,8 +88,6 @@ jobs:
           git tag -f terbaru
           git push -f origin refs/tags/terbaru
 
-      # Catatan: GitHub mengganti spasi di nama file Release menjadi titik
-      # (Pengingat.Absen.UDINUS.apk); di artifact namanya tetap persis.
       - name: Perbarui Release "terbaru" (unduhan publik)
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
@@ -81,6 +96,23 @@ jobs:
           name: NgiBsen UDINUS (terbaru)
           make_latest: true
           body: |
-            Unduh **Pengingat Absen UDINUS.apk** di bawah, lalu instal.
+            Unduh **${{ env.APK_NAME }}** di bawah, lalu instal. Versi **${{ env.APK_VERSION }}**.
+            Sidik jari SHA-256 sertifikat (harus selalu sama di setiap versi):
+            `${{ env.APK_CERT_SHA256 }}`
             Dibangun otomatis dari commit ${{ github.sha }}.
-          files: dist/${{ env.APK_NAME }}
+          files: |
+            dist/${{ env.APK_NAME }}
+            dist/versi.json
+
+      # File APK dengan nama lama (sebelum 3.1) dihapus dari Release supaya tidak terunduh versi usang.
+      - name: Hapus APK bernama lama dari Release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for OLD in "Pengingat.Absen.UDINUS.apk" "Pengingat Absen UDINUS.apk"; do
+            if gh release view terbaru --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qxF "$OLD"; then
+              gh release delete-asset terbaru "$OLD" --repo "$GITHUB_REPOSITORY" --yes
+              echo "Dihapus: $OLD"
+            fi
+          done

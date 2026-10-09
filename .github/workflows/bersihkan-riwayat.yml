@@ -1,0 +1,57 @@
+name: Bersihkan riwayat build lama
+
+# Dijalankan MANUAL saja: tab Actions → "Bersihkan riwayat build lama" → Run workflow → ketik HAPUS.
+# Menghapus PERMANEN semua riwayat build (beserta artifact-nya) kecuali build untuk commit terbaru di main.
+# Kode, commit, dan Release "terbaru" (APK unduhan) TIDAK tersentuh.
+on:
+  workflow_dispatch:
+    inputs:
+      konfirmasi:
+        description: 'Ketik HAPUS (huruf besar) untuk menghapus riwayat build lama'
+        required: true
+        default: ''
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  bersihkan:
+    if: github.event.inputs.konfirmasi == 'HAPUS'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hapus riwayat build lama
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_INI: ${{ github.run_id }}
+        run: |
+          HEAD_MAIN=$(gh api "repos/$REPO/commits/main" --jq .sha)
+          echo "Dipertahankan: build untuk commit main ${HEAD_MAIN:0:7} dan proses ini."
+          gh api --paginate "repos/$REPO/actions/runs?per_page=100" \
+            --jq '.workflow_runs[] | "\(.id) \(.head_sha) \(.status)"' > runs.txt
+          TOTAL=$(wc -l < runs.txt)
+          HAPUS=0
+          while read -r ID SHA STATUS; do
+            [ "$ID" = "$RUN_INI" ] && continue
+            [ "$SHA" = "$HEAD_MAIN" ] && continue
+            # Yang masih berjalan tidak bisa dihapus; dilewati.
+            [ "$STATUS" != "completed" ] && continue
+            if gh api -X DELETE "repos/$REPO/actions/runs/$ID" --silent; then
+              HAPUS=$((HAPUS + 1))
+            else
+              echo "Gagal menghapus run $ID (dilewati)"
+            fi
+          done < runs.txt
+          echo "Selesai: $HAPUS dari $TOTAL riwayat build dihapus."
+
+      - name: Bila gagal
+        if: failure()
+        run: echo "Ada yang gagal. Riwayat yang belum terhapus tetap aman; jalankan lagi nanti."
+
+  batal:
+    if: github.event.inputs.konfirmasi != 'HAPUS'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::notice::Tidak ada yang dihapus: kolom konfirmasi harus diisi HAPUS (huruf besar)."

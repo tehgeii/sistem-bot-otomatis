@@ -67,8 +67,8 @@ Ini notifikasi biasa, bukan nada dering alarm; AlarmManager hanya dipakai sebaga
 ## Cara install APK
 
 1. Buka **[Releases → terbaru](https://github.com/tehgeii/sistem-bot-otomatis/releases/latest)** di repo ini (tidak perlu login GitHub).
-2. Unduh **Pengingat Absen UDINUS.apk** (GitHub menampilkannya sebagai
-   `Pengingat.Absen.UDINUS.apk` — sama saja).
+2. Unduh **NgiBsen-UDINUS.apk** (sebelum versi 3.1 namanya `Pengingat.Absen.UDINUS.apk`; isinya
+   aplikasi yang sama, cukup instal di atasnya).
 3. Buka file APK. Jika diminta, izinkan **Instal aplikasi tak dikenal** untuk browser/Files.
    Jika Play Protect memperingatkan "aplikasi tidak dikenal", pilih **Tetap instal**.
 4. Selesai. Versi baru cukup diinstal di atas versi lama — data jadwal & riwayat tetap ada.
@@ -311,7 +311,7 @@ matkul itu saja. Tiap baris punya ikon status (✅ terkirim · 📤 antre · ⚠
 Boleh. Setiap orang memakai datanya sendiri — tidak ada yang tercampur:
 
 1. Kirim link **[Releases → terbaru](https://github.com/tehgeii/sistem-bot-otomatis/releases/latest)** atau file
-   **Pengingat Absen UDINUS.apk** ke teman (lewat WhatsApp/Telegram/Drive).
+   **NgiBsen-UDINUS.apk** ke teman (lewat WhatsApp/Telegram/Drive).
 2. Teman menginstal APK, lalu menjalankan wizard dengan **NIM, password, jadwal, dan bot Telegram
    milik mereka sendiri** (setiap orang membuat bot sendiri di @BotFather).
 3. Semua data (jadwal, riwayat, token bot, NIM & password) tersimpan di HP masing-masing saja.
@@ -410,7 +410,12 @@ Butuh JDK 17 dan Android SDK.
 ```
 
 GitHub Actions menjalankan unit test, membangun APK, dan memperbarui Release **terbaru** setiap
-ada perubahan di `main`.
+ada perubahan di `main` (berisi `NgiBsen-UDINUS.apk` + `versi.json` untuk pemberitahuan versi baru).
+Log build juga mencetak **sidik jari SHA-256 sertifikat**; angka ini harus selalu sama di setiap versi.
+
+**Bersihkan riwayat build lama:** tab **Actions → Bersihkan riwayat build lama → Run workflow**, ketik
+`HAPUS`, lalu **Run workflow**. Semua riwayat build dihapus permanen kecuali build commit terbaru di `main`.
+Kode, commit, dan Release tidak tersentuh.
 
 ## Privasi
 
