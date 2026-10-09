@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
@@ -21,10 +22,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.pengingatabsen.logic.AppUpdate
+import com.pengingatabsen.update.UpdateActivity
 import com.pengingatabsen.update.UpdateChecker
 
 /**
- * Versi terpasang, sidik jari sertifikat (untuk memastikan APK asli dari Release repo), dan pemberitahuan versi baru.
+ * Versi terpasang, sidik jari sertifikat (untuk memastikan APK asli dari Release repo), pemberitahuan versi baru,
+ * dan pembaruan sekali tap ([UpdateActivity]).
  */
 @Composable
 fun AboutSection(vm: SetupViewModel) {
@@ -52,11 +55,30 @@ fun AboutSection(vm: SetupViewModel) {
         Column(Modifier.weight(1f)) {
             Text("Beri tahu bila ada versi baru")
             Text(
-                "Cek Release GitHub sehari sekali (±200 byte). Hanya memberi tahu; pasang tetap kamu yang lakukan.",
+                "Cek Release GitHub sehari sekali (±300 byte). Memasang selalu menunggu tap-mu.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
         Switch(checked = settings?.updateCheck ?: true, onCheckedChange = { vm.setUpdateCheck(it, context) })
+    }
+    if (settings?.updateCheck != false) {
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Unduh lebih dulu lewat Wi-Fi")
+                Text(
+                    "Versi baru (±9 MB) diunduh & dicek keasliannya saat tersambung Wi-Fi, jadi tinggal sekali tap. " +
+                        "Tidak memakai kuota data seluler.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Switch(checked = settings?.updateAutoDownload ?: true, onCheckedChange = { vm.setUpdateAutoDownload(it) })
+        }
+    }
+    if (vm.updateAvailable) {
+        Button(
+            onClick = { runCatching { context.startActivity(UpdateActivity.intent(context, start = true)) } },
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        ) { Text("Perbarui sekarang") }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
         OutlinedButton(enabled = !vm.checkingUpdate, onClick = { vm.checkUpdateNow(context) }, modifier = Modifier.weight(1f)) {

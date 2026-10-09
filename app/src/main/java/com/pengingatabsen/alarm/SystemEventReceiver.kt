@@ -21,6 +21,10 @@ class SystemEventReceiver : BroadcastReceiver() {
                 AlarmScheduler.rescheduleAll(context)
                 // Setelah HP menyala lagi: beri tahu bila ada alarm jam buka yang terlewat saat HP mati.
                 if (intent.action == Intent.ACTION_BOOT_COMPLETED) PresensiCheck.checkMissedAlarms(context)
+                // Diperbarui lewat "Perbarui sekarang": beri tahu & tawarkan membuka lagi.
+                if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+                    com.pengingatabsen.update.SelfUpdater.afterPackageReplaced(context)
+                }
             }
         }
     }

@@ -91,6 +91,8 @@ class SetupViewModel : ViewModel() {
         com.pengingatabsen.update.UpdateChecker.schedule(context.applicationContext, enabled)
     }
 
+    fun setUpdateAutoDownload(enabled: Boolean) = viewModelScope.launch { store.setUpdateAutoDownload(enabled) }
+
     // ---------- Cadangan & pulihkan (pindah HP) ----------
 
     sealed class BackupUi {

@@ -52,8 +52,10 @@ data class AppSettings(
     val readinessText: String? = null,
     /** Kemunculan ("courseId:epochDay") yang presensinya sudah terlihat dibuka dosen. */
     val presensiOpenKeys: Set<String> = emptySet(),
-    /** Cek sehari sekali apakah ada versi NgiBsen baru di Release (hanya memberi tahu). */
+    /** Cek sehari sekali apakah ada versi NgiBsen baru di Release. */
     val updateCheck: Boolean = true,
+    /** Versi baru diunduh & diperiksa lebih dulu saat Wi-Fi (dipasang tetap atas tap pengguna). */
+    val updateAutoDownload: Boolean = true,
     /** Aturan kehadiran untuk "jatah tidak hadir" (pertemuan per semester & minimal hadir %). */
     val meetingsPerSemester: Int = com.pengingatabsen.logic.AttendanceRule.DEFAULT_MEETINGS,
     val minAttendancePercent: Int = com.pengingatabsen.logic.AttendanceRule.DEFAULT_MIN_PERCENT,
@@ -117,6 +119,9 @@ class SettingsStore(private val context: Context) {
         /** Hari (epoch day) peringatan "tampilan SiAdin berubah" terakhir dikirim. */
         val LAYOUT_WARNED_DAY = longPreferencesKey("layout_warned_day")
         val UPDATE_CHECK = booleanPreferencesKey("update_check")
+        val UPDATE_AUTO_DOWNLOAD = booleanPreferencesKey("update_auto_download")
+        /** versionCode yang sedang dipasang lewat pembaruan sekali tap (untuk notifikasi "diperbarui"). */
+        val UPDATE_INSTALLING = longPreferencesKey("update_installing")
         val MEETINGS = intPreferencesKey("meetings_per_semester")
         val MIN_PERCENT = intPreferencesKey("min_attendance_percent")
         val SEMESTER_START = longPreferencesKey("semester_start_day")
@@ -135,7 +140,7 @@ class SettingsStore(private val context: Context) {
     // juga status sementara & onboarding (wizard di HP baru tetap jalan supaya izin & login diisi ulang).
     private val backupBooleans = listOf(
         Keys.VIBRATE_ONLY, Keys.AUTO_LOGIN, Keys.SMART_PRESENSI, Keys.FULL_SCREEN_ALERT,
-        Keys.WEEKLY_SUMMARY, Keys.READINESS_CHECK, Keys.UPDATE_CHECK,
+        Keys.WEEKLY_SUMMARY, Keys.READINESS_CHECK, Keys.UPDATE_CHECK, Keys.UPDATE_AUTO_DOWNLOAD,
     )
     private val backupInts = listOf(Keys.REMIND_INTERVAL, Keys.MEETINGS, Keys.MIN_PERCENT)
     private val backupLongs = listOf(Keys.SEMESTER_START)
@@ -204,6 +209,7 @@ class SettingsStore(private val context: Context) {
         readinessText = this[Keys.READINESS_TEXT],
         presensiOpenKeys = this[Keys.PRESENSI_OPEN] ?: emptySet(),
         updateCheck = this[Keys.UPDATE_CHECK] ?: true,
+        updateAutoDownload = this[Keys.UPDATE_AUTO_DOWNLOAD] ?: true,
         meetingsPerSemester = this[Keys.MEETINGS] ?: com.pengingatabsen.logic.AttendanceRule.DEFAULT_MEETINGS,
         minAttendancePercent = this[Keys.MIN_PERCENT] ?: com.pengingatabsen.logic.AttendanceRule.DEFAULT_MIN_PERCENT,
         semesterStartEpochDay = this[Keys.SEMESTER_START],
@@ -296,6 +302,22 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun setUpdateCheck(enabled: Boolean) = context.dataStore.edit { it[Keys.UPDATE_CHECK] = enabled }
+
+    suspend fun setUpdateAutoDownload(enabled: Boolean) = context.dataStore.edit { it[Keys.UPDATE_AUTO_DOWNLOAD] = enabled }
+
+    suspend fun setUpdateInstalling(versionCode: Long?) = context.dataStore.edit {
+        if (versionCode == null) it.remove(Keys.UPDATE_INSTALLING) else it[Keys.UPDATE_INSTALLING] = versionCode
+    }
+
+    /** versionCode pembaruan yang sedang dipasang (lalu dihapus), atau null. */
+    suspend fun takeUpdateInstalling(): Long? {
+        var value: Long? = null
+        context.dataStore.edit {
+            value = it[Keys.UPDATE_INSTALLING]
+            it.remove(Keys.UPDATE_INSTALLING)
+        }
+        return value
+    }
 
     suspend fun setMeetings(value: Int) = context.dataStore.edit { it[Keys.MEETINGS] = value.coerceIn(MEETINGS_RANGE) }
 

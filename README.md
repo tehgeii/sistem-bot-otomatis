@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 3.2** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 3.3** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -72,6 +72,8 @@ Ini notifikasi biasa, bukan nada dering alarm; AlarmManager hanya dipakai sebaga
 3. Buka file APK. Jika diminta, izinkan **Instal aplikasi tak dikenal** untuk browser/Files.
    Jika Play Protect memperingatkan "aplikasi tidak dikenal", pilih **Tetap instal**.
 4. Selesai. Versi baru cukup diinstal di atas versi lama — data jadwal & riwayat tetap ada.
+   Mulai **3.3**, versi berikutnya cukup lewat **Perbarui sekarang** di dalam aplikasi (lihat
+   [Versi baru & keaslian APK](#versi-baru--keaslian-apk)).
 
 ### Pindah dari versi lama (nama "Pengingat Absen", sebelum versi 1.1)
 
@@ -371,10 +373,30 @@ cek SiAdin sendiri ketika kuliah, lalu kirim **log diagnosis** supaya pengecek b
 ## Versi baru & keaslian APK
 
 *Pengaturan → Tentang & versi*: versi terpasang dan **sidik jari SHA-256 sertifikat** APK. NgiBsen mengecek
-`versi.json` di Release sehari sekali (±200 byte) dan memberi notifikasi **"⬆️ Versi baru NgiBsen …"** — tap
-untuk membuka halaman unduhan. Aplikasi **tidak pernah** mengunduh atau memasang apa pun sendiri.
+`versi.json` di Release sehari sekali (±300 byte) dan memberi notifikasi **"⬆️ Versi baru NgiBsen …"**.
 **Cek sekarang** juga membandingkan sidik jari APK di HP dengan rilis resmi: ✅ sama = APK asli dari Release
-repo ini. Sidik jari rilis resmi:
+repo ini.
+
+**Pembaruan sekali tap (3.3):** tap notifikasi **Perbarui** atau tombol **Perbarui sekarang** di *Tentang & versi*.
+NgiBsen mengunduh `NgiBsen-UDINUS.apk` dari Release repo ini, lalu **memeriksanya sebelum dipasang**:
+- isi file sama persis dengan rilis resmi (SHA-256 file di `versi.json`),
+- nama paket `com.pengingatabsen`,
+- **sertifikat sama** dengan aplikasi yang terpasang (dan dengan `versi.json`),
+- versinya lebih baru (tidak bisa turun versi).
+
+Gagal satu saja → file dibuang dan tidak dipasang. Yang lolos diserahkan ke pemasang Android: di **Android 12+**
+aplikasi yang memperbarui dirinya sendiri biasanya terpasang **tanpa dialog**; di Android 8–11 (atau bila sistem
+tetap meminta) muncul satu dialog **Perbarui**/**Instal** dari Android — pada pembaruan pertama bisa diminta
+mengizinkan *Instal aplikasi tak dikenal* untuk NgiBsen (sekali saja). NgiBsen tertutup sebentar, lalu muncul
+notifikasi **"✅ NgiBsen diperbarui ke …"**; data jadwal, riwayat, login, dan pengaturan tetap. Semua alarm
+dipasang ulang otomatis.
+
+- **Unduh lebih dulu lewat Wi-Fi** (bawaan aktif): versi baru diunduh & diperiksa di latar saat tersambung Wi-Fi,
+  notifikasinya menjadi **"siap dipasang"**. Memasang **tetap menunggu tap-mu** — tidak pernah otomatis.
+- Gagal/ragu? Tombol **Halaman unduhan** tetap ada untuk memasang manual seperti biasa.
+- Pembaruan dari **3.2 ke 3.3** masih manual (3.2 belum punya fitur ini); setelah itu tinggal sekali tap.
+
+Sidik jari rilis resmi:
 
 ```
 6db7 e5f4 8092 aa56 d8ba 1877 4472 5b93 70aa 46de 8514 29c4 06f9 3bcb 4e24 4aab
@@ -473,7 +495,7 @@ app/src/main/java/com/pengingatabsen/
 ├── telegram/               Bot API client (OkHttp) + SendWorker (WorkManager, retry offline)
 ├── widget/                 Widget layar utama (+ TodayData, sumber bersama widget & tile)
 ├── tile/                   Tile Quick Settings "Presensi"
-├── update/                 Pemberitahuan versi baru (versi.json di Release)
+├── update/                 Versi baru (versi.json) + pembaruan sekali tap (unduh, periksa, PackageInstaller)
 └── ui/                     Compose: jadwal, riwayat (grafik, ekspor), pengaturan, wizard, cadangan
 app/src/test/…/logic/       Unit test semua logika murni
 ```
@@ -488,7 +510,8 @@ Butuh JDK 17 dan Android SDK.
 ```
 
 GitHub Actions menjalankan unit test, membangun APK, dan memperbarui Release **terbaru** setiap
-ada perubahan di `main` (berisi `NgiBsen-UDINUS.apk` + `versi.json` untuk pemberitahuan versi baru).
+ada perubahan di `main` (berisi `NgiBsen-UDINUS.apk` + `versi.json`: versi, sidik jari sertifikat, dan SHA-256
+file APK untuk pembaruan sekali tap).
 Log build juga mencetak **sidik jari SHA-256 sertifikat**; angka ini harus selalu sama di setiap versi.
 
 **Bersihkan riwayat build lama:** tab **Actions → Bersihkan riwayat build lama → Run workflow**, ketik
@@ -523,6 +546,7 @@ Sumber: [FAQ verifikasi developer](https://developer.android.com/developer-verif
 Setelah memasang versi baru, cek sekali:
 1. *Pengaturan → Diagnosis → Tes cek sekarang* → ✅ terbaca.
 2. *Pengaturan → Tentang & versi → Cek sekarang* → "Sudah versi terbaru" dan ✅ sidik jari sama.
+   Bila memperbarui lewat **Perbarui sekarang**, notifikasi **"✅ NgiBsen diperbarui ke …"** muncul setelahnya.
 3. *Pengaturan → Cadangan data → Cadangkan* → simpan file (sekalian cadangan pertama).
 4. Layar **Hari ini** & widget menampilkan matkul yang benar; tile **Presensi** bisa dipasang.
 5. Selama seminggu pertama tetap lirik SiAdin sendiri; bila ada yang meleset, kirim **log diagnosis**.
@@ -536,7 +560,8 @@ Setelah memasang versi baru, cek sekali:
 - Data jadwal & riwayat hanya di perangkat; yang keluar hanya pesan bukti ke bot Telegram milikmu.
 - File cadangan & ekspor dibuat hanya saat kamu memintanya, di lokasi yang kamu pilih; isinya jadwal, riwayat,
   dan pengaturan (tanpa NIM, password, token, atau foto).
-- Pemberitahuan versi baru hanya membaca `versi.json` publik di Release repo (tanpa data apa pun dari HP).
+- Pemberitahuan versi baru hanya membaca `versi.json` publik di Release repo (tanpa data apa pun dari HP);
+  pembaruan sekali tap hanya mengunduh APK dari Release repo yang sama dan tidak mengirim apa pun.
 
 ## Kontributor
 

@@ -27,13 +27,18 @@ import java.util.concurrent.TimeUnit
 data class InstalledVersion(val versionName: String, val versionCode: Long, val certSha256: String?)
 
 /**
- * Pemberitahuan versi baru: membaca `versi.json` di Release "terbaru" repo (publik, tanpa login, ±200 byte),
- * membandingkan dengan versi terpasang. Tidak pernah mengunduh/memasang APK sendiri — hanya memberi tahu.
+ * Pemberitahuan versi baru: membaca `versi.json` di Release "terbaru" repo (publik, tanpa login, ±300 byte),
+ * membandingkan dengan versi terpasang. Bila diizinkan, APK diunduh & diperiksa lebih dulu lewat Wi-Fi supaya
+ * tinggal sekali tap; MEMASANG selalu atas tap pengguna ([SelfUpdater]).
  */
 object UpdateChecker {
     const val VERSION_URL = "https://github.com/tehgeii/sistem-bot-otomatis/releases/download/terbaru/versi.json"
     const val RELEASE_PAGE = "https://github.com/tehgeii/sistem-bot-otomatis/releases/latest"
+    private const val RELEASE_DOWNLOAD = "https://github.com/tehgeii/sistem-bot-otomatis/releases/download/terbaru/"
     private const val PERIODIC_NAME = "cek-versi-baru"
+
+    /** Alamat APK di Release (nama file dari versi.json disaring dulu). */
+    fun apkUrl(remote: RemoteVersion): String = RELEASE_DOWNLOAD + AppUpdate.safeApkName(remote.apk)
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -70,13 +75,23 @@ object UpdateChecker {
         return InstalledVersion(info.versionName ?: "?", PackageInfoCompat.getLongVersionCode(info), sha)
     }
 
-    /** Cek sekarang; tampilkan notifikasi bila ada versi lebih baru yang BELUM pernah diberitahukan. */
-    suspend fun checkAndNotify(context: Context): RemoteVersion? {
+    /**
+     * Cek sekarang; bila ada versi lebih baru: unduh & periksa lebih dulu ([prefetch], hanya lewat Wi-Fi/jaringan
+     * tak berbayar), lalu notifikasi sekali per versi. Tidak pernah memasang.
+     */
+    suspend fun checkAndNotify(context: Context, prefetch: Boolean): RemoteVersion? {
         val remote = fetchRemote() ?: return null
         val mine = installed(context)
-        if (AppUpdate.isNewer(remote, mine.versionCode) && Graph.settings.claimUpdateNotice(remote.versionCode)) {
-            DiagLog.add("versi baru tersedia: ${remote.versionName} (terpasang ${mine.versionName})")
-            Notifications.showUpdateAvailable(context, remote.versionName, mine.versionName)
+        if (!AppUpdate.isNewer(remote, mine.versionCode)) return remote
+        var ready = false
+        if (prefetch && SelfUpdater.onUnmeteredNetwork(context)) {
+            val prepared = SelfUpdater.prepare(context, remote)
+            ready = prepared is SelfUpdater.Prepared.Ready
+            if (prepared is SelfUpdater.Prepared.Error) DiagLog.add("unduh otomatis ${remote.versionName} gagal: ${prepared.message}")
+        }
+        if (Graph.settings.claimUpdateNotice(remote.versionCode)) {
+            DiagLog.add("versi baru tersedia: ${remote.versionName} (terpasang ${mine.versionName})" + if (ready) ", sudah diunduh" else "")
+            Notifications.showUpdateAvailable(context, remote.versionName, mine.versionName, ready)
         }
         return remote
     }
@@ -97,8 +112,9 @@ object UpdateChecker {
 
 class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        if (!Graph.settings.current().updateCheck) return Result.success()
-        UpdateChecker.checkAndNotify(applicationContext)
+        val settings = Graph.settings.current()
+        if (!settings.updateCheck) return Result.success()
+        UpdateChecker.checkAndNotify(applicationContext, prefetch = settings.updateAutoDownload)
         return Result.success()
     }
 }

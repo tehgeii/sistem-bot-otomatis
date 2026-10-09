@@ -89,6 +89,7 @@ object AlarmScheduler {
         NextCourseWidget.updateAll(context)
         SummaryWorker.schedule(context, Graph.settings.current().weeklySummary)
         com.pengingatabsen.update.UpdateChecker.schedule(context, Graph.settings.current().updateCheck)
+        com.pengingatabsen.update.SelfUpdater.cleanup(context)
         schedulePreflight(context)
     }
 

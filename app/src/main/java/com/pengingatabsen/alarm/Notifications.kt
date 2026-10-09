@@ -232,25 +232,64 @@ object Notifications {
     }
 
     /** Versi baru di Release "terbaru". Tap → halaman unduhan (browser). Aplikasi tidak memasang apa pun sendiri. */
-    fun showUpdateAvailable(context: Context, newVersion: String, installedVersion: String) {
-        val open = PendingIntent.getActivity(
+    /** Versi baru ada. Tap → pembaruan sekali tap ([com.pengingatabsen.update.UpdateActivity]); [ready] = APK sudah diunduh & diperiksa. */
+    fun showUpdateAvailable(context: Context, newVersion: String, installedVersion: String, ready: Boolean) {
+        val update = updateIntent(context, start = true)
+        val page = PendingIntent.getActivity(
             context, 7,
             Intent(Intent.ACTION_VIEW, Uri.parse(com.pengingatabsen.update.UpdateChecker.RELEASE_PAGE))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val text = "NgiBsen $newVersion sudah ada (terpasang $installedVersion). Unduh NgiBsen-UDINUS.apk lalu " +
-            "instal di atas versi lama — data tetap aman."
+        val title = if (ready) "⬆️ NgiBsen $newVersion siap dipasang" else "⬆️ Versi baru NgiBsen $newVersion"
+        val text = if (ready) {
+            "Sudah diunduh lewat Wi-Fi & dicek keasliannya (terpasang $installedVersion). Ketuk Perbarui — data tetap aman."
+        } else {
+            "Terpasang $installedVersion. Ketuk Perbarui untuk mengunduh & memasang (±9 MB) — data tetap aman."
+        }
         val builder = NotificationCompat.Builder(context, CHANNEL_INFO)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("⬆️ Versi baru NgiBsen $newVersion")
+            .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(true)
-            .setContentIntent(open)
-            .addAction(0, "Buka halaman unduhan", open)
+            .setContentIntent(update)
+            .addAction(0, "Perbarui", update)
+            .addAction(0, "Halaman unduhan", page)
         notify(context, UPDATE_ID, builder)
     }
+
+    /** Pembaruan yang sedang berjalan butuh kamu (konfirmasi Android / gagal). Tap → layar pembaruan. */
+    fun showUpdateStep(context: Context, title: String, text: String) {
+        val builder = NotificationCompat.Builder(context, CHANNEL_INFO)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(updateIntent(context, start = false))
+        notify(context, UPDATE_ID, builder)
+    }
+
+    /** Dikirim versi BARU setelah pembaruan dari dalam aplikasi selesai. */
+    fun showUpdated(context: Context, versionName: String) {
+        val text = "Jadwal, riwayat, login, dan pengaturan tetap seperti sebelumnya. Ketuk untuk membuka NgiBsen."
+        val builder = NotificationCompat.Builder(context, CHANNEL_INFO)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("✅ NgiBsen diperbarui ke $versionName")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(openApp(context))
+        notify(context, UPDATE_ID, builder)
+    }
+
+    private fun updateIntent(context: Context, start: Boolean): PendingIntent =
+        PendingIntent.getActivity(
+            context, if (start) 70 else 71,
+            com.pengingatabsen.update.UpdateActivity.intent(context, start),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
 
     /** Info non-heads-up, mis. gagal mengirim bukti. */
     fun showInfo(context: Context, id: Int, title: String, text: String, action: Pair<String, PendingIntent>? = null) {

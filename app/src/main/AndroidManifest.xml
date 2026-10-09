@@ -26,6 +26,10 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Pembaruan sekali tap: APK dari Release resmi diserahkan ke pemasang Android (selalu atas tap pengguna).
+         Android 12+: aplikasi yang memperbarui dirinya sendiri boleh tanpa dialog konfirmasi bila sistem mengizinkan. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
 
     <uses-feature
         android:name="android.hardware.camera"
@@ -120,6 +124,19 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
+
+        <!-- Pembaruan sekali tap (dialog unduh/periksa/pasang) -->
+        <activity
+            android:name=".update.UpdateActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="com.pengingatabsen.update"
+            android:theme="@style/Theme.PengingatAbsen.Transparent" />
+
+        <receiver
+            android:name=".update.InstallResultReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".alarm.AlarmReceiver"

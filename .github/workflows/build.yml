@@ -49,7 +49,7 @@ jobs:
 
       # Sidik jari SHA-256 sertifikat = identitas kunci tanda tangan (publik, bukan rahasia). Dipakai untuk
       # memastikan APK asli & untuk pendaftaran verifikasi developer Google. versi.json dibaca aplikasi
-      # untuk memberi tahu bila ada versi baru.
+      # untuk memberi tahu bila ada versi baru; apkSha256 (isi file) dicocokkan sebelum pembaruan sekali tap.
       - name: Periksa tanda tangan, versi & beri nama file
         if: github.event_name != 'pull_request'
         run: |
@@ -68,10 +68,12 @@ jobs:
           echo "Versi $NAME ($CODE) · SHA-256 sertifikat: $SHA256"
           mkdir -p dist
           cp "$APK" "dist/$APK_NAME"
-          printf '{"versionCode":%s,"versionName":"%s","apk":"%s","certSha256":"%s","commit":"%s"}\n' \
-            "$CODE" "$NAME" "$APK_NAME" "$SHA256" "$GITHUB_SHA" > dist/versi.json
+          FILE_SHA256=$(sha256sum "dist/$APK_NAME" | cut -d' ' -f1)
+          if [ -z "$FILE_SHA256" ]; then echo "::error::Gagal menghitung SHA-256 file APK"; exit 1; fi
+          printf '{"versionCode":%s,"versionName":"%s","apk":"%s","certSha256":"%s","apkSha256":"%s","commit":"%s"}\n' \
+            "$CODE" "$NAME" "$APK_NAME" "$SHA256" "$FILE_SHA256" "$GITHUB_SHA" > dist/versi.json
           cat dist/versi.json
-          { echo "APK_VERSION=$NAME"; echo "APK_CERT_SHA256=$SHA256"; } >> "$GITHUB_ENV"
+          { echo "APK_VERSION=$NAME"; echo "APK_CERT_SHA256=$SHA256"; echo "APK_FILE_SHA256=$FILE_SHA256"; } >> "$GITHUB_ENV"
           rm -f "$RUNNER_TEMP/release.jks"
 
       - name: Unggah APK (artifact)
@@ -99,6 +101,7 @@ jobs:
             Unduh **${{ env.APK_NAME }}** di bawah, lalu instal. Versi **${{ env.APK_VERSION }}**.
             Sidik jari SHA-256 sertifikat (harus selalu sama di setiap versi):
             `${{ env.APK_CERT_SHA256 }}`
+            SHA-256 file APK ini: `${{ env.APK_FILE_SHA256 }}`
             Dibangun otomatis dari commit ${{ github.sha }}.
           files: |
             dist/${{ env.APK_NAME }}
