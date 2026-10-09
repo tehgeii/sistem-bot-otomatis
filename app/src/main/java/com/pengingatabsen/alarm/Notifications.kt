@@ -174,6 +174,7 @@ object Notifications {
     const val READINESS_ID = 780
     private const val MISSED_ALARM_ID = 781
     private const val LAYOUT_CHANGED_ID = 782
+    private const val UPDATE_ID = 783
 
     /** Intent ke tab Pengaturan (untuk memperbaiki izin/login). */
     private fun settingsIntent(context: Context, requestCode: Int): PendingIntent =
@@ -228,6 +229,27 @@ object Notifications {
             .setContentIntent(open)
             .addAction(0, "Buka Diagnosis", open)
         notify(context, LAYOUT_CHANGED_ID, builder)
+    }
+
+    /** Versi baru di Release "terbaru". Tap → halaman unduhan (browser). Aplikasi tidak memasang apa pun sendiri. */
+    fun showUpdateAvailable(context: Context, newVersion: String, installedVersion: String) {
+        val open = PendingIntent.getActivity(
+            context, 7,
+            Intent(Intent.ACTION_VIEW, Uri.parse(com.pengingatabsen.update.UpdateChecker.RELEASE_PAGE))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val text = "NgiBsen $newVersion sudah ada (terpasang $installedVersion). Unduh NgiBsen-UDINUS.apk lalu " +
+            "instal di atas versi lama — data tetap aman."
+        val builder = NotificationCompat.Builder(context, CHANNEL_INFO)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("⬆️ Versi baru NgiBsen $newVersion")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(open)
+            .addAction(0, "Buka halaman unduhan", open)
+        notify(context, UPDATE_ID, builder)
     }
 
     /** Info non-heads-up, mis. gagal mengirim bukti. */

@@ -88,6 +88,7 @@ object AlarmScheduler {
         for (course in Graph.repository.allCourses()) reschedule(context, course.id)
         NextCourseWidget.updateAll(context)
         SummaryWorker.schedule(context, Graph.settings.current().weeklySummary)
+        com.pengingatabsen.update.UpdateChecker.schedule(context, Graph.settings.current().updateCheck)
         schedulePreflight(context)
     }
 

@@ -69,6 +69,9 @@ fun SettingsScreen(vm: SetupViewModel, contentPadding: PaddingValues) {
             SectionTitle("Aplikasi tujuan")
             TargetAppSection(vm)
         }
+        HorizontalDivider(Modifier.padding(top = 8.dp))
+        SectionTitle("Tentang & versi")
+        AboutSection(vm)
         Spacer(Modifier.height(32.dp))
     }
 }

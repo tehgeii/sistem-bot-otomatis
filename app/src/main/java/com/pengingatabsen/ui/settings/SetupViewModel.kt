@@ -45,6 +45,46 @@ class SetupViewModel : ViewModel() {
 
     private var pollJob: Job? = null
 
+    // ---------- Tentang & versi baru ----------
+
+    var updateStatus by mutableStateOf<String?>(null)
+        private set
+    var updateAvailable by mutableStateOf(false)
+        private set
+    /** Sidik jari sertifikat APK terpasang sama dengan rilis resmi? null = belum dicek / tak bisa dibandingkan. */
+    var certMatches by mutableStateOf<Boolean?>(null)
+        private set
+    var checkingUpdate by mutableStateOf(false)
+        private set
+
+    fun installedVersion(context: Context) = runCatching { com.pengingatabsen.update.UpdateChecker.installed(context) }.getOrNull()
+
+    fun checkUpdateNow(context: Context) = viewModelScope.launch {
+        if (checkingUpdate) return@launch
+        checkingUpdate = true
+        updateStatus = "Mengecek Release di GitHub…"
+        val remote = com.pengingatabsen.update.UpdateChecker.fetchRemote()
+        val mine = installedVersion(context)
+        if (remote == null || mine == null) {
+            updateStatus = "Tidak bisa mengecek (internet?). Coba lagi nanti."
+            updateAvailable = false
+        } else {
+            certMatches = com.pengingatabsen.logic.AppUpdate.sameCert(mine.certSha256, remote.certSha256)
+            updateAvailable = com.pengingatabsen.logic.AppUpdate.isNewer(remote, mine.versionCode)
+            updateStatus = if (updateAvailable) {
+                "Versi baru ${remote.versionName} tersedia (terpasang ${mine.versionName})."
+            } else {
+                "Sudah versi terbaru (${mine.versionName})."
+            }
+        }
+        checkingUpdate = false
+    }
+
+    fun setUpdateCheck(enabled: Boolean, context: Context) = viewModelScope.launch {
+        store.setUpdateCheck(enabled)
+        com.pengingatabsen.update.UpdateChecker.schedule(context.applicationContext, enabled)
+    }
+
     // ---------- Cadangan & pulihkan (pindah HP) ----------
 
     sealed class BackupUi {

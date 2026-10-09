@@ -53,6 +53,8 @@ data class AppSettings(
     val readinessText: String? = null,
     /** Kemunculan ("courseId:epochDay") yang presensinya sudah terlihat dibuka dosen. */
     val presensiOpenKeys: Set<String> = emptySet(),
+    /** Cek sehari sekali apakah ada versi NgiBsen baru di Release (hanya memberi tahu). */
+    val updateCheck: Boolean = true,
 ) {
     /** Mode pintar hanya berlaku untuk SiAdin web dengan login tersimpan. */
     val smartModeActive: Boolean
@@ -99,6 +101,9 @@ class SettingsStore(private val context: Context) {
         val LAYOUT_SUSPECTS = stringPreferencesKey("layout_suspects")
         /** Hari (epoch day) peringatan "tampilan SiAdin berubah" terakhir dikirim. */
         val LAYOUT_WARNED_DAY = longPreferencesKey("layout_warned_day")
+        val UPDATE_CHECK = booleanPreferencesKey("update_check")
+        /** versionCode terbaru yang sudah diberitahukan (agar notifikasi versi baru tidak berulang). */
+        val UPDATE_NOTIFIED_CODE = longPreferencesKey("update_notified_code")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -108,7 +113,7 @@ class SettingsStore(private val context: Context) {
     // juga status sementara & onboarding (wizard di HP baru tetap jalan supaya izin & login diisi ulang).
     private val backupBooleans = listOf(
         Keys.VIBRATE_ONLY, Keys.AUTO_LOGIN, Keys.SMART_PRESENSI, Keys.FULL_SCREEN_ALERT,
-        Keys.WEEKLY_SUMMARY, Keys.READINESS_CHECK,
+        Keys.WEEKLY_SUMMARY, Keys.READINESS_CHECK, Keys.UPDATE_CHECK,
     )
     private val backupInts = listOf(Keys.REMIND_INTERVAL)
     private val backupStrings = listOf(Keys.TARGET_PACKAGE, Keys.TARGET_LABEL, Keys.DEEP_LINK)
@@ -164,6 +169,7 @@ class SettingsStore(private val context: Context) {
         readinessOk = this[Keys.READINESS_OK],
         readinessText = this[Keys.READINESS_TEXT],
         presensiOpenKeys = this[Keys.PRESENSI_OPEN] ?: emptySet(),
+        updateCheck = this[Keys.UPDATE_CHECK] ?: true,
     )
 
     suspend fun setReadinessCheck(enabled: Boolean) = context.dataStore.edit { it[Keys.READINESS_CHECK] = enabled }
@@ -223,6 +229,20 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit {
             if (it[Keys.LOGIN_FAILED_DAY] != today) {
                 it[Keys.LOGIN_FAILED_DAY] = today
+                claimed = true
+            }
+        }
+        return claimed
+    }
+
+    suspend fun setUpdateCheck(enabled: Boolean) = context.dataStore.edit { it[Keys.UPDATE_CHECK] = enabled }
+
+    /** True bila versi [versionCode] belum pernah diberitahukan (lalu menandainya sudah). */
+    suspend fun claimUpdateNotice(versionCode: Long): Boolean {
+        var claimed = false
+        context.dataStore.edit {
+            if ((it[Keys.UPDATE_NOTIFIED_CODE] ?: 0L) < versionCode) {
+                it[Keys.UPDATE_NOTIFIED_CODE] = versionCode
                 claimed = true
             }
         }
