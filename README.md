@@ -423,4 +423,3 @@ ada perubahan di `main`.
 ## Kontributor
 
 - [@tehgeii](https://github.com/tehgeii) — ide, kebutuhan, dan arah desain aplikasi
-- Claude (Claude Code) — implementasi kode
