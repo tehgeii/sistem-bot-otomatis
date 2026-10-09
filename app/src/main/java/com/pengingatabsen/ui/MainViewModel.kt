@@ -54,12 +54,7 @@ class MainViewModel : ViewModel() {
             courseName = "",
             extractScript = com.pengingatabsen.launch.SiadinScripts.CARD_TEXTS_SCRIPT,
         ) { com.pengingatabsen.data.DiagLog.add("impor KRS: $it") }
-        val texts = result.extracted?.let { raw ->
-            runCatching {
-                val arr = org.json.JSONArray(raw)
-                (0 until arr.length()).map { arr.optString(it) }
-            }.getOrNull()
-        }.orEmpty()
+        val texts = com.pengingatabsen.data.OfficialSync.cardTexts(result.extracted)
         val parsed = com.pengingatabsen.logic.KrsParser.parse(texts)
         // Kartu KRS juga memuat persentase kehadiran resmi: sekalian disimpan.
         com.pengingatabsen.data.OfficialSync.absorb(Graph.appContext, texts)

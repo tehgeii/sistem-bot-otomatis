@@ -130,4 +130,59 @@ class SiadinPresensiRulesTest {
         // Kode salah ketik tapi nama cocok → nama yang dipakai.
         assertEquals(listOf(1), SiadinPresensiRules.pick(cards, "Kriptografi 9999"))
     }
+
+    // Halaman dengan SATU kartu (log HP 9 Okt 07:04): pembungkus kartu ikut memuat navbar & footer.
+    private val singleCardPage = """
+        SiAdin
+        Sistem Informasi Akademik
+        BUDI DATA PRATAMA
+        Masa studi: 4 th 1 bl 9 hr
+        Presensi Kuliah Online
+        KRIPTOGRAFI
+        KDMK: A11.64501
+        KLPK: A11.4502
+        09 October 2026
+        21.43 %
+        Berhasil Presensi
+        Realisasi RPS: Belum Dikonfirmasi
+        SiAdin | Copyright © Udinus 2008 - 2026 All rights reserved
+    """.trimIndent()
+
+    @Test
+    fun outsideMarkers() {
+        listOf("Presensi Kuliah Online", "Masa studi: 4 th 1 bl", "Belum Ada Presensi", "SiAdin | Copyright © Udinus",
+            "KHS", "Jadwal Ujian", "KRS KHS Jadwal Ujian Presensi Online").forEach { assertTrue(it, SiadinPresensiRules.isOutsideCard(it)) }
+        listOf("KRIPTOGRAFI", "KDMK: A11.64501", "Belum Jadwalnya", "Realisasi RPS: Belum Dikonfirmasi", "09 October 2026",
+            "21.43 %", "3 SKS", "SENIN 12.30-14.10 H.5.9", "Presensi Sekarang", "Berhasil Presensi", "TECHNOPRENEURSHIP 2 SKS",
+            "• KAMIS 12.30-15.00 Kulino").forEach { assertFalse(it, SiadinPresensiRules.isOutsideCard(it)) }
+    }
+
+    @Test
+    fun cleansSingleCardPage() {
+        val clean = SiadinPresensiRules.cleanCardText(singleCardPage)
+        assertTrue(clean, clean.startsWith("KRIPTOGRAFI\nKDMK"))
+        assertTrue(clean, clean.endsWith("Realisasi RPS: Belum Dikonfirmasi"))
+        // Sudah bersih → tidak berubah (aman dipanggil berulang).
+        assertEquals(clean, SiadinPresensiRules.cleanCardText(clean))
+        assertEquals("tanpa kdmk", SiadinPresensiRules.cleanCardText("tanpa kdmk"))
+    }
+
+    @Test
+    fun singleCardOfAnotherCourseIsNotMatched() {
+        // Tanpa dibersihkan, kata "Sistem Informasi" di navbar membuat kartu Kriptografi seolah milik SI.
+        assertTrue(SiadinPresensiRules.wordMatches(singleCardPage, "Sistem Informasi 4507"))
+        // Dengan aturan baru: bukan kartu SI → presensi Kriptografi yang BERHASIL tidak dicatat sebagai SI.
+        assertEquals(emptyList<Int>(), SiadinPresensiRules.pick(listOf(singleCardPage), "Sistem Informasi 4507"))
+        assertEquals(
+            CardStatus.WAITING,
+            SiadinPresensiRules.pageStatus(true, false, listOf(PresensiCard(singleCardPage, "Berhasil Presensi")), "Sistem Informasi 4507"),
+        )
+        // Kartu sendiri tetap dikenali.
+        assertEquals(listOf(0), SiadinPresensiRules.pick(listOf(singleCardPage), "Kriptografi 4502"))
+        assertEquals(listOf(0), SiadinPresensiRules.pick(listOf(singleCardPage), "Kriptografi"))
+        assertEquals(
+            CardStatus.DONE,
+            SiadinPresensiRules.pageStatus(true, false, listOf(PresensiCard(singleCardPage, "Berhasil Presensi")), "Kriptografi 4502"),
+        )
+    }
 }

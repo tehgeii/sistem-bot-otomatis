@@ -50,8 +50,13 @@ object SiadinScripts {
      *
      * Kartu dicari dari SETIAP teks yang memuat "KDMK" (bentuk HTML apa pun: `<span>KDMK:</span>`,
      * `KDMK: <b>A11…</b>`, atau teks langsung di dalam kotak), lalu naik ke pembungkus terbesar yang hanya
-     * memuat satu KDMK. (7 Okt: aturan lama hanya menerima elemen tanpa anak yang diawali "KDMK", sehingga
-     * di halaman asli tidak ada satu kartu pun yang ditemukan.)
+     * memuat satu KDMK — TETAPI berhenti sebelum pembungkus yang memuat isi halaman di luar kartu (judul
+     * "Presensi Kuliah Online", kotak masa studi, menu KRS/KHS/…, "Copyright", tag nav/header/footer/main/aside,
+     * atau teks >1500 huruf). Sisa teks luar yang masih ikut (halaman tanpa pembungkus kartu) dipotong per baris
+     * ([SiadinPresensiRules.cleanCardText] = aturan yang sama, teruji).
+     * (7 Okt: aturan lama hanya menerima elemen tanpa anak yang diawali "KDMK", sehingga di halaman asli tidak
+     * ada satu kartu pun yang ditemukan. 9 Okt: bila hanya ADA SATU kartu, pembungkusnya naik sampai seluruh
+     * halaman — navbar & footer ikut terbaca, kata di header bisa membuat kartu matkul lain dikira milik matkul ini.)
      *
      * Kartu dicocokkan ke matkul jadwal (lihat juga SiadinPresensiRules.matches, aturan yang sama & teruji):
      * 1. kode kelas di nama jadwal (deret ≥4 angka, mis. "MPTI 4515") sama dengan angka di kartu (KLPK A11.4515);
@@ -61,6 +66,39 @@ object SiadinScripts {
     private const val CARDS_JS = """
         function __norm(s){ return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
         function __count(s){ return ((s || '').match(/kdmk/gi) || []).length; }
+        // Isi halaman yang PASTI di luar kartu: judul halaman, kotak masa studi ("4 th 1 bl"), "Belum Ada Presensi",
+        // footer, atau menu akademik (≥2 dari KRS/KHS/Jadwal Ujian/…). Sama dengan SiadinPresensiRules.isOutsideCard.
+        var __MENU = ['krs', 'khs', 'jadwal ujian', 'daftar nilai', 'matrikulasi', 'semester antara', 'presensi online'];
+        function __outside(t){
+          if (/presensi\s*kuliah\s*online|copyright|belum\s*ada\s*presensi|\d+\s*(th|bl|hr)\b/i.test(t || '')) return true;
+          var s = ' ' + __norm(t) + ' ', n = 0;
+          for (var i = 0; i < __MENU.length; i++) if (s.indexOf(' ' + __MENU[i] + ' ') >= 0) n++;
+          return n >= 2 || (n === 1 && __MENU.indexOf(__norm(t)) >= 0);
+        }
+        // Naik dari label KDMK ke pembungkus kartu, berhenti sebelum isi halaman di luar kartu ikut.
+        function __card(label){
+          var card = label;
+          while (true) {
+            var par = card.parentElement;
+            if (!par || par === document.body || par === document.documentElement) break;
+            if (/^(main|header|footer|nav|aside)$/i.test(par.tagName)) break;
+            var pt = par.innerText || par.textContent || '';
+            if (__count(pt) !== 1 || pt.replace(/\s+/g, ' ').length > 1500 || __outside(pt)) break;
+            card = par;
+          }
+          return card;
+        }
+        // Potong baris di luar kartu yang masih ikut (halaman tanpa pembungkus kartu): sebelum KDMK sampai penanda
+        // luar TERAKHIR, sesudah KDMK mulai penanda luar PERTAMA. Sama dengan SiadinPresensiRules.cleanCardText.
+        function __clean(t){
+          var lines = (t || '').split('\n'), k = -1, i;
+          for (i = 0; i < lines.length; i++) if (/kdmk/i.test(lines[i])) { k = i; break; }
+          if (k < 0) return t || '';
+          var from = 0, to = lines.length;
+          for (i = 0; i < k; i++) if (__outside(lines[i])) from = i + 1;
+          for (i = k + 1; i < lines.length; i++) if (__outside(lines[i])) { to = i; break; }
+          return lines.slice(from, to).join('\n');
+        }
         // Elemen terdalam yang teksnya cocok (tahan terhadap <br>/<span> di dalam tombol).
         function __leaf(card, re){
           var all = card.querySelectorAll('*');
@@ -113,20 +151,17 @@ object SiadinScripts {
         function __cards(course){
           var cards = [];
           __labels().forEach(function(l){
-            var card = l;
-            while (card.parentElement && card.parentElement !== document.body && __count(card.parentElement.innerText || card.parentElement.textContent) === 1) {
-              card = card.parentElement;
-            }
+            var card = __card(l);
             if (cards.indexOf(card) < 0) cards.push(card);
           });
           return cards.map(function(card){
-            var t = card.innerText || card.textContent || '';
+            var t = __clean(card.innerText || card.textContent || '');
             var state = /berhasil\s*presensi|sudah\s*presensi/i.test(t) ? 'done'
               : /presensi\s*sekarang/i.test(t) ? 'open'
               : /belum\s*jadwal/i.test(t) ? 'waiting' : 'unknown';
             var btn = __leaf(card, /presensi\s*sekarang/i);
             if (btn && btn.closest) btn = btn.closest('button,a,[role=button]') || btn;
-            return { card: card, el: btn, doneEl: __leaf(card, /berhasil\s*presensi|sudah\s*presensi/i), state: state,
+            return { card: card, text: t, el: btn, doneEl: __leaf(card, /berhasil\s*presensi|sudah\s*presensi/i), state: state,
               code: __codeMatch(t, course), word: __wordMatch(t, course), match: false };
           });
         }
@@ -204,7 +239,7 @@ object SiadinScripts {
     val CARD_TEXTS_SCRIPT = """
         (function(){
           $CARDS_JS
-          return JSON.stringify(__cards('').map(function(c){ return c.card.innerText || c.card.textContent || ''; }));
+          return JSON.stringify(__cards('').map(function(c){ return c.text; }));
         })();
     """
 
@@ -222,7 +257,7 @@ object SiadinScripts {
           var dom = document.body ? (document.body.textContent || '') : '';
           var p = __pick(course);
           var parts = p.all.map(function(c){
-            var name = ((c.card.innerText || '').split(/\n|kdmk/i)[0] || '').trim().slice(0, 40);
+            var name = (c.text.split(/\n|kdmk/i)[0] || '').trim().slice(0, 40);
             return name + '=' + c.state + (c.match ? '*' : '');
           });
           var logged = /\d+\s*(th|bl|hr)\b/i.test(t) ? 'login✓' : 'login✗';

@@ -89,4 +89,17 @@ class KrsParserTest {
         assertTrue(KrsParser.parseCard("SKRIPSI 6 SKS\nKDMK: A11.9 —— KLPK: A11.4999\n• -\n• -").isEmpty())
         assertTrue(KrsParser.parse(listOf("")).isEmpty())
     }
+
+    @Test
+    fun singleCardKrsPageIgnoresMenuAndNavbar() {
+        val page = "SiAdin Sistem Informasi Akademik BUDI\nMasa studi: 4 th 1 bl 9 hr\n" +
+            "KRS KHS Jadwal Ujian Presensi Online Daftar Nilai Matrikulasi Semester Antara\n" + technopreneurship +
+            "\nSiAdin | Copyright © Udinus 2008 - 2026"
+        assertEquals(
+            listOf(CourseData("Technopreneurship 4502", 1, 12 * 60 + 30, 14 * 60 + 10, "H.5.9")),
+            KrsParser.parse(listOf(page)),
+        )
+        // Kartu yang sudah bersih tetap sama hasilnya.
+        assertEquals(KrsParser.parseCard(technopreneurship), KrsParser.parse(listOf(technopreneurship)))
+    }
 }

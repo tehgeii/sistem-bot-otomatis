@@ -146,4 +146,14 @@ class OfficialAttendanceTest {
         assertEquals("28.57", OfficialAttendance.pct(28.57))
         assertEquals("100", OfficialAttendance.pct(100.0))
     }
+
+    @Test
+    fun singleCardPageOnlyCountsItsOwnCourse() {
+        val page = "SiAdin\nSistem Informasi Akademik\nMasa studi: 4 th 1 bl\nPresensi Kuliah Online\nKRIPTOGRAFI\n" +
+            "KDMK: A11.64501\nKLPK: A11.4502\n09 October 2026\n21.43 %\nBelum Jadwalnya\nSiAdin | Copyright © Udinus"
+        assertEquals(
+            mapOf("Kriptografi 4502" to 21.43),
+            OfficialAttendance.match(listOf(page), listOf("Sistem Informasi 4507", "Kriptografi 4502")),
+        )
+    }
 }

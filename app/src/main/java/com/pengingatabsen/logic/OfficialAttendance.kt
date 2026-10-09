@@ -63,7 +63,9 @@ object OfficialAttendance {
      * Kriptografi, dan Technopreneurship), kode hanya untuk memilih bila ada beberapa. Bila tetap beberapa kartu
      * dengan persentase berbeda, matkul itu dilewati (tidak menebak).
      */
-    fun match(cardTexts: List<String>, courseNames: Collection<String>): Map<String, Double> {
+    fun match(rawCardTexts: List<String>, courseNames: Collection<String>): Map<String, Double> {
+        // Navbar/judul/footer yang ikut terbaca dibuang dulu (kata & angka % di luar kartu tidak dipakai).
+        val cardTexts = rawCardTexts.map(SiadinPresensiRules::cleanCardText)
         val out = LinkedHashMap<String, Double>()
         for (name in courseNames.distinct()) {
             val word = cardTexts.indices.filter { SiadinPresensiRules.wordMatches(cardTexts[it], name) }

@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 3.3** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 3.3.1** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -467,6 +467,11 @@ Bila spesifikasi ambigu, dipilih opsi paling sederhana:
 - **Gagal** = token/chat salah atau ditolak Telegram, atau 10 kali percobaan gagal. Saat offline
   status tetap **antre** sampai ada internet.
 - **targetSdk/compileSdk 36** (Android 16).
+- **Batas kartu SiAdin (3.3.1):** kartu = pembungkus terbesar yang hanya memuat satu "KDMK", tetapi tidak
+  pernah ikut memuat isi halaman di luar kartu (judul "Presensi Kuliah Online", kotak masa studi, menu
+  KRS/KHS/…, footer "Copyright", navbar). Sebelumnya, bila halaman hanya berisi SATU kartu, navbar & footer ikut
+  terbaca sebagai isi kartu; kata di header bisa membuat kartu matkul lain (bahkan yang sudah "Berhasil
+  Presensi") dikira milik matkul ini. Aturannya sama di skrip halaman (JS) dan di `SiadinPresensiRules` (Kotlin).
 - **Aturan awal "jangan simpan/isi NIM/password" dicabut oleh pemilik** demi login otomatis SiAdin
   web. Pengisian hanya ke form login asli: tepat satu kolom password yang tampil di layar, kolom
   NIM (nama/id/placeholder berisi `nim`, `user`, `login`, `email`, `induk`), dan tombol
@@ -507,6 +512,7 @@ Butuh JDK 17 dan Android SDK.
 ```bash
 ./gradlew testDebugUnitTest   # unit test
 ./gradlew assembleDebug       # APK debug untuk uji coba sendiri
+node tools/uji-skrip-siadin/uji.mjs   # uji skrip pembaca SiAdin di Chromium (butuh paket playwright)
 ```
 
 GitHub Actions menjalankan unit test, membangun APK, dan memperbarui Release **terbaru** setiap

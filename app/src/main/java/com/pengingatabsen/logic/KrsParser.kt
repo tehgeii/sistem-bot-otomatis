@@ -26,7 +26,9 @@ object KrsParser {
     private val KLPK = Regex("KLPK\\s*:?\\s*\\|?\\s*([A-Z0-9]+(?:\\.[A-Z0-9]+)*)", RegexOption.IGNORE_CASE)
 
     /** Semua jadwal dari teks kartu-kartu KRS (duplikat dibuang). */
-    fun parse(cardTexts: List<String>): List<CourseData> = cardTexts.flatMap(::parseCard).distinct()
+    /** Teks kartu dibersihkan dulu dari navbar/menu/footer yang ikut terbaca ([SiadinPresensiRules.cleanCardText]). */
+    fun parse(cardTexts: List<String>): List<CourseData> =
+        cardTexts.map(SiadinPresensiRules::cleanCardText).flatMap(::parseCard).distinct()
 
     fun parseCard(text: String): List<CourseData> {
         val joined = text.replace("•", " ").lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" | ")

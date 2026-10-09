@@ -50,11 +50,50 @@ object SiadinPresensiRules {
         codeMatches(cardText, courseName) || wordMatches(cardText, courseName)
 
     /**
+     * Teks yang PASTI di luar kartu presensi/KRS (meniru `__outside` di launch/SiadinScripts.kt): judul halaman
+     * "Presensi Kuliah Online", kotak masa studi ("4 th 1 bl 9 hr"), "Belum Ada Presensi", footer "Copyright",
+     * atau menu akademik (≥2 dari KRS/KHS/Jadwal Ujian/…, atau satu baris yang isinya hanya menu itu).
+     */
+    fun isOutsideCard(text: String): Boolean {
+        if (OUTSIDE.containsMatchIn(text)) return true
+        val n = norm(text)
+        val hits = MENU.count { " $n ".contains(" $it ") }
+        return hits >= 2 || (hits == 1 && n in MENU)
+    }
+
+    /**
+     * Buang baris di luar kartu yang ikut terbaca (meniru `__clean`): sebelum baris KDMK sampai penanda luar
+     * TERAKHIR, sesudah KDMK mulai penanda luar PERTAMA. Teks kartu yang sudah bersih tidak berubah.
+     * (9 Okt: di halaman dengan satu kartu, navbar "SiAdin …" & footer ikut terbaca sebagai isi kartu.)
+     */
+    fun cleanCardText(text: String): String {
+        val lines = text.split('\n')
+        val k = lines.indexOfFirst { KDMK.containsMatchIn(it) }
+        if (k < 0) return text
+        var from = 0
+        for (i in 0 until k) if (isOutsideCard(lines[i])) from = i + 1
+        var to = lines.size
+        for (i in k + 1 until lines.size) {
+            if (isOutsideCard(lines[i])) {
+                to = i
+                break
+            }
+        }
+        return lines.subList(from, to).joinToString("\n")
+    }
+
+    private val OUTSIDE = Regex("presensi\\s*kuliah\\s*online|copyright|belum\\s*ada\\s*presensi|\\d+\\s*(th|bl|hr)\\b", RegexOption.IGNORE_CASE)
+    private val KDMK = Regex("kdmk", RegexOption.IGNORE_CASE)
+    private val MENU = listOf("krs", "khs", "jadwal ujian", "daftar nilai", "matrikulasi", "semester antara", "presensi online")
+
+    /**
      * Kartu milik [courseName] di satu halaman (indeks), meniru `__pick` di launch/SiadinScripts.kt.
      * Urutan: kode + nama cocok → nama saja (kode salah ketik) → kode saja bila hanya SATU kartu berkode itu.
      * KLPK bukan kode unik per matkul (mis. 4502 dipakai Technopreneurship, Penambangan Data, Kriptografi).
+     * Teks kartu dibersihkan dulu ([cleanCardText]) supaya kata di navbar/judul halaman tidak ikut dicocokkan.
      */
-    fun pick(cardTexts: List<String>, courseName: String): List<Int> {
+    fun pick(rawCardTexts: List<String>, courseName: String): List<Int> {
+        val cardTexts = rawCardTexts.map(::cleanCardText)
         val code = cardTexts.indices.filter { codeMatches(cardTexts[it], courseName) }
         val word = cardTexts.indices.filter { wordMatches(cardTexts[it], courseName) }
         val both = code.filter { it in word }
