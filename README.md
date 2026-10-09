@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 3.0** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 3.1** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -237,7 +237,7 @@ ruang (opsional). Jadwal berulang tiap minggu dan dikelompokkan per hari.
 
 - **Simpan & tambah lagi**: simpan lalu langsung buka isian baru (hari sama, jam lanjut dari jam
   tutup sebelumnya) — semua matkul bisa diisi sekali duduk.
-- Menu ⋮ tiap matkul: **Duplikat**, **Libur hari ini**, **Lewati minggu ini**,
+- Menu ⋮ tiap matkul: **Kelas pengganti…**, **Duplikat**, **Libur hari ini**, **Lewati minggu ini**,
   **Batalkan libur**, **Hapus**.
 - Saklar di kanan: aktif/nonaktif.
 
@@ -245,6 +245,15 @@ ruang (opsional). Jadwal berulang tiap minggu dan dikelompokkan per hari.
 teman lewat WhatsApp/Telegram, sekalian jadi cadangan) dan **Impor jadwal** (tempel teks → pratinjau
 jumlah matkul baru → Impor). Matkul yang sudah ada (nama + hari + jam sama) dilewati, jadi aman
 diimpor berulang. Teman sekelas cukup impor satu kali, tidak perlu mengetik ulang.
+
+## Kelas pengganti (jadwal dipindah dosen)
+
+Menu **⋮** pada matkul → **Kelas pengganti…** → pilih tanggal, jam buka/tutup, dan ruang. Kelas ini hanya
+terjadi **sekali** pada tanggal itu, dengan nama matkul yang sama (kartu presensi SiAdin tetap dikenali).
+Pengingat, pengecekan SiAdin, layar Hari ini, widget, dan riwayat berjalan seperti biasa. Bila kelas biasa
+minggu itu ikut dipindah, centang **Liburkan jadwal biasa …** (bisa dibatalkan lewat **Batalkan libur**).
+Kelas pengganti tampil di bagian tersendiri di atas daftar jadwal, dan yang sudah lewat hilang sendiri
+setelah 7 hari (riwayatnya tetap). Batal: ⋮ → **Batalkan kelas ini**.
 
 ## Libur massal (UTS/UAS/libur semester)
 
@@ -305,6 +314,56 @@ warna: hijau ≥75%, kuning ≥50%, merah di bawahnya). Libur dan "tidak dibuka 
 bukti yang gagal terkirim tetap dihitung hadir. Tap nama matkul atau chip filter untuk melihat riwayat
 matkul itu saja. Tiap baris punya ikon status (✅ terkirim · 📤 antre · ⚠️ gagal · ❌ terlewat · 🏖 libur ·
 ⏸ tidak dibuka); yang gagal bisa **Kirim ulang**.
+
+**Sisa jatah tidak hadir** (per matkul, di bawah persentase): mis. "Jatah tidak hadir: sisa 2 dari 3". Bawaan
+**14 pertemuan** dan **minimal hadir 75%** → wajib hadir 11, boleh tidak hadir paling banyak **3×**. Atur
+sesuai aturan kampus di *Pengaturan → Kehadiran* (jumlah pertemuan, minimal %, dan **awal semester** supaya
+riwayat semester lalu tidak ikut dihitung). Hanya "terlewat" yang mengurangi jatah. Begitu jatah tinggal 1
+(atau habis), muncul notifikasi + pesan Telegram. Angka ini dari catatan NgiBsen; tetap cek angka resmi
+di SiAdin.
+
+**Grafik kehadiran per minggu** (8 minggu terakhir): kolom bertumpuk ✅ hadir (biru) + ❌ terlewat (oranye).
+Warnanya dipilih supaya tetap terbedakan bagi pengguna buta warna. Tap kolom untuk rinciannya.
+
+**Ekspor** (menu **⋮** di tab Riwayat): **PDF** (siap cetak/kirim: ringkasan per matkul + tabel lengkap
+tanggal, matkul, status, waktu presensi) atau **CSV** untuk Excel/Google Sheets (pemisah titik koma,
+cocok untuk Excel berbahasa Indonesia).
+
+## Pintasan cepat
+
+- **Tile Quick Settings "Presensi"**: tarik panel notifikasi → edit (✏️) → seret tile **Presensi** ke atas.
+  Sekali tap membuka halaman presensi; tile menyala dan bertuliskan **DIBUKA** saat dosen sudah membuka
+  presensi matkul yang sedang berjalan.
+- **Tekan lama ikon NgiBsen**: **Buka presensi** dan **Riwayat**.
+
+## Cadangan & pindah HP
+
+*Pengaturan → Cadangan data* → **Cadangkan**: simpan jadwal (termasuk kelas pengganti), riwayat, dan
+pengaturan ke satu file `.json` (pilih lokasinya, mis. Google Drive). Di HP baru: instal NgiBsen → di
+langkah pertama wizard tekan **Pulihkan dari cadangan** (atau *Pengaturan → Cadangan data → Pulihkan*).
+Semua jadwal & riwayat di HP itu **diganti** isi cadangan, lalu alarm dipasang ulang.
+
+Yang **tidak** ikut (sengaja): NIM/password SiAdin, bot token Telegram (terenkripsi dengan kunci yang terkunci
+di HP lama), dan foto bukti. Isi ulang login SiAdin dan sambungkan bot Telegram lagi setelah memulihkan.
+
+## Peringatan tampilan SiAdin berubah
+
+Bila halaman presensi SiAdin **termuat tapi isinya tidak dikenali** berkali-kali berturut-turut (minimal 4
+pengecekan, di 2 matkul atau 2 hari berbeda), NgiBsen mengirim notifikasi + pesan Telegram **"⚠️ Tampilan
+SiAdin sepertinya berubah"** (maks. sekali sehari). Internet putus atau login ditolak tidak dihitung. Saat itu:
+cek SiAdin sendiri ketika kuliah, lalu kirim **log diagnosis** supaya pengecek bisa diperbaiki.
+
+## Versi baru & keaslian APK
+
+*Pengaturan → Tentang & versi*: versi terpasang dan **sidik jari SHA-256 sertifikat** APK. NgiBsen mengecek
+`versi.json` di Release sehari sekali (±200 byte) dan memberi notifikasi **"⬆️ Versi baru NgiBsen …"** — tap
+untuk membuka halaman unduhan. Aplikasi **tidak pernah** mengunduh atau memasang apa pun sendiri.
+**Cek sekarang** juga membandingkan sidik jari APK di HP dengan rilis resmi: ✅ sama = APK asli dari Release
+repo ini. Sidik jari rilis resmi:
+
+```
+6db7 e5f4 8092 aa56 d8ba 1877 4472 5b93 70aa 46de 8514 29c4 06f9 3bcb 4e24 4aab
+```
 
 ## Bagikan ke teman
 
@@ -390,14 +449,18 @@ Satu modul `app`, MVVM + repository sederhana (service locator `Graph`).
 app/src/main/java/com/pengingatabsen/
 ├── App.kt                  Application + Graph (service locator)
 ├── data/                   Room (Course, AttendanceRecord), DataStore, enkripsi token, Repository
-├── logic/                  ScheduleMath (hitung alarm & pengingat ulang), Formatters (teks Indonesia)
+├── logic/                  Logika murni & teruji: ScheduleMath (alarm, kelas pengganti), CheckerBrain
+│                           (otak pengecek SiAdin), TodayPlan, Readiness, Allowance (jatah tidak hadir),
+│                           BackupCodec, HistoryExport, LayoutWatch, AppUpdate, Formatters
 ├── alarm/                  AlarmScheduler, receiver alarm/aksi/boot, notifikasi, izin
 ├── launch/                 Buka target (LaunchTargetActivity), browser mini SiAdin + login otomatis
 │                           (WebBrowserActivity), share target screenshot
 ├── telegram/               Bot API client (OkHttp) + SendWorker (WorkManager, retry offline)
-├── widget/                 Widget layar utama
-└── ui/                     Compose: jadwal, riwayat, pengaturan, wizard
-app/src/test/…/ScheduleMathTest.kt   Unit test perhitungan waktu
+├── widget/                 Widget layar utama (+ TodayData, sumber bersama widget & tile)
+├── tile/                   Tile Quick Settings "Presensi"
+├── update/                 Pemberitahuan versi baru (versi.json di Release)
+└── ui/                     Compose: jadwal, riwayat (grafik, ekspor), pengaturan, wizard, cadangan
+app/src/test/…/logic/       Unit test semua logika murni
 ```
 
 ## Build sendiri
@@ -417,6 +480,38 @@ Log build juga mencetak **sidik jari SHA-256 sertifikat**; angka ini harus selal
 `HAPUS`, lalu **Run workflow**. Semua riwayat build dihapus permanen kecuali build commit terbaru di `main`.
 Kode, commit, dan Release tidak tersentuh.
 
+## Untuk pemilik repo: kunci tanda tangan & aturan Google
+
+**Cadangkan kunci tanda tangan (WAJIB).** APK ditandatangani dengan keystore yang tersimpan di GitHub Secrets
+(`SIGNING_KEYSTORE_BASE64` + 3 password). Simpan **juga** salinan file `.jks` dan ketiga passwordnya di tempat
+aman di luar GitHub (mis. pengelola password, atau Drive pribadi yang terkunci). Tanpa kunci yang sama, versi
+baru tidak bisa dipasang menimpa yang lama (harus uninstall → data hilang), dan paket tidak bisa didaftarkan
+ke Google. Kunci ini **tidak boleh** di-commit ke repo. Cocokkan dengan sidik jari di atas: sidik jarinya
+harus selalu sama di setiap rilis.
+
+**Verifikasi developer Google** (berlaku di Indonesia sejak 30 Sep 2026):
+- **Sekarang:** aturan ini hanya untuk aplikasi dari toko resmi (Play Store, Galaxy Store, dst.). APK yang dipasang
+  langsung dari Release repo ini **belum terkena**: pasang & update tetap seperti biasa.
+- **Mulai 2027 (tahap global):** memasang/memperbarui aplikasi yang paketnya belum terdaftar hanya bisa lewat
+  **advanced flow** (pengaturan sekali di HP: mode developer, konfirmasi, tunggu 24 jam, lalu izinkan aplikasi
+  tak terverifikasi) atau **ADB**. Bila advanced flow dimatikan, update aplikasi tak terdaftar akan gagal.
+- **Persiapan (gratis):** akun **limited distribution** di Android Developer Console (Google Account dengan
+  verifikasi 2 langkah + profil pembayaran Google; tanpa KTP & tanpa biaya), lalu daftarkan paket
+  `com.pengingatabsen` dengan kunci tanda tangan di atas. Bisa dibagikan ke maksimal 20 perangkat. Kunci
+  hilang = paket tidak bisa didaftarkan.
+
+Sumber: [FAQ verifikasi developer](https://developer.android.com/developer-verification/guides/faq) ·
+[Limited distribution](https://developer.android.com/developer-verification/guides/limited-distribution).
+
+## Daftar uji setelah update
+
+Setelah memasang versi baru, cek sekali:
+1. *Pengaturan → Diagnosis → Tes cek sekarang* → ✅ terbaca.
+2. *Pengaturan → Tentang & versi → Cek sekarang* → "Sudah versi terbaru" dan ✅ sidik jari sama.
+3. *Pengaturan → Cadangan data → Cadangkan* → simpan file (sekalian cadangan pertama).
+4. Layar **Hari ini** & widget menampilkan matkul yang benar; tile **Presensi** bisa dipasang.
+5. Selama seminggu pertama tetap lirik SiAdin sendiri; bila ada yang meleset, kirim **log diagnosis**.
+
 ## Privasi
 
 - Bot token Telegram hanya tersimpan di HP kamu, terenkripsi.
@@ -424,6 +519,9 @@ Kode, commit, dan Release tidak tersentuh.
   di HP kamu, dan hanya diisikan ke halaman login SiAdin. Bisa dihapus kapan saja
   (Pengaturan → SiAdin web → Hapus data login).
 - Data jadwal & riwayat hanya di perangkat; yang keluar hanya pesan bukti ke bot Telegram milikmu.
+- File cadangan & ekspor dibuat hanya saat kamu memintanya, di lokasi yang kamu pilih; isinya jadwal, riwayat,
+  dan pengaturan (tanpa NIM, password, token, atau foto).
+- Pemberitahuan versi baru hanya membaca `versi.json` publik di Release repo (tanpa data apa pun dari HP).
 
 ## Kontributor
 
