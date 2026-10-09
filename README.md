@@ -467,47 +467,35 @@ Jika tawaran simpan tidak muncul, simpan manual: buka **Pengelola Sandi Google**
 
 ---
 
-## Catatan keputusan (hal yang ambigu)
+## Detail cara kerja
 
-Bila spesifikasi ambigu, dipilih opsi paling sederhana:
-
-- **Alarm** memakai `setAlarmClock` untuk semua bunyi (buka, ulang, terakhir, tutup) karena paling
-  tepat waktu dan tidak dibatasi Doze. Efek sampingnya: ikon jam alarm tampil di status bar.
-  Tanpa izin exact alarm, aplikasi memakai `setAndAllowWhileIdle` (bisa telat beberapa menit).
-- **Satu alarm aktif per matkul**; setelah berbunyi, alarm berikutnya dihitung ulang
-  (`ScheduleMath.plan`). Semua alarm dihitung ulang saat reboot, update aplikasi, jam/zona waktu
-  berubah, dan setiap aplikasi dibuka.
-- **Tanpa jam tutup** = jendela 30 menit; notifikasi terakhir tetap muncul 5 menit sebelum
-  (menit ke-25). Jam tutup ≤ jam buka dianggap kosong.
+- **Alarm tepat waktu:** pengingat memakai alarm sistem supaya tidak ditunda penghemat baterai, jadi ikon jam
+  alarm tampil di status bar. Tanpa izin alarm tepat waktu, pengingat bisa telat beberapa menit.
+- Semua alarm dipasang ulang otomatis setelah HP dinyalakan ulang, aplikasi diperbarui, jam/zona waktu berubah,
+  dan setiap NgiBsen dibuka.
+- **Tanpa jam tutup** = 30 menit sejak jam buka; notifikasi terakhir muncul 5 menit sebelum berakhir. Jam tutup
+  yang sama dengan atau lebih awal dari jam buka dianggap kosong.
 - **Tunda 5 menit** tidak pernah melewati notifikasi terakhir.
-- **Absen sekarang** memberi waktu satu interval (default 3 menit) sebelum pengingat berikutnya;
-  pengingat berikutnya menampilkan lagi "Sudah absen?" dengan suara. **Belum** mengembalikan
-  notifikasi utama tanpa suara.
-- Ada tombol tambahan **Libur** di notifikasi (selain dua tombol wajib) agar kuliah kosong bisa
-  dihentikan dengan satu tap.
-- **Libur hari ini** hanya muncul bila matkul memang ada hari ini. **Lewati minggu ini** berlaku
-  untuk minggu berjalan (Senin–Minggu).
-- **Screenshot yang dibagikan** dikaitkan ke: (1) matkul yang sedang dibuka & belum selesai;
-  (2) jika tidak ada, absen yang dikonfirmasi ≤ 2 jam lalu (foto menyusul setelah pesan teks);
-  (3) jika tidak ada, matkul hari ini yang jam bukanya paling dekat; (4) jika tidak ada jadwal
-  hari ini, dicatat sebagai "Tanpa matkul".
-- **Terlewat** juga dicatat jika HP mati sepanjang jendela absen yang sudah berjalan.
-  Menonaktifkan/menghapus matkul saat jendelanya sedang berlangsung mencatatnya sebagai "libur".
-- **Gagal** = token/chat salah atau ditolak Telegram, atau 10 kali percobaan gagal. Saat offline
-  status tetap **antre** sampai ada internet.
-- **targetSdk/compileSdk 36** (Android 16).
-- **Batas kartu SiAdin (3.3.1):** kartu = pembungkus terbesar yang hanya memuat satu "KDMK", tetapi tidak
-  pernah ikut memuat isi halaman di luar kartu (judul "Presensi Kuliah Online", kotak masa studi, menu
-  KRS/KHS/…, footer "Copyright", navbar). Sebelumnya, bila halaman hanya berisi SATU kartu, navbar & footer ikut
-  terbaca sebagai isi kartu; kata di header bisa membuat kartu matkul lain (bahkan yang sudah "Berhasil
-  Presensi") dikira milik matkul ini. Aturannya sama di skrip halaman (JS) dan di `SiadinPresensiRules` (Kotlin).
-- **Aturan awal "jangan simpan/isi NIM/password" dicabut oleh pemilik** demi login otomatis SiAdin
-  web. Pengisian hanya ke form login asli: tepat satu kolom password yang tampil di layar, kolom
-  NIM (nama/id/placeholder berisi `nim`, `user`, `login`, `email`, `induk`), dan tombol
-  **Masuk/Login** — form tersembunyi seperti di menu dashboard diabaikan. Maksimal 2 percobaan per
-  pembukaan; aplikasi tidak pernah menekan tombol presensi.
-- **Browser mini** tampil sebagai Chrome biasa (penanda WebView dihapus dari user agent) supaya
-  website memperlakukannya sama. Cookie sesi disimpan selama website mengizinkan.
+- **Absen sekarang** memberi jeda satu interval (bawaan 3 menit) sebelum pengingat berikutnya, yang menanyakan
+  "Sudah absen?". **Belum** mengembalikan notifikasi utama tanpa suara.
+- Tombol **Libur** di notifikasi menghentikan pengingat kuliah yang kosong dengan satu tap.
+- **Libur hari ini** hanya muncul bila matkul memang ada hari ini. **Lewati minggu ini** berlaku untuk minggu
+  berjalan (Senin–Minggu).
+- **Screenshot yang dibagikan** dikaitkan ke: (1) matkul yang sedang berlangsung & belum selesai; (2) bila tidak
+  ada, absen yang dikonfirmasi ≤ 2 jam lalu (foto menyusul setelah pesan teks); (3) bila tidak ada, matkul hari
+  ini yang jam bukanya paling dekat; (4) bila tidak ada jadwal hari ini, dicatat sebagai "Tanpa matkul".
+  Bukti dari browser mini selalu tercatat ke matkul yang sedang dibuka.
+- **Terlewat** juga dicatat bila HP mati sepanjang jam presensi. Menonaktifkan/menghapus matkul saat jamnya
+  sedang berlangsung mencatatnya sebagai "libur".
+- **Gagal kirim** = token/chat Telegram salah atau ditolak, atau 10 kali percobaan gagal. Saat offline statusnya
+  **antre** sampai ada internet.
+- **Login otomatis** hanya mengisi form login asli SiAdin (kolom NIM, satu kolom password yang tampil, dan tombol
+  Masuk/Login); form tersembunyi diabaikan dan maksimal 2 percobaan tiap halaman dibuka. Tombol presensi tidak
+  pernah ditekan aplikasi.
+- **Browser mini** tampil seperti Chrome biasa supaya SiAdin memperlakukannya sama; sesi login disimpan selama
+  SiAdin mengizinkan.
+- **Pembacaan kartu SiAdin** hanya mengambil isi kartu itu sendiri (tanpa judul halaman, menu, atau footer), jadi
+  kartu matkul lain tidak bisa dikira milik matkulmu.
 
 ---
 
@@ -548,10 +536,6 @@ GitHub Actions menjalankan unit test, membangun APK, dan memperbarui Release **t
 ada perubahan di `main` (berisi `NgiBsen-UDINUS.apk` + `versi.json`: versi, sidik jari sertifikat, dan SHA-256
 file APK untuk pembaruan sekali tap).
 Log build juga mencetak **sidik jari SHA-256 sertifikat**; angka ini harus selalu sama di setiap versi.
-
-**Bersihkan riwayat build lama:** tab **Actions → Bersihkan riwayat build lama → Run workflow**, ketik
-`HAPUS`, lalu **Run workflow**. Semua riwayat build dihapus permanen kecuali build commit terbaru di `main`.
-Kode, commit, dan Release tidak tersentuh.
 
 ## Privasi
 
