@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pintasan saat ikon NgiBsen ditekan lama. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_presensi"
+        android:shortcutId="buka_presensi"
+        android:shortcutLongLabel="@string/shortcut_presensi_long"
+        android:shortcutShortLabel="@string/shortcut_presensi_short">
+        <intent
+            android:action="com.pengingatabsen.BUKA_PRESENSI"
+            android:targetClass="com.pengingatabsen.launch.ShortcutActivity"
+            android:targetPackage="com.pengingatabsen" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_riwayat"
+        android:shortcutId="riwayat"
+        android:shortcutLongLabel="@string/shortcut_riwayat_long"
+        android:shortcutShortLabel="@string/shortcut_riwayat_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.pengingatabsen.ui.MainActivity"
+            android:targetPackage="com.pengingatabsen">
+            <extra
+                android:name="tab"
+                android:value="1" />
+        </intent>
+    </shortcut>
+</shortcuts>

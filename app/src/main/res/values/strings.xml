@@ -6,4 +6,9 @@
     <string name="widget_countdown_prefix">dibuka dalam</string>
     <string name="widget_loading">Memuat…</string>
     <string name="widget_description">Matkul hari ini/berikutnya, status presensi, dan hitung mundur. Tap untuk membuka halaman presensi.</string>
+    <string name="tile_label">Presensi</string>
+    <string name="shortcut_presensi_short">Buka presensi</string>
+    <string name="shortcut_presensi_long">Buka halaman presensi SiAdin</string>
+    <string name="shortcut_riwayat_short">Riwayat</string>
+    <string name="shortcut_riwayat_long">Riwayat &amp; statistik kehadiran</string>
 </resources>

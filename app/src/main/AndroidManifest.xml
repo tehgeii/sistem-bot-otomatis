@@ -63,7 +63,20 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Pintasan saat ikon ditekan lama: Buka presensi, Riwayat -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- Pintasan "Buka presensi": hanya membuka halaman presensi, tanpa mencatat apa pun -->
+        <activity
+            android:name=".launch.ShortcutActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.PengingatAbsen.Transparent" />
 
         <!-- Tombol "Absen sekarang" & widget: buka Dinusverse tanpa menampilkan UI sendiri -->
         <activity
@@ -147,6 +160,18 @@
             android:name=".alarm.PresensiCheckService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Tile Quick Settings "Presensi" -->
+        <service
+            android:name=".tile.PresensiTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_notification"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
     </application>
 </manifest>

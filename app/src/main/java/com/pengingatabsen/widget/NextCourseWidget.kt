@@ -8,13 +8,10 @@ import android.content.Context
 import android.os.SystemClock
 import android.view.View
 import android.widget.RemoteViews
-import com.pengingatabsen.Graph
 import com.pengingatabsen.R
 import com.pengingatabsen.alarm.runAsync
 import com.pengingatabsen.launch.LaunchTargetActivity
 import com.pengingatabsen.logic.Formatters
-import com.pengingatabsen.logic.ScheduleMath
-import com.pengingatabsen.logic.TodayCourse
 import com.pengingatabsen.logic.TodayItem
 import com.pengingatabsen.logic.TodayPlan
 import com.pengingatabsen.logic.TodayState
@@ -72,31 +69,19 @@ class NextCourseWidget : AppWidgetProvider() {
         }
 
         private suspend fun describe(now: LocalDateTime): Display {
-            val settings = Graph.settings.current()
-            val courses = Graph.repository.allCourses().filter { it.active }
-            if (courses.isEmpty()) return Display("Belum ada jadwal", "Tap untuk membuka NgiBsen", null, 0L, 0L)
-            val today = now.toLocalDate().toEpochDay()
-            val records = Graph.db.recordDao().between(today, today).associateBy { it.courseId }
-            val view = TodayPlan.build(
-                courses = courses.map { TodayCourse(it.id, it.name, it.room, it.toSlot()) },
-                now = now,
-                record = { id, day -> if (day == today) records[id]?.status?.toSummaryKind() else null },
-                presensiOpen = { id, day -> "$id:$day" in settings.presensiOpenKeys },
-                graceMinutes = if (settings.smartModeActive) ScheduleMath.SMART_GRACE_MINUTES else 0,
-            )
+            val loaded = TodayData.load(now) ?: return Display("Belum ada jadwal", "Tap untuk membuka NgiBsen", null, 0L, 0L)
+            val view = loaded.view
             // Fokus: yang sedang dibuka > menunggu > berikutnya hari ini > matkul hari lain > yang terakhir hari ini.
-            val focus = view.items.firstOrNull { it.state == TodayState.OPEN }
-                ?: view.items.firstOrNull { it.state == TodayState.WAITING }
-                ?: view.items.firstOrNull { it.state == TodayState.UPCOMING }
-            if (focus != null) return display(focus, now, settings.smartModeActive)
+            loaded.focus?.let { return display(it, now, loaded.smart) }
             view.next?.let { next ->
                 val day = if (next.open.toLocalDate() == now.toLocalDate().plusDays(1)) "Besok" else Formatters.dayName(next.open.dayOfWeek.value)
                 val room = next.room?.let { " · $it" }.orEmpty()
                 val doneToday = view.items.count { it.state == TodayState.DONE }
                 val prefix = if (doneToday > 0) "✅ Hari ini $doneToday presensi beres · " else ""
-                return Display(next.name, "$prefix$day ${Formatters.hm(next.open)}$room", next.open, next.courseId, next.epochDay)
+                // Matkul hari lain: tap cukup membuka halaman presensi (tanpa mencatat apa pun).
+                return Display(next.name, "$prefix$day ${Formatters.hm(next.open)}$room", next.open, 0L, 0L)
             }
-            return view.items.lastOrNull()?.let { display(it, now, settings.smartModeActive) }
+            return view.items.lastOrNull()?.let { display(it, now, loaded.smart) }
                 ?: Display("NgiBsen", "Tap untuk membuka", null, 0L, 0L)
         }
 
@@ -114,7 +99,8 @@ class NextCourseWidget : AppWidgetProvider() {
                 TodayState.ENDED -> "Selesai"
             }
             val countdown = if (item.state == TodayState.UPCOMING) item.open else null
-            return Display(item.name, detail, countdown, item.courseId, item.epochDay)
+            val (courseId, epochDay) = TodayData.launchTarget(item)
+            return Display(item.name, detail, countdown, courseId, epochDay)
         }
     }
 }
