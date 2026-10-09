@@ -553,39 +553,6 @@ Log build juga mencetak **sidik jari SHA-256 sertifikat**; angka ini harus selal
 `HAPUS`, lalu **Run workflow**. Semua riwayat build dihapus permanen kecuali build commit terbaru di `main`.
 Kode, commit, dan Release tidak tersentuh.
 
-## Untuk pemilik repo: kunci tanda tangan & aturan Google
-
-**Cadangkan kunci tanda tangan (WAJIB).** APK ditandatangani dengan keystore yang tersimpan di GitHub Secrets
-(`SIGNING_KEYSTORE_BASE64` + 3 password). Simpan **juga** salinan file `.jks` dan ketiga passwordnya di tempat
-aman di luar GitHub (mis. pengelola password, atau Drive pribadi yang terkunci). Tanpa kunci yang sama, versi
-baru tidak bisa dipasang menimpa yang lama (harus uninstall → data hilang), dan paket tidak bisa didaftarkan
-ke Google. Kunci ini **tidak boleh** di-commit ke repo. Cocokkan dengan sidik jari di atas: sidik jarinya
-harus selalu sama di setiap rilis.
-
-**Verifikasi developer Google** (berlaku di Indonesia sejak 30 Sep 2026):
-- **Sekarang:** aturan ini hanya untuk aplikasi dari toko resmi (Play Store, Galaxy Store, dst.). APK yang dipasang
-  langsung dari Release repo ini **belum terkena**: pasang & update tetap seperti biasa.
-- **Mulai 2027 (tahap global):** memasang/memperbarui aplikasi yang paketnya belum terdaftar hanya bisa lewat
-  **advanced flow** (pengaturan sekali di HP: mode developer, konfirmasi, tunggu 24 jam, lalu izinkan aplikasi
-  tak terverifikasi) atau **ADB**. Bila advanced flow dimatikan, update aplikasi tak terdaftar akan gagal.
-- **Persiapan (gratis):** akun **limited distribution** di Android Developer Console (Google Account dengan
-  verifikasi 2 langkah + profil pembayaran Google; tanpa KTP & tanpa biaya), lalu daftarkan paket
-  `com.pengingatabsen` dengan kunci tanda tangan di atas. Bisa dibagikan ke maksimal 20 perangkat. Kunci
-  hilang = paket tidak bisa didaftarkan.
-
-Sumber: [FAQ verifikasi developer](https://developer.android.com/developer-verification/guides/faq) ·
-[Limited distribution](https://developer.android.com/developer-verification/guides/limited-distribution).
-
-## Daftar uji setelah update
-
-Setelah memasang versi baru, cek sekali:
-1. *Pengaturan → Diagnosis → Tes cek sekarang* → ✅ terbaca.
-2. *Pengaturan → Tentang & versi → Cek sekarang* → "Sudah versi terbaru" dan ✅ sidik jari sama.
-   Bila memperbarui lewat **Perbarui sekarang**, notifikasi **"✅ NgiBsen diperbarui ke …"** muncul setelahnya.
-3. *Pengaturan → Cadangan data → Cadangkan* → simpan file (sekalian cadangan pertama).
-4. Layar **Hari ini** & widget menampilkan matkul yang benar; tile **Presensi** bisa dipasang.
-5. Selama seminggu pertama tetap lirik SiAdin sendiri; bila ada yang meleset, kirim **log diagnosis**.
-
 ## Privasi
 
 - Bot token Telegram hanya tersimpan di HP kamu, terenkripsi.
