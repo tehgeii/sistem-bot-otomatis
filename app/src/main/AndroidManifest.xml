@@ -150,6 +150,11 @@
             android:name=".alarm.PreflightReceiver"
             android:exported="false" />
 
+        <!-- Pengingat sebelum kuliah + cek mode senyap & baterai -->
+        <receiver
+            android:name=".alarm.PreClassReceiver"
+            android:exported="false" />
+
         <receiver
             android:name=".alarm.SystemEventReceiver"
             android:exported="true">

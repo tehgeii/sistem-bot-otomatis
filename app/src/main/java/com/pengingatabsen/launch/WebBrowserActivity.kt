@@ -510,7 +510,7 @@ class WebBrowserActivity : ComponentActivity() {
                 val dir = File(filesDir, "bukti").apply { mkdirs() }
                 val file = File(dir, "bukti_${System.currentTimeMillis()}.jpg")
                 file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
-                Graph.repository.attachPhoto(file.absolutePath, sharedAt)
+                Graph.repository.attachPhoto(file.absolutePath, sharedAt, courseId, epochDay)
             }
             busy = false
             Toast.makeText(this@WebBrowserActivity, "Screenshot ${record.courseName} diantrekan ke Telegram", Toast.LENGTH_LONG).show()

@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 3.3.1** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 3.3.2** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -262,6 +262,35 @@ setelah 7 hari (riwayatnya tetap). Batal: ⋮ → **Batalkan kelas ini**.
 Tab **Jadwal** → menu **⋮** → **Liburkan semua sampai…** → pilih tanggal terakhir libur. Semua
 pengingat berhenti sampai tanggal itu (di atas daftar tampil "🏖 Semua jadwal libur s/d …"), lalu
 otomatis aktif lagi. Mau batal lebih cepat: **⋮ → Aktifkan semua lagi**.
+
+## Penjaga supaya presensi tidak terlewat (3.3.2)
+
+Semua **hanya memberi tahu** — tombol presensi tetap kamu yang tekan. Masing-masing punya sakelar sendiri.
+
+| Fitur | Kapan | Sakelar |
+|---|---|---|
+| **Pengingat sebelum kuliah** — "🔔 Kriptografi 4502 mulai 09:30 (15 menit lagi) · Ruang …" | 10/15/30 menit sebelum setiap kuliah | Pengaturan → Pengingat |
+| **Cek mode senyap & Jangan Ganggu** — HP mode *Senyap* (getar mati) atau Jangan Ganggu menahan NgiBsen → diberi tahu + tombol **Izinkan NgiBsen** / **Atur suara** | ikut pengingat sebelum kuliah, dan sekali lagi saat kuliah dimulai | Pengaturan → Pengingat |
+| **Cek baterai** — baterai ≤15% dan tidak dicas → "cas dulu" | ikut pengingat sebelum kuliah | Pengaturan → Pengingat |
+| **Pesan Telegram cadangan** — presensi sudah dibuka ±5 menit tapi belum ditekan → sekali pesan ke Telegram (ikut muncul di laptop/jam tangan yang login Telegram) | selama jam kuliah (mode pintar) | Pengaturan → Telegram |
+| **Radar presensi di luar jadwal** — presensi matkulmu dibuka di luar jam jadwal NgiBsen (dimajukan, susulan, kelas pengganti yang belum dicatat), atau ada kartu presensi hari ini untuk matkul yang tidak dijadwalkan hari ini | setiap pengecekan + cek ringan tiap ±30 menit di hari kuliah 07.00–17.30 | Pengaturan → SiAdin web |
+| **Jadwal KRS berubah** — hari/jam di KRS SiAdin berbeda dengan jadwal NgiBsen → pemberitahuan + banner **Lihat & terapkan** di layar Jadwal | saat KRS dibaca (ringkasan mingguan / Sinkronkan) | Pengaturan → SiAdin web |
+
+Catatan:
+- **Jangan Ganggu:** aktifkan *Abaikan Jangan Ganggu* di pengaturan notifikasi presensi NgiBsen (tombol
+  **Atur Jangan Ganggu**). Di Android baru, mengizinkan aplikasi lewat *Mode → Jangan Ganggu → Aplikasi* tidak
+  selalu terbaca oleh NgiBsen: tekan **Sudah diizinkan** di notifikasinya supaya tidak diingatkan lagi.
+- **Mode Senyap** mematikan getar notifikasi; pakai mode **Getar** saat kuliah.
+- **Radar** memakai halaman yang memang sudah dibaca pengecekan biasa (tanpa kuota tambahan); cek ringan berkalanya
+  hanya di hari kuliah, tidak saat jam kuliah berlangsung, dan di data seluler paling sering tiap ±1 jam. Tap
+  notifikasi radar membuka halaman presensi dengan tombol disorot; buktinya tercatat ke matkul itu.
+- **Kartu presensi hari ini untuk matkul yang tidak dijadwalkan** → tombol **Tambah kelas pengganti** (jadwal biasa
+  tidak ikut diliburkan secara bawaan) supaya NgiBsen mengecek & mengingatkan seperti biasa.
+- **Jadwal KRS** dibandingkan berdasarkan hari & jam buka saja (jam tutup & ruang sering kamu ubah sendiri).
+  **Terapkan** memindah hari/jam satu jadwal dan menambah matkul baru; matkul yang berubah jadi beberapa jadwal
+  ditandai *ubah manual*. Jadwal yang kamu tambah sendiri (tidak ada di KRS) tidak disentuh.
+- Bukti dari browser mini kini selalu tercatat ke matkul yang dibuka (sebelumnya bisa jatuh ke matkul lain yang
+  sedang aktif bila dibuka dari pintasan/notifikasi lain).
 
 ## Ringkasan mingguan
 
@@ -566,6 +595,8 @@ Setelah memasang versi baru, cek sekali:
 - Data jadwal & riwayat hanya di perangkat; yang keluar hanya pesan bukti ke bot Telegram milikmu.
 - File cadangan & ekspor dibuat hanya saat kamu memintanya, di lokasi yang kamu pilih; isinya jadwal, riwayat,
   dan pengaturan (tanpa NIM, password, token, atau foto).
+- Radar presensi hanya MEMBACA halaman Presensi Online SiAdin (sama seperti pengecekan biasa); pesan Telegram cadangan
+  hanya dikirim ke bot milikmu.
 - Pemberitahuan versi baru hanya membaca `versi.json` publik di Release repo (tanpa data apa pun dari HP);
   pembaruan sekali tap hanya mengunduh APK dari Release repo yang sama dan tidak mengirim apa pun.
 

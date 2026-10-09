@@ -49,6 +49,8 @@ class AlarmReceiver : BroadcastReceiver() {
         val type = if (!LocalDateTime.now().isBefore(occ.end)) EventType.EXPIRE else planned
 
         var record = existing ?: repo.markOccurrence(course, date, RecordStatus.ACTIVE)
+        // Kuliah dimulai: HP masih Senyap/Jangan Ganggu → getar presensi nanti tidak terasa (sekali per kemunculan).
+        if (type == EventType.OPEN) Guards.quietAtStart(context, course, date.toEpochDay())
         // Mode pintar tidak memakai "Sudah absen?": sisa tanda lama tidak boleh menghentikan pengecekan SiAdin.
         if (smartActive && record.awaitingConfirm) {
             record = record.copy(awaitingConfirm = false)

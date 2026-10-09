@@ -24,6 +24,20 @@ class MainViewModel : ViewModel() {
     val settings: StateFlow<AppSettings?> =
         store.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    /** Dialog kelas pengganti yang diminta dari notifikasi radar (id matkul), lalu dikosongkan oleh layar Jadwal. */
+    val replaceRequest = kotlinx.coroutines.flow.MutableStateFlow<Long?>(null)
+    fun requestReplacement(courseId: Long) { if (courseId > 0) replaceRequest.value = courseId }
+
+    /** Terapkan perbedaan jadwal KRS yang bisa diterapkan otomatis; sisanya tetap untuk diubah manual. */
+    fun applyScheduleChanges() = viewModelScope.launch {
+        val changes = store.current().scheduleChanges
+        val applied = repo.applyScheduleChanges(changes)
+        com.pengingatabsen.data.DiagLog.add("jadwal KRS: $applied perubahan diterapkan")
+        store.clearScheduleChanges()
+    }
+
+    fun dismissScheduleChanges() = viewModelScope.launch { store.clearScheduleChanges() }
+
     /** Alarm jam buka yang terlewat (tampil di layar Hari ini). */
     val missedAlarms = kotlinx.coroutines.flow.MutableStateFlow<List<String>>(emptyList())
     fun setMissedAlarms(list: List<String>) { missedAlarms.value = list }

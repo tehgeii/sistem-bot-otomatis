@@ -32,6 +32,7 @@ fun SettingsScreen(vm: SetupViewModel, contentPadding: PaddingValues) {
         StatusSummary(vm)
         SectionTitle("SiAdin web")
         SiadinWebSection(vm)
+        RadarSection(vm)
         HorizontalDivider(Modifier.padding(top = 8.dp))
         SectionTitle("Pengingat")
         VibrateOnlySection(vm)
@@ -48,6 +49,7 @@ fun SettingsScreen(vm: SetupViewModel, contentPadding: PaddingValues) {
             },
             style = MaterialTheme.typography.bodySmall,
         )
+        BeforeClassSection(vm)
         HorizontalDivider(Modifier.padding(top = 8.dp))
         SectionTitle("Telegram (bukti absen)")
         TelegramSection(vm)

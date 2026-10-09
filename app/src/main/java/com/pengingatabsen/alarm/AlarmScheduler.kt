@@ -25,6 +25,8 @@ import java.time.LocalDateTime
 object AlarmScheduler {
     const val ACTION_ALARM = "com.pengingatabsen.ALARM"
     const val ACTION_PREFLIGHT = "com.pengingatabsen.PREFLIGHT"
+    const val ACTION_PRE_CLASS = "com.pengingatabsen.PRE_CLASS"
+    const val EXTRA_OPEN_MILLIS = "open_millis"
     const val EXTRA_COURSE_ID = "course_id"
     const val EXTRA_EPOCH_DAY = "epoch_day"
     const val EXTRA_TYPE = "type"
@@ -91,7 +93,40 @@ object AlarmScheduler {
         com.pengingatabsen.update.UpdateChecker.schedule(context, Graph.settings.current().updateCheck)
         com.pengingatabsen.update.SelfUpdater.cleanup(context)
         schedulePreflight(context)
+        schedulePreClass(context)
+        Graph.settings.current().let { RadarWorker.schedule(context, it.radar && it.smartModeActive) }
     }
+
+    /**
+     * Pasang alarm "sebelum kuliah" berikutnya ([com.pengingatabsen.logic.PreClass]): pengingat N menit sebelum kuliah
+     * mulai, sekaligus cek mode senyap & baterai. Satu alarm untuk semua matkul; dipasang ulang setelah berbunyi.
+     */
+    suspend fun schedulePreClass(context: Context, now: LocalDateTime = LocalDateTime.now()) {
+        val settings = Graph.settings.current()
+        val am = alarmManager(context)
+        val wanted = settings.preClassReminder || settings.quietCheck || settings.batteryCheck
+        val slots = Graph.repository.allCourses().filter { it.active }.map { it.id to it.toSlot() }
+        val next = if (wanted) com.pengingatabsen.logic.PreClass.next(slots, now, settings.preClassLead) else null
+        if (next == null) {
+            am.cancel(preClassIntent(context, 0L))
+            return
+        }
+        val at = next.first
+        val pi = preClassIntent(context, at.plusMinutes(settings.preClassLead.toLong()).toMillis())
+        val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
+        if (canExact) {
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toMillis(), pi)
+        } else {
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toMillis(), pi)
+        }
+    }
+
+    private fun preClassIntent(context: Context, openMillis: Long): PendingIntent =
+        PendingIntent.getBroadcast(
+            context, 2,
+            Intent(context, PreClassReceiver::class.java).setAction(ACTION_PRE_CLASS).putExtra(EXTRA_OPEN_MILLIS, openMillis),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
 
     /**
      * Pasang alarm "cek kesiapan" ±30 menit sebelum matkul pertama hari berikutnya yang ada kuliah

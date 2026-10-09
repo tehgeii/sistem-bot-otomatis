@@ -32,6 +32,8 @@ object Notifications {
     const val CHANNEL_ABSEN_VIBRATE = "absen_dibuka_getar"
     /** Channel biasa untuk info (gagal kirim, dll.). */
     const val CHANNEL_INFO = "info"
+    /** Pengingat sebelum kuliah & peringatan mode senyap/baterai (getar singkat, tanpa layar penuh). */
+    const val CHANNEL_PRE = "sebelum_kuliah"
 
     /** ID notifikasi uji. */
     const val TEST_COURSE_ID = -1L
@@ -63,7 +65,14 @@ object Notifications {
         val info = NotificationChannel(CHANNEL_INFO, "Info", NotificationManager.IMPORTANCE_DEFAULT).apply {
             description = "Status pengiriman bukti ke Telegram"
         }
-        nm.createNotificationChannels(listOf(absen, absenVibrate, info))
+        val pre = NotificationChannel(CHANNEL_PRE, "Sebelum kuliah", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = "Pengingat sebelum kuliah dimulai, peringatan mode senyap & baterai lemah"
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 300, 150, 300)
+            setSound(null, null)
+            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+        }
+        nm.createNotificationChannels(listOf(absen, absenVibrate, info, pre))
     }
 
     fun idFor(courseId: Long): Int = 1000 + (courseId % 1_000_000).toInt()
@@ -175,6 +184,9 @@ object Notifications {
     private const val MISSED_ALARM_ID = 781
     private const val LAYOUT_CHANGED_ID = 782
     private const val UPDATE_ID = 783
+    private const val PRE_CLASS_ID = 784
+    private const val QUIET_ID = 785
+    private const val SCHEDULE_CHANGES_ID = 786
 
     /** Intent ke tab Pengaturan (untuk memperbaiki izin/login). */
     private fun settingsIntent(context: Context, requestCode: Int): PendingIntent =
@@ -291,6 +303,143 @@ object Notifications {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
+    /**
+     * Pengingat sebelum kuliah ([title], mis. "🔔 Kriptografi 4502 mulai 09:30 (15 menit lagi)") beserta peringatan
+     * mode senyap/baterai. [quiet] menentukan tombol perbaikan. Hilang sendiri ±1 jam setelah kuliah mulai.
+     */
+    fun showPreClass(
+        context: Context,
+        title: String,
+        detail: String?,
+        warnings: List<String>,
+        quiet: com.pengingatabsen.logic.QuietIssue?,
+        timeoutMillis: Long,
+    ) {
+        val text = listOfNotNull(detail?.takeIf { it.isNotBlank() }).plus(warnings.map { "⚠️ $it" }).joinToString("\n")
+            .ifBlank { "Siapkan diri — NgiBsen mengecek presensi otomatis saat jam kuliah." }
+        val builder = NotificationCompat.Builder(context, CHANNEL_PRE)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(text.lineSequence().first())
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setAutoCancel(true)
+            .setTimeoutAfter(timeoutMillis.coerceAtLeast(60_000L))
+            .setContentIntent(openApp(context))
+        addQuietActions(context, builder, quiet)
+        notify(context, PRE_CLASS_ID, builder)
+    }
+
+    /** Saat kuliah dimulai HP masih Senyap/Jangan Ganggu: getar presensi tidak akan terasa. */
+    fun showQuietWarning(context: Context, courseName: String, issue: com.pengingatabsen.logic.QuietIssue) {
+        val text = com.pengingatabsen.logic.PhoneCheck.quietText(issue) + ". NgiBsen tetap mengecek presensi $courseName, " +
+            "tapi kamu mungkin tidak merasakan getarnya."
+        val builder = NotificationCompat.Builder(context, CHANNEL_PRE)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("🔕 HP dalam mode senyap: $courseName")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setTimeoutAfter(3 * 60 * 60_000L)
+            .setContentIntent(openApp(context))
+        addQuietActions(context, builder, issue)
+        notify(context, QUIET_ID, builder)
+    }
+
+    private fun addQuietActions(context: Context, builder: NotificationCompat.Builder, quiet: com.pengingatabsen.logic.QuietIssue?) {
+        when (quiet) {
+            com.pengingatabsen.logic.QuietIssue.DND -> {
+                builder.addAction(
+                    0, "Izinkan NgiBsen",
+                    PendingIntent.getActivity(
+                        context, 72, PhoneStatus.dndSettingsIntent(context),
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                    ),
+                )
+                builder.addAction(
+                    0, "Sudah diizinkan",
+                    PendingIntent.getBroadcast(
+                        context, 73,
+                        Intent(context, NotificationActionReceiver::class.java).setAction(NotificationActionReceiver.ACTION_DND_ALLOWED),
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                    ),
+                )
+            }
+            com.pengingatabsen.logic.QuietIssue.SILENT -> builder.addAction(
+                0, "Atur suara",
+                PendingIntent.getActivity(
+                    context, 74, PhoneStatus.soundSettingsIntent(),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
+            null -> Unit
+        }
+    }
+
+    fun cancelQuietNotices(context: Context) {
+        cancelId(context, PRE_CLASS_ID)
+        cancelId(context, QUIET_ID)
+    }
+
+    /**
+     * Radar presensi di luar jadwal. Yang DIBUKA → bergetar seperti presensi biasa, tap membuka halaman presensi
+     * ([courseId]/[epochDay] = matkul jadwal yang cocok, supaya tombolnya disorot & buktinya tercatat ke matkul itu).
+     * Sesi hari ini yang tidak dijadwalkan → info + tombol "Tambah kelas pengganti".
+     */
+    fun showRadar(context: Context, finding: com.pengingatabsen.logic.RadarFinding, courseId: Long?, epochDay: Long, url: String) {
+        val title = com.pengingatabsen.logic.Radar.title(finding)
+        val text = com.pengingatabsen.logic.Radar.text(finding)
+        val id = 9_900 + (finding.key(java.time.LocalDate.ofEpochDay(epochDay.coerceAtLeast(0))).hashCode() and 0x7F)
+        val builder = if (finding.kind == com.pengingatabsen.logic.RadarKind.SESSION_NOT_SCHEDULED_TODAY) {
+            val add = PendingIntent.getActivity(
+                context, id,
+                Intent(context, MainActivity::class.java)
+                    .putExtra(MainActivity.EXTRA_TAB, 0)
+                    .putExtra(MainActivity.EXTRA_REPLACE_COURSE, courseId ?: 0L)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            NotificationCompat.Builder(context, CHANNEL_INFO)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setAutoCancel(true)
+                .setContentIntent(add)
+                .addAction(0, "Tambah kelas pengganti", add)
+        } else {
+            val open = PendingIntent.getActivity(
+                context, id, WebBrowserActivity.intent(context, url, courseId ?: 0L, if (courseId != null) epochDay else 0L),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            base(context, absenChannel(), silent = false)
+                .setOngoing(false)
+                .setAutoCancel(true)
+                .setContentIntent(open)
+                .addAction(0, "Buka presensi", open)
+        }
+        builder.setContentTitle(title).setContentText(text).setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        notify(context, id, builder)
+    }
+
+    /** Jadwal di KRS SiAdin berbeda dengan jadwal NgiBsen. Tap → layar Jadwal (banner "Terapkan"). */
+    fun showScheduleChanges(context: Context, lines: List<String>) {
+        val text = lines.joinToString("\n") { "• $it" } + "\nBuka NgiBsen untuk menerapkan atau mengabaikan."
+        val open = PendingIntent.getActivity(
+            context, 75,
+            Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_TAB, 0)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val builder = NotificationCompat.Builder(context, CHANNEL_INFO)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("📅 Jadwal di SiAdin berubah")
+            .setContentText(lines.first())
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(open)
+            .addAction(0, "Lihat", open)
+        notify(context, SCHEDULE_CHANGES_ID, builder)
+    }
+
     /** Info non-heads-up, mis. gagal mengirim bukti. */
     fun showInfo(context: Context, id: Int, title: String, text: String, action: Pair<String, PendingIntent>? = null) {
         val builder = NotificationCompat.Builder(context, CHANNEL_INFO)
@@ -333,6 +482,12 @@ object Notifications {
     fun cancelId(context: Context, id: Int) {
         NotificationManagerCompat.from(context).cancel(id)
     }
+
+    /** Channel notifikasi presensi yang sedang dipakai (untuk cek & pengaturan Jangan Ganggu). */
+    fun presensiChannel(): String = absenChannel()
+
+    /** Channel presensi untuk pengaturan "Getar saja" [vibrateOnly] (tanpa membaca pengaturan). */
+    fun presensiChannel(vibrateOnly: Boolean): String = if (vibrateOnly) CHANNEL_ABSEN_VIBRATE else CHANNEL_ABSEN
 
     /** Channel absen sesuai pengaturan "Getar saja". */
     private fun absenChannel(): String {

@@ -91,6 +91,32 @@ class Repository(private val db: AppDatabase) {
         return toAdd.size
     }
 
+    /** Jadwal mingguan NgiBsen (id + data) untuk dibandingkan dengan KRS ([com.pengingatabsen.logic.ScheduleDiff]). */
+    suspend fun weeklyForDiff(): List<Pair<Long, CourseData>> =
+        weekly().map { it.id to CourseData(it.name, it.dayOfWeek, it.openMinute, it.closeMinute, it.room, it.active) }
+
+    /**
+     * Terapkan perbedaan jadwal KRS yang bisa diterapkan otomatis: matkul baru ditambah, satu jadwal yang pindah
+     * hari/jam diubah (nama, ruang, status aktif, & riwayat tetap). Mengembalikan jumlah yang diterapkan.
+     */
+    suspend fun applyScheduleChanges(changes: List<com.pengingatabsen.logic.ScheduleChange>): Int {
+        var applied = 0
+        for (c in changes.filter { it.applicable }) {
+            if (c.isNew) {
+                c.after.forEach { s ->
+                    saveCourse(Course(name = c.name, dayOfWeek = s.day, openMinute = s.open, closeMinute = s.close, room = c.room))
+                }
+                applied++
+                continue
+            }
+            val course = courseDao.get(c.appCourseIds.single()) ?: continue
+            val to = c.after.single()
+            saveCourse(course.copy(dayOfWeek = to.day, openMinute = to.open, closeMinute = to.close ?: course.closeMinute))
+            applied++
+        }
+        return applied
+    }
+
     /** Berapa matkul yang akan ditambah bila teks ini diimpor (untuk pratinjau). */
     suspend fun previewImport(text: String): Int {
         val incoming = ScheduleCodec.decode(text)
@@ -264,10 +290,12 @@ class Repository(private val db: AppDatabase) {
      * kalau tidak absen yang sedang dibuka. Null bila tidak ada absen yang bisa dikonfirmasi.
      */
     suspend fun confirmFromBrowser(courseId: Long, epochDay: Long, pressedAt: LocalDateTime): AttendanceRecord? {
-        val record = (if (courseId > 0) recordDao.find(courseId, epochDay) else null)
-            ?.takeIf { it.status == RecordStatus.ACTIVE }
-            ?: recordDao.active().firstOrNull()
-            ?: return null
+        // Browser dibuka untuk matkul tertentu (notifikasi/radar): JANGAN jatuh ke matkul lain yang sedang aktif.
+        val record = if (courseId > 0 && epochDay > 0) {
+            courseRecord(courseId, epochDay, pressedAt)?.takeIf { it.status == RecordStatus.ACTIVE } ?: return null
+        } else {
+            recordDao.active().firstOrNull() ?: return null
+        }
         confirmDone(record, pressedAt)
         Notifications.cancel(Graph.appContext, record.courseId)
         AlarmScheduler.reschedule(Graph.appContext, record.courseId)
@@ -289,13 +317,21 @@ class Repository(private val db: AppDatabase) {
      * atau ke absen yang baru saja dikonfirmasi (maks. 2 jam lalu).
      * Mengembalikan baris riwayat yang akan dikirim.
      */
-    suspend fun attachPhoto(photoPath: String, now: LocalDateTime): AttendanceRecord {
+    suspend fun attachPhoto(photoPath: String, now: LocalDateTime, courseId: Long = 0, epochDay: Long = 0): AttendanceRecord {
         val nowMillis = now.toMillis()
         val active = recordDao.active()
-        val target = active.firstOrNull { nowMillis in it.openAtMillis until it.endAtMillis }
-            ?: active.firstOrNull()
+        // Dari browser yang dibuka untuk matkul tertentu: bukti selalu milik matkul itu (bukan matkul lain yang aktif).
+        val specific = courseId > 0 && epochDay > 0
+        val forCourse = if (specific) courseRecord(courseId, epochDay, now) else null
+        val target = if (forCourse != null) {
+            forCourse.takeIf { it.doneAtMillis == null }
+        } else {
+            active.firstOrNull { nowMillis in it.openAtMillis until it.endAtMillis } ?: active.firstOrNull()
+        }
         val record = when {
             target != null -> target.copy(doneAtMillis = nowMillis, awaitingConfirm = false)
+            // Matkul itu sudah tercatat selesai: foto melengkapi catatan yang sama (dikirim ulang dengan foto).
+            forCourse != null -> forCourse
             else -> recordDao.lastDone()?.takeIf { nowMillis - (it.doneAtMillis ?: 0) <= 2 * 60 * 60 * 1000L }
                 ?: nearestCourseToday(now)?.let { markOccurrence(it, now.toLocalDate(), RecordStatus.QUEUED) }
                     ?.copy(doneAtMillis = nowMillis)
@@ -318,6 +354,32 @@ class Repository(private val db: AppDatabase) {
         }
         SendWorker.enqueue(Graph.appContext, updated.id, SendWorker.KIND_PROOF)
         return updated
+    }
+
+    /**
+     * Catatan [courseId] pada [epochDay]. Belum ada (presensi DI LUAR jadwal, dari radar) → dibuat "berlangsung"
+     * mulai [now] supaya bukti tercatat ke matkul yang benar. Catatan yang sudah ditutup karena dosen tidak membuka
+     * presensi pada jamnya ("tidak dibuka"/"terlewat") dibuka lagi sebagai "berlangsung".
+     */
+    private suspend fun courseRecord(courseId: Long, epochDay: Long, now: LocalDateTime): AttendanceRecord? {
+        val existing = recordDao.find(courseId, epochDay)
+        if (existing != null) {
+            if (existing.status != RecordStatus.NO_SESSION && existing.status != RecordStatus.MISSED) return existing
+            val reopened = existing.copy(status = RecordStatus.ACTIVE, endAtMillis = maxOf(existing.endAtMillis, now.toMillis() + 60 * 60_000L))
+            recordDao.update(reopened)
+            return reopened
+        }
+        val course = courseDao.get(courseId) ?: return null
+        val nowMillis = now.toMillis()
+        val record = AttendanceRecord(
+            courseId = course.id,
+            courseName = course.name,
+            epochDay = epochDay,
+            openAtMillis = nowMillis,
+            endAtMillis = nowMillis + 60 * 60_000L,
+            status = RecordStatus.ACTIVE,
+        )
+        return record.copy(id = recordDao.insert(record))
     }
 
     /** Matkul aktif hari ini yang jam bukanya paling dekat dengan [now]. */
@@ -421,6 +483,9 @@ class Repository(private val db: AppDatabase) {
             Notifications.cancel(context, courseId)
         }
         NextCourseWidget.updateAll(context)
+        // Jam kuliah berubah → alarm "sebelum kuliah" & cek kesiapan ikut dihitung ulang.
+        AlarmScheduler.schedulePreClass(context)
+        AlarmScheduler.schedulePreflight(context)
     }
 }
 

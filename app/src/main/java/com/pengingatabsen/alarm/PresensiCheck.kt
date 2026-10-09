@@ -76,8 +76,11 @@ object PresensiCheck {
         ) { DiagLog.add("kesiapan ${course.name}: $it") }
         DiagLog.add("kesiapan HASIL ${course.name}: ${result.state} — ${result.detail}")
         // Persentase resmi di kartu hari ini (tanpa kuota tambahan) = angka "sebelum presensi" hari ini.
-        com.pengingatabsen.data.OfficialSync.absorb(ctx, com.pengingatabsen.data.OfficialSync.cardTexts(result.extracted))
+        val preflightCards = com.pengingatabsen.data.OfficialSync.cardTexts(result.extracted)
+        com.pengingatabsen.data.OfficialSync.absorb(ctx, preflightCards)
         SiadinHealth.record(ctx, course.id, occ.date.toEpochDay(), result)
+        // Radar: kartu matkul lain yang sudah dibuka/ada sesi hari ini di luar jadwal NgiBsen.
+        Guards.radar(ctx, preflightCards)
         when (result.state) {
             PresensiState.WAITING, PresensiState.OPEN, PresensiState.DONE -> Unit
             PresensiState.LOGIN_FAILED -> problems.add(0, "login SiAdin ditolak — perbarui NIM/password")
@@ -166,7 +169,10 @@ object PresensiCheck {
         val state = result.state
         // Kehadiran resmi: angka SEBELUM pengecekan ini diingat untuk memastikan presensi tercatat.
         val officialBefore = store.officialSnapshots()[course.name]?.percent
-        val official = com.pengingatabsen.data.OfficialSync.absorb(ctx, com.pengingatabsen.data.OfficialSync.cardTexts(result.extracted))
+        val cardTexts = com.pengingatabsen.data.OfficialSync.cardTexts(result.extracted)
+        val official = com.pengingatabsen.data.OfficialSync.absorb(ctx, cardTexts)
+        // Radar: halaman yang sama juga memperlihatkan kartu matkul LAIN (dibuka di luar jadwalnya?).
+        Guards.radar(ctx, cardTexts)
         if (state == PresensiState.DONE) {
             com.pengingatabsen.data.OfficialSync.afterCheckerDone(ctx, course.name, officialBefore, official[course.name])
         }
@@ -211,6 +217,8 @@ object PresensiCheck {
             PresensiState.OPEN -> {
                 store.setPresensiUnknownStreak(courseId, epochDay, 0)
                 store.markPresensiOpen(courseId, epochDay)
+                // Waktu pertama terlihat dibuka (sekali) → dasar pesan Telegram cadangan ±5 menit kemudian.
+                store.markPresensiOpenedAt(courseId, epochDay, System.currentTimeMillis())
                 // Hapus dulu notifikasi senyap supaya yang baru diposting ulang & pasti bergetar.
                 Notifications.cancel(ctx, courseId)
                 // Layar penuh hanya di momen ini: kartu baru saja berubah menjadi "Presensi Sekarang".
@@ -234,6 +242,7 @@ object PresensiCheck {
                 }
                 // Sudah dibuka: kembali ke interval pengingat pengguna (bukan cek tiap menit).
                 AlarmScheduler.reschedule(ctx, courseId)
+                Guards.nudgeIfDue(ctx, course, epochDay)
             }
             PresensiState.UNKNOWN, PresensiState.LOGIN_FAILED -> {
                 // Login ditolak (NIM/password berubah?): beri tahu sekali sehari, pengingat tetap jalan.
@@ -253,6 +262,7 @@ object PresensiCheck {
                     // Presensi sudah terlihat dibuka: pengingat tetap jalan walau cek kali ini gagal.
                     Notifications.cancel(ctx, courseId)
                     Notifications.showReminder(ctx, course, record, final = false, sessionOpen = true)
+                    Guards.nudgeIfDue(ctx, course, epochDay)
                 } else if (type == EventType.OPEN) {
                     // Pengecekan pertama gagal: tampilkan status menunggu (senyap) agar notifikasi tetap ada.
                     Notifications.showReminder(ctx, course, record, final = false, waiting = true)

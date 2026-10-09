@@ -63,6 +63,23 @@ data class AppSettings(
     val semesterStartEpochDay: Long? = null,
     /** Persentase kehadiran resmi SiAdin terakhir per nama jadwal. */
     val official: Map<String, com.pengingatabsen.logic.OfficialSnapshot> = emptyMap(),
+    /** Pesan Telegram cadangan bila presensi sudah dibuka ±5 menit tapi belum ditekan. */
+    val telegramNudge: Boolean = true,
+    /** Peringatan bila HP mode Senyap / Jangan Ganggu sebelum & saat kuliah dimulai. */
+    val quietCheck: Boolean = true,
+    /** Pengguna menyatakan NgiBsen sudah diizinkan menembus Jangan Ganggu. */
+    val dndAllowed: Boolean = false,
+    /** Peringatan baterai lemah sebelum kuliah. */
+    val batteryCheck: Boolean = true,
+    /** Pengingat biasa beberapa menit sebelum kuliah mulai. */
+    val preClassReminder: Boolean = true,
+    val preClassLead: Int = com.pengingatabsen.logic.PreClass.DEFAULT_LEAD,
+    /** Radar presensi di luar jadwal (kartu lain yang terbaca + cek ringan berkala di hari kuliah). */
+    val radar: Boolean = true,
+    /** Beri tahu bila jadwal di KRS SiAdin berbeda dengan jadwal NgiBsen. */
+    val scheduleDiffCheck: Boolean = true,
+    /** Perbedaan jadwal KRS ↔ NgiBsen yang belum diterapkan/diabaikan. */
+    val scheduleChanges: List<com.pengingatabsen.logic.ScheduleChange> = emptyList(),
 ) {
     val attendanceRule: com.pengingatabsen.logic.AttendanceRule
         get() = com.pengingatabsen.logic.AttendanceRule(meetingsPerSemester, minAttendancePercent)
@@ -131,6 +148,22 @@ class SettingsStore(private val context: Context) {
         val OFFICIAL_WARNED = stringSetPreferencesKey("official_warned")
         /** versionCode terbaru yang sudah diberitahukan (agar notifikasi versi baru tidak berulang). */
         val UPDATE_NOTIFIED_CODE = longPreferencesKey("update_notified_code")
+        val TELEGRAM_NUDGE = booleanPreferencesKey("telegram_nudge")
+        val QUIET_CHECK = booleanPreferencesKey("quiet_check")
+        val DND_ALLOWED = booleanPreferencesKey("dnd_allowed")
+        val BATTERY_CHECK = booleanPreferencesKey("battery_check")
+        val PRE_CLASS = booleanPreferencesKey("pre_class_reminder")
+        val PRE_CLASS_LEAD = intPreferencesKey("pre_class_lead")
+        val RADAR = booleanPreferencesKey("radar")
+        val RADAR_LAST_RUN = longPreferencesKey("radar_last_run")
+        val SCHEDULE_DIFF_CHECK = booleanPreferencesKey("schedule_diff_check")
+        /** Perbedaan jadwal KRS yang menunggu keputusan (JSON) & sidik perbedaan terakhir yang sudah diberitahukan. */
+        val SCHEDULE_CHANGES = stringPreferencesKey("schedule_changes")
+        val SCHEDULE_CHANGES_SEEN = stringPreferencesKey("schedule_changes_seen")
+        /** Kapan presensi pertama kali terlihat dibuka ("courseId:epochDay:millis"). */
+        val PRESENSI_OPENED_AT = stringSetPreferencesKey("presensi_opened_at")
+        /** Pemberitahuan sekali-saja yang sudah dikirim (Telegram cadangan, radar, mode senyap). */
+        val NOTICES = stringSetPreferencesKey("notices_sent")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -141,8 +174,9 @@ class SettingsStore(private val context: Context) {
     private val backupBooleans = listOf(
         Keys.VIBRATE_ONLY, Keys.AUTO_LOGIN, Keys.SMART_PRESENSI, Keys.FULL_SCREEN_ALERT,
         Keys.WEEKLY_SUMMARY, Keys.READINESS_CHECK, Keys.UPDATE_CHECK, Keys.UPDATE_AUTO_DOWNLOAD,
+        Keys.TELEGRAM_NUDGE, Keys.QUIET_CHECK, Keys.BATTERY_CHECK, Keys.PRE_CLASS, Keys.RADAR, Keys.SCHEDULE_DIFF_CHECK,
     )
-    private val backupInts = listOf(Keys.REMIND_INTERVAL, Keys.MEETINGS, Keys.MIN_PERCENT)
+    private val backupInts = listOf(Keys.REMIND_INTERVAL, Keys.MEETINGS, Keys.MIN_PERCENT, Keys.PRE_CLASS_LEAD)
     private val backupLongs = listOf(Keys.SEMESTER_START)
     private val backupStrings = listOf(Keys.TARGET_PACKAGE, Keys.TARGET_LABEL, Keys.DEEP_LINK)
 
@@ -176,7 +210,13 @@ class SettingsStore(private val context: Context) {
         p[Keys.REMIND_INTERVAL]?.let { p[Keys.REMIND_INTERVAL] = it.coerceIn(1, 30) }
         p[Keys.MEETINGS]?.let { p[Keys.MEETINGS] = it.coerceIn(MEETINGS_RANGE) }
         p[Keys.MIN_PERCENT]?.let { p[Keys.MIN_PERCENT] = it.coerceIn(0, 100) }
+        p[Keys.PRE_CLASS_LEAD]?.let { if (it !in com.pengingatabsen.logic.PreClass.LEAD_CHOICES) p.remove(Keys.PRE_CLASS_LEAD) }
         p.remove(Keys.PRESENSI_OPEN)
+        p.remove(Keys.PRESENSI_OPENED_AT)
+        p.remove(Keys.NOTICES)
+        // Id matkul berganti setelah pemulihan: perbedaan jadwal lama tidak berlaku lagi.
+        p.remove(Keys.SCHEDULE_CHANGES)
+        p.remove(Keys.SCHEDULE_CHANGES_SEEN)
         p.remove(Keys.ARMED)
         p.remove(Keys.MISSED_REPORTED)
         p.remove(Keys.LAYOUT_SUSPECTS)
@@ -214,7 +254,88 @@ class SettingsStore(private val context: Context) {
         minAttendancePercent = this[Keys.MIN_PERCENT] ?: com.pengingatabsen.logic.AttendanceRule.DEFAULT_MIN_PERCENT,
         semesterStartEpochDay = this[Keys.SEMESTER_START],
         official = com.pengingatabsen.logic.OfficialAttendance.decode(this[Keys.OFFICIAL]),
+        telegramNudge = this[Keys.TELEGRAM_NUDGE] ?: true,
+        quietCheck = this[Keys.QUIET_CHECK] ?: true,
+        dndAllowed = this[Keys.DND_ALLOWED] ?: false,
+        batteryCheck = this[Keys.BATTERY_CHECK] ?: true,
+        preClassReminder = this[Keys.PRE_CLASS] ?: true,
+        preClassLead = this[Keys.PRE_CLASS_LEAD]?.takeIf { it in com.pengingatabsen.logic.PreClass.LEAD_CHOICES }
+            ?: com.pengingatabsen.logic.PreClass.DEFAULT_LEAD,
+        radar = this[Keys.RADAR] ?: true,
+        scheduleDiffCheck = this[Keys.SCHEDULE_DIFF_CHECK] ?: true,
+        scheduleChanges = com.pengingatabsen.logic.ScheduleDiff.decode(this[Keys.SCHEDULE_CHANGES]),
     )
+
+    suspend fun setTelegramNudge(enabled: Boolean) = context.dataStore.edit { it[Keys.TELEGRAM_NUDGE] = enabled }
+    suspend fun setQuietCheck(enabled: Boolean) = context.dataStore.edit { it[Keys.QUIET_CHECK] = enabled }
+    suspend fun setDndAllowed(allowed: Boolean) = context.dataStore.edit { it[Keys.DND_ALLOWED] = allowed }
+    suspend fun setBatteryCheck(enabled: Boolean) = context.dataStore.edit { it[Keys.BATTERY_CHECK] = enabled }
+    suspend fun setPreClass(enabled: Boolean) = context.dataStore.edit { it[Keys.PRE_CLASS] = enabled }
+    suspend fun setPreClassLead(minutes: Int) = context.dataStore.edit {
+        it[Keys.PRE_CLASS_LEAD] = minutes.takeIf { m -> m in com.pengingatabsen.logic.PreClass.LEAD_CHOICES }
+            ?: com.pengingatabsen.logic.PreClass.DEFAULT_LEAD
+    }
+    suspend fun setRadar(enabled: Boolean) = context.dataStore.edit { it[Keys.RADAR] = enabled }
+    suspend fun setScheduleDiffCheck(enabled: Boolean) = context.dataStore.edit {
+        it[Keys.SCHEDULE_DIFF_CHECK] = enabled
+        if (!enabled) it.remove(Keys.SCHEDULE_CHANGES)
+    }
+
+    suspend fun radarLastRun(): Long = context.dataStore.data.first()[Keys.RADAR_LAST_RUN] ?: 0L
+    suspend fun setRadarLastRun(millis: Long) = context.dataStore.edit { it[Keys.RADAR_LAST_RUN] = millis }
+
+    /**
+     * Simpan perbedaan jadwal KRS terbaru. True bila perbedaan ini BARU (belum pernah diberitahukan) → beri tahu.
+     * Kosong = jadwal sudah sama, yang tertunda dihapus.
+     */
+    suspend fun putScheduleChanges(changes: List<com.pengingatabsen.logic.ScheduleChange>): Boolean {
+        var fresh = false
+        context.dataStore.edit { p ->
+            if (changes.isEmpty()) {
+                p.remove(Keys.SCHEDULE_CHANGES)
+                p.remove(Keys.SCHEDULE_CHANGES_SEEN)
+                return@edit
+            }
+            val sig = com.pengingatabsen.logic.ScheduleDiff.signature(changes)
+            p[Keys.SCHEDULE_CHANGES] = com.pengingatabsen.logic.ScheduleDiff.encode(changes)
+            if (p[Keys.SCHEDULE_CHANGES_SEEN] != sig) {
+                p[Keys.SCHEDULE_CHANGES_SEEN] = sig
+                fresh = true
+            }
+        }
+        return fresh
+    }
+
+    /** Perbedaan sudah diterapkan/diabaikan: banner hilang; perbedaan yang sama tidak diberitahukan lagi. */
+    suspend fun clearScheduleChanges() = context.dataStore.edit { it.remove(Keys.SCHEDULE_CHANGES) }
+
+    /** Catat kapan presensi kemunculan ini pertama kali terlihat dibuka (sekali; dibersihkan setelah 7 hari). */
+    suspend fun markPresensiOpenedAt(courseId: Long, epochDay: Long, millis: Long) = context.dataStore.edit { p ->
+        val prefix = "$courseId:$epochDay:"
+        val set = p[Keys.PRESENSI_OPENED_AT] ?: emptySet()
+        if (set.any { it.startsWith(prefix) }) return@edit
+        p[Keys.PRESENSI_OPENED_AT] = set.filter { (it.split(':').getOrNull(1)?.toLongOrNull() ?: 0L) >= epochDay - 7 }.toSet() +
+            (prefix + millis)
+    }
+
+    suspend fun presensiOpenedAt(courseId: Long, epochDay: Long): Long? {
+        val prefix = "$courseId:$epochDay:"
+        return context.dataStore.data.first()[Keys.PRESENSI_OPENED_AT]
+            ?.firstOrNull { it.startsWith(prefix) }?.removePrefix(prefix)?.toLongOrNull()
+    }
+
+    /** True bila pemberitahuan sekali-saja [key] belum pernah dikirim (lalu menandainya). Maks. 300 kunci. */
+    suspend fun claimNotice(key: String): Boolean {
+        var claimed = false
+        context.dataStore.edit { p ->
+            val set = p[Keys.NOTICES] ?: emptySet()
+            if (key !in set) {
+                p[Keys.NOTICES] = (set.toList().takeLast(299) + key).toSet()
+                claimed = true
+            }
+        }
+        return claimed
+    }
 
     suspend fun setReadinessCheck(enabled: Boolean) = context.dataStore.edit { it[Keys.READINESS_CHECK] = enabled }
 

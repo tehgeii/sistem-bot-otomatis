@@ -46,6 +46,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedTab = intent.getIntExtra(EXTRA_TAB, -1)
+        vm.requestReplacement(intent.getLongExtra(EXTRA_REPLACE_COURSE, 0L))
         enableEdgeToEdge()
         setContent {
             PengingatTheme {
@@ -104,6 +105,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         requestedTab = intent.getIntExtra(EXTRA_TAB, -1)
+        vm.requestReplacement(intent.getLongExtra(EXTRA_REPLACE_COURSE, 0L))
     }
 
     override fun onResume() {
@@ -119,6 +121,8 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_TAB = "tab"
+        /** Buka dialog kelas pengganti untuk matkul ini (dari radar "ada sesi hari ini"). */
+        const val EXTRA_REPLACE_COURSE = "replace_course"
         const val TAB_SETTINGS = 2
     }
 }

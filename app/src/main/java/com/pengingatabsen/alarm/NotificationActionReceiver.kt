@@ -18,6 +18,16 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val epochDay = intent.getLongExtra(AlarmScheduler.EXTRA_EPOCH_DAY, 0L)
         val action = intent.action ?: return
 
+        if (action == ACTION_DND_ALLOWED) {
+            // NgiBsen sudah diizinkan di pengaturan Jangan Ganggu (Android baru menyimpannya di "Mode"):
+            // berhenti memperingatkan Jangan Ganggu (mode Senyap & baterai tetap dicek).
+            runAsync {
+                Graph.settings.setDndAllowed(true)
+                Notifications.cancelQuietNotices(context)
+                com.pengingatabsen.data.DiagLog.add("pengguna: NgiBsen sudah diizinkan menembus Jangan Ganggu")
+            }
+            return
+        }
         if (action == ACTION_RESEND) {
             val recordId = intent.getLongExtra(EXTRA_RECORD_ID, -1)
             runAsync { Graph.repository.resend(recordId) }
@@ -82,6 +92,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
         const val ACTION_DONE = "com.pengingatabsen.DONE"
         const val ACTION_NOT_YET = "com.pengingatabsen.NOT_YET"
         const val ACTION_RESEND = "com.pengingatabsen.RESEND"
+        const val ACTION_DND_ALLOWED = "com.pengingatabsen.DND_ALLOWED"
         const val EXTRA_RECORD_ID = "record_id"
     }
 }

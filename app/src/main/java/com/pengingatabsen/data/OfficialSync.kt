@@ -104,7 +104,10 @@ object OfficialSync {
             courseName = "",
             extractScript = SiadinScripts.CARD_TEXTS_SCRIPT,
         ) { DiagLog.add("sinkron kehadiran: $it") }
-        val found = absorb(context, cardTexts(result.extracted))
+        val texts = cardTexts(result.extracted)
+        val found = absorb(context, texts)
+        // KRS yang sama: apakah hari/jam kuliah di SiAdin berbeda dengan jadwal NgiBsen?
+        com.pengingatabsen.alarm.Guards.checkScheduleChanges(context, texts)
         return when {
             found.isNotEmpty() -> "${found.size} matkul diperbarui dari SiAdin."
             result.state == PresensiState.LOGIN_FAILED -> "Login SiAdin ditolak. Perbarui NIM/password."

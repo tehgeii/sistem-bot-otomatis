@@ -30,6 +30,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -185,6 +186,21 @@ fun ScheduleScreen(vm: MainViewModel, contentPadding: PaddingValues, onOpenSetti
     var editing by remember { mutableStateOf<Course?>(null) }
     var deleting by remember { mutableStateOf<Course?>(null) }
     var replacing by remember { mutableStateOf<Course?>(null) }
+    var showChanges by remember { mutableStateOf(false) }
+    // Dari radar: sesi TAMBAHAN hari ini → jadwal biasa jangan ikut diliburkan secara bawaan.
+    var replacingExtra by remember { mutableStateOf(false) }
+    val settings by vm.settings.collectAsState()
+    val changes = settings?.scheduleChanges.orEmpty()
+
+    // Dari notifikasi radar "ada sesi hari ini": langsung buka dialog kelas pengganti matkul itu.
+    val replaceRequest by vm.replaceRequest.collectAsState()
+    LaunchedEffect(replaceRequest, courses) {
+        val id = replaceRequest ?: return@LaunchedEffect
+        val target = courses?.firstOrNull { it.id == id } ?: return@LaunchedEffect
+        replacing = target
+        replacingExtra = true
+        vm.replaceRequest.value = null
+    }
 
     Scaffold(
         modifier = Modifier.padding(contentPadding),
@@ -211,6 +227,17 @@ fun ScheduleScreen(vm: MainViewModel, contentPadding: PaddingValues, onOpenSetti
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
             ) {
                 item(key = "today") { TodayCard(vm, onOpenSettings) }
+                if (changes.isNotEmpty()) {
+                    item(key = "krs-changes") {
+                        Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                            Column(Modifier.padding(16.dp)) {
+                                Text("📅 Jadwal di SiAdin berubah (${changes.size})", style = MaterialTheme.typography.titleSmall)
+                                Text(changes.first().describe(), style = MaterialTheme.typography.bodySmall)
+                                TextButton(onClick = { showChanges = true }) { Text("Lihat & terapkan") }
+                            }
+                        }
+                    }
+                }
                 val weekly = list.filter { !it.isOneOff }
                 val oneOffs = list.filter { it.isOneOff }.sortedWith(compareBy({ it.oneOffEpochDay }, { it.openMinute }))
                 val pausedUntil = ScheduleMath.allPausedUntil(weekly.filter { it.active }.map { it.skipUntil }, LocalDate.now())
@@ -292,10 +319,38 @@ fun ScheduleScreen(vm: MainViewModel, contentPadding: PaddingValues, onOpenSetti
         )
     }
 
+    if (showChanges && changes.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { showChanges = false },
+            title = { Text("Jadwal di KRS SiAdin berubah") },
+            text = {
+                Column {
+                    changes.forEach { Text("• " + it.describe(), style = MaterialTheme.typography.bodyMedium) }
+                    Text(
+                        "\"Terapkan\" mengubah hari & jam (dan menambah matkul baru) sesuai KRS. Yang bertanda " +
+                            "\"ubah manual\" diubah sendiri lewat Ubah jadwal. Riwayat tidak berubah.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = changes.any { it.applicable },
+                    onClick = { vm.applyScheduleChanges(); showChanges = false },
+                ) { Text("Terapkan") }
+            },
+            dismissButton = {
+                TextButton(onClick = { vm.dismissScheduleChanges(); showChanges = false }) { Text("Abaikan") }
+            },
+        )
+    }
+
     replacing?.let { source ->
-        ReplacementDialog(source, onDismiss = { replacing = null }) { draft ->
+        ReplacementDialog(source, skipRegularByDefault = !replacingExtra, onDismiss = { replacing = null; replacingExtra = false }) { draft ->
             vm.addReplacement(source, draft)
             replacing = null
+            replacingExtra = false
         }
     }
 

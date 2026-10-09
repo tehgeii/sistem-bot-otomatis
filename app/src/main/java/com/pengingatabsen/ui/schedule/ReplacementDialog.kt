@@ -55,7 +55,13 @@ data class ReplacementDraft(
  * Nama matkul sama persis, jadi kartu presensi SiAdin tetap dikenali.
  */
 @Composable
-fun ReplacementDialog(source: Course, onDismiss: () -> Unit, onSave: (ReplacementDraft) -> Unit) {
+fun ReplacementDialog(
+    source: Course,
+    /** false = sesi tambahan (dari radar): jadwal biasa tidak dicentang untuk diliburkan. */
+    skipRegularByDefault: Boolean = true,
+    onDismiss: () -> Unit,
+    onSave: (ReplacementDraft) -> Unit,
+) {
     val context = LocalContext.current
     val now = remember { LocalDateTime.now() }
     var date by remember { mutableStateOf(now.toLocalDate()) }
@@ -68,7 +74,7 @@ fun ReplacementDialog(source: Course, onDismiss: () -> Unit, onSave: (Replacemen
     // Kelas yang sedang berlangsung hari ini tidak dicentang otomatis (meliburkannya menghentikan pengingat
     // yang sedang berjalan); pengguna mencentang sendiri bila memang kelas hari ini yang dipindah.
     val ongoing = replaced != null && ScheduleMath.currentOccurrence(source.toSlot(), now)?.date == replaced
-    var skipRegular by remember(replaced) { mutableStateOf(!ongoing) }
+    var skipRegular by remember(replaced) { mutableStateOf(!ongoing && skipRegularByDefault) }
     val closeInvalid = close != null && close!! <= open
     val end = ScheduleMath.occurrenceOn(com.pengingatabsen.logic.Slot(date.dayOfWeek.value, open, close), date).end
     val alreadyOver = !end.isAfter(LocalDateTime.now())

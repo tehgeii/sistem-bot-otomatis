@@ -93,6 +93,37 @@ class SetupViewModel : ViewModel() {
 
     fun setUpdateAutoDownload(enabled: Boolean) = viewModelScope.launch { store.setUpdateAutoDownload(enabled) }
 
+    // ---------- Penjaga presensi (3.3.2) ----------
+
+    fun setTelegramNudge(enabled: Boolean) = viewModelScope.launch { store.setTelegramNudge(enabled) }
+    fun setDndAllowed(allowed: Boolean) = viewModelScope.launch { store.setDndAllowed(allowed) }
+    fun setScheduleDiffCheck(enabled: Boolean) = viewModelScope.launch { store.setScheduleDiffCheck(enabled) }
+
+    fun setPreClass(enabled: Boolean, context: Context) = viewModelScope.launch {
+        store.setPreClass(enabled)
+        com.pengingatabsen.alarm.AlarmScheduler.schedulePreClass(context.applicationContext)
+    }
+
+    fun setPreClassLead(minutes: Int, context: Context) = viewModelScope.launch {
+        store.setPreClassLead(minutes)
+        com.pengingatabsen.alarm.AlarmScheduler.schedulePreClass(context.applicationContext)
+    }
+
+    fun setQuietCheck(enabled: Boolean, context: Context) = viewModelScope.launch {
+        store.setQuietCheck(enabled)
+        com.pengingatabsen.alarm.AlarmScheduler.schedulePreClass(context.applicationContext)
+    }
+
+    fun setBatteryCheck(enabled: Boolean, context: Context) = viewModelScope.launch {
+        store.setBatteryCheck(enabled)
+        com.pengingatabsen.alarm.AlarmScheduler.schedulePreClass(context.applicationContext)
+    }
+
+    fun setRadar(enabled: Boolean, context: Context) = viewModelScope.launch {
+        store.setRadar(enabled)
+        com.pengingatabsen.alarm.RadarWorker.schedule(context.applicationContext, enabled && store.current().smartModeActive)
+    }
+
     // ---------- Cadangan & pulihkan (pindah HP) ----------
 
     sealed class BackupUi {

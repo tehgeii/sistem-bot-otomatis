@@ -263,6 +263,7 @@ fun TelegramSection(vm: SetupViewModel) {
                 Switch(checked = settings?.weeklySummary ?: true, onCheckedChange = { vm.setWeeklySummary(it, context) })
             }
             TextButton(enabled = chatId != null, onClick = { vm.sendSummaryNow(context) }) { Text("Kirim ringkasan sekarang") }
+            TelegramNudgeRow(vm)
         }
     }
 }
