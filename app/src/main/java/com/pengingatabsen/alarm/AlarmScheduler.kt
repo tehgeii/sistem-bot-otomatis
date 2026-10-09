@@ -128,6 +128,9 @@ object AlarmScheduler {
     /** Jendela yang sudah lewat tapi masih ACTIVE (mis. HP mati) dicatat sebagai terlewat. */
     private suspend fun expireStale(context: Context) {
         val now = System.currentTimeMillis()
+        // Catatan "berlangsung" yang dibuat sebelum jam buka (sisa versi lama) dibersihkan; toleransi 2 menit.
+        val removed = Graph.db.recordDao().deletePrematureActive(now + 2 * 60_000L)
+        if (removed > 0) DiagLog.add("bersih: $removed catatan \"berlangsung\" sebelum waktunya dihapus")
         for (record in Graph.db.recordDao().active()) {
             if (record.endAtMillis <= now) {
                 Graph.repository.markMissed(record)

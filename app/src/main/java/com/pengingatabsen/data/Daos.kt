@@ -80,4 +80,11 @@ interface RecordDao {
     /** Hanya untuk pulihkan cadangan (di dalam transaksi). */
     @Query("DELETE FROM records")
     suspend fun deleteAll()
+
+    /**
+     * Catatan "berlangsung" untuk kuliah yang jam bukanya masih nanti tidak pernah sah (alarm membuatnya tepat saat
+     * jam buka). Sisa versi lama (mis. widget 3.0 mencatat matkul berikutnya) dihapus; alarm membuatnya lagi tepat waktu.
+     */
+    @Query("DELETE FROM records WHERE status = 'ACTIVE' AND openAtMillis > :afterMillis AND doneAtMillis IS NULL")
+    suspend fun deletePrematureActive(afterMillis: Long): Int
 }

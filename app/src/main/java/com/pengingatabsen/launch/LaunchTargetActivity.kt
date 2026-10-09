@@ -59,6 +59,12 @@ class LaunchTargetActivity : Activity() {
     private suspend fun showFollowUp(context: Context, courseId: Long, epochDay: Long, interval: Int) {
         val repo = Graph.repository
         val course = repo.course(courseId) ?: return
+        // Hanya untuk kuliah yang jamnya SUDAH mulai. Mengetuk matkul yang belum mulai (widget, kartu "Hari ini")
+        // cukup membuka halaman presensi — tanpa membuat catatan "berlangsung" sebelum waktunya.
+        val grace = if (Graph.settings.current().smartModeActive) com.pengingatabsen.logic.ScheduleMath.SMART_GRACE_MINUTES else 0
+        val occ = com.pengingatabsen.logic.ScheduleMath.occurrenceOn(course.toSlot(grace), LocalDate.ofEpochDay(epochDay))
+        val now = LocalDateTime.now()
+        if (now.isBefore(occ.open) || !now.isBefore(occ.end)) return
         val dao = Graph.db.recordDao()
         val record = dao.find(courseId, epochDay)
             ?: repo.markOccurrence(course, LocalDate.ofEpochDay(epochDay), RecordStatus.ACTIVE)

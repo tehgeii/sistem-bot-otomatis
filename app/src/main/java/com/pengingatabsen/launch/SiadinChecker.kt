@@ -68,6 +68,8 @@ enum class RenderMode {
  */
 object SiadinChecker {
     private const val TOTAL_TIMEOUT_MS = (CheckerBrain.DEADLINE_SECONDS + 15) * 1_000L
+    /** Lama menunggu jaringan tersambung sebelum pengecekan dianggap gagal "tidak ada internet". */
+    private const val NET_WAIT_SECONDS = 15
     private const val WIDTH = 1080
     private const val HEIGHT = 2400
 
@@ -83,7 +85,18 @@ object SiadinChecker {
         extractScript: String? = null,
         log: (String) -> Unit = {},
     ): CheckResult {
-        if (!hasInternet(context)) return CheckResult(PresensiState.UNKNOWN, "tidak ada internet")
+        // Tepat setelah HP bangun dari tidur, jaringan sering baru tersambung beberapa detik kemudian:
+        // tunggu sebentar dulu sebelum menyerah (sebelumnya langsung gagal lalu menunggu alarm berikutnya).
+        if (!hasInternet(context)) {
+            log("belum ada internet, menunggu hingga ${NET_WAIT_SECONDS} dtk")
+            var waited = 0
+            while (waited < NET_WAIT_SECONDS && !hasInternet(context)) {
+                delay(1_000)
+                waited++
+            }
+            if (!hasInternet(context)) return CheckResult(PresensiState.UNKNOWN, "tidak ada internet (sudah ditunggu ${NET_WAIT_SECONDS} dtk)")
+            log("internet tersambung setelah ${waited} dtk")
+        }
         return withTimeoutOrNull(TOTAL_TIMEOUT_MS) {
             withContext(Dispatchers.Main) {
                 runCheck(context.applicationContext, targetUrl, credentials, courseName, mode, captureProof, extractScript, log)
