@@ -61,6 +61,8 @@ class MainViewModel : ViewModel() {
             }.getOrNull()
         }.orEmpty()
         val parsed = com.pengingatabsen.logic.KrsParser.parse(texts)
+        // Kartu KRS juga memuat persentase kehadiran resmi: sekalian disimpan.
+        com.pengingatabsen.data.OfficialSync.absorb(Graph.appContext, texts)
         com.pengingatabsen.data.DiagLog.add("impor KRS: ${texts.size} kartu → ${parsed.size} jadwal (${result.state})")
         krsImport.value = when {
             parsed.isNotEmpty() -> KrsImport.Ready(parsed, repo.newFromKrs(parsed))
@@ -79,6 +81,19 @@ class MainViewModel : ViewModel() {
     }
 
     fun closeKrs() { krsImport.value = KrsImport.Idle }
+
+    // ---------- Kehadiran resmi SiAdin ----------
+
+    val officialSyncing = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    fun syncOfficial(onDone: (String) -> Unit) = viewModelScope.launch {
+        if (officialSyncing.value) return@launch
+        officialSyncing.value = true
+        val msg = runCatching { com.pengingatabsen.data.OfficialSync.syncFromKrs(Graph.appContext) }
+            .getOrElse { "Gagal sinkron (${it.javaClass.simpleName})." }
+        officialSyncing.value = false
+        onDone(msg)
+    }
 
     fun save(course: Course) = viewModelScope.launch { repo.saveCourse(course) }
     fun addReplacement(source: Course, draft: com.pengingatabsen.ui.schedule.ReplacementDraft) = viewModelScope.launch {

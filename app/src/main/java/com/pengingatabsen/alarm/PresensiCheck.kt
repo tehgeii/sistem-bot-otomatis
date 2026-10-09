@@ -72,8 +72,11 @@ object PresensiCheck {
             settings.deepLink ?: TargetApps.SIADIN_PRESENSI_URL,
             if (settings.autoLogin) store.siadinLogin() else null,
             course.name,
+            extractScript = com.pengingatabsen.launch.SiadinScripts.CARD_TEXTS_SCRIPT,
         ) { DiagLog.add("kesiapan ${course.name}: $it") }
         DiagLog.add("kesiapan HASIL ${course.name}: ${result.state} — ${result.detail}")
+        // Persentase resmi di kartu hari ini (tanpa kuota tambahan) = angka "sebelum presensi" hari ini.
+        com.pengingatabsen.data.OfficialSync.absorb(ctx, com.pengingatabsen.data.OfficialSync.cardTexts(result.extracted))
         SiadinHealth.record(ctx, course.id, occ.date.toEpochDay(), result)
         when (result.state) {
             PresensiState.WAITING, PresensiState.OPEN, PresensiState.DONE -> Unit
@@ -158,8 +161,15 @@ object PresensiCheck {
             if (settings.autoLogin) store.siadinLogin() else null,
             course.name,
             captureProof = true,
+            extractScript = com.pengingatabsen.launch.SiadinScripts.CARD_TEXTS_SCRIPT,
         ) { DiagLog.add("cek ${course.name}: $it") }
         val state = result.state
+        // Kehadiran resmi: angka SEBELUM pengecekan ini diingat untuk memastikan presensi tercatat.
+        val officialBefore = store.officialSnapshots()[course.name]?.percent
+        val official = com.pengingatabsen.data.OfficialSync.absorb(ctx, com.pengingatabsen.data.OfficialSync.cardTexts(result.extracted))
+        if (state == PresensiState.DONE) {
+            com.pengingatabsen.data.OfficialSync.afterCheckerDone(ctx, course.name, officialBefore, official[course.name])
+        }
         val rxAfter = android.net.TrafficStats.getUidRxBytes(uid)
         val txAfter = android.net.TrafficStats.getUidTxBytes(uid)
         if (rxBefore >= 0 && rxAfter >= rxBefore) {
@@ -191,7 +201,11 @@ object PresensiCheck {
                 DiagLog.add("selesai: Berhasil Presensi terdeteksi → bukti dikirim, pengingat berhenti")
                 Notifications.cancel(ctx, courseId)
                 // Bukti foto otomatis (kartu hijau dipotret pengecek) bila ada; kalau tidak, bukti teks.
-                Graph.repository.confirmDone(record.copy(photoPath = result.photoPath ?: record.photoPath), LocalDateTime.now())
+                Graph.repository.confirmDone(
+                    record.copy(photoPath = result.photoPath ?: record.photoPath),
+                    LocalDateTime.now(),
+                    verifyOfficial = false,
+                )
                 AlarmScheduler.reschedule(ctx, courseId)
             }
             PresensiState.OPEN -> {

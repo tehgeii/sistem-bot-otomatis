@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 3.1.1** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 3.2** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -321,6 +321,21 @@ sesuai aturan kampus di *Pengaturan → Kehadiran* (jumlah pertemuan, minimal %,
 riwayat semester lalu tidak ikut dihitung). Hanya "terlewat" yang mengurangi jatah. Begitu jatah tinggal 1
 (atau habis), muncul notifikasi + pesan Telegram. Angka ini dari catatan NgiBsen; tetap cek angka resmi
 di SiAdin.
+
+**Kehadiran resmi SiAdin** (3.2): persentase di kartu KRS & Presensi Online SiAdin = **jumlah hadir resmi ÷ 14
+pertemuan** (mis. 28.57% = hadir 4, 21.43% = hadir 3). NgiBsen membacanya otomatis di setiap pengecekan kuliah
+(tanpa kuota tambahan), dari **Impor KRS**, dari **⋮ → Sinkronkan kehadiran resmi (SiAdin)**, dan seminggu sekali
+bersama ringkasan Minggu malam. Per matkul tampil:
+- **"SiAdin: 28.57% · hadir 4/14 · butuh 7 lagi (min. 11)"** — angka pasti dari kampus;
+- **"Perkiraan: 4 pertemuan berlangsung · tidak hadir 0 · sisa jatah 3"** — bila *awal semester* diatur di
+  *Pengaturan → Kehadiran*. SiAdin tidak menampilkan jumlah pertemuan yang sudah berlangsung, jadi angka ini
+  ditaksir dari jadwal sejak awal semester (dikurangi libur & "tidak dibuka dosen"). Atur awal semester ke hari
+  pertama kuliah minggu pertama supaya tepat.
+- Peringatan (notifikasi + Telegram) bila perkiraan jatah tinggal 1/habis, atau minimal tidak mungkin tercapai lagi.
+
+**Presensi benar-benar tercatat?** Setiap kali presensi selesai, NgiBsen membandingkan persentase resmi sebelum dan
+sesudahnya: harus naik 1/14. Bila belum naik, dicek ulang ±10 menit, 1 jam, dan 3 jam kemudian (lewat KRS); bila
+tetap tidak naik → peringatan **"Presensi … belum tercatat di SiAdin?"** supaya bisa segera lapor dosen.
 
 **Grafik kehadiran per minggu** (8 minggu terakhir): kolom bertumpuk ✅ hadir (biru) + ❌ terlewat (oranye).
 Warnanya dipilih supaya tetap terbedakan bagi pengguna buta warna. Tap kolom untuk rinciannya.

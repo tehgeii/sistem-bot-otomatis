@@ -241,8 +241,11 @@ class Repository(private val db: AppDatabase) {
         recordDao.update(record.copy(status = RecordStatus.NO_SESSION, awaitingConfirm = false))
     }
 
-    /** "Sudah, kirim bukti": waktu bukti = [pressedAt], lalu antre ke Telegram. */
-    suspend fun confirmDone(record: AttendanceRecord, pressedAt: LocalDateTime) {
+    /**
+     * "Sudah, kirim bukti": waktu bukti = [pressedAt], lalu antre ke Telegram. [verifyOfficial]: jadwalkan cek apakah
+     * presensi tercatat di SiAdin (pengecek latar melakukannya sendiri dengan angka sebelum/sesudah, jadi false).
+     */
+    suspend fun confirmDone(record: AttendanceRecord, pressedAt: LocalDateTime, verifyOfficial: Boolean = true) {
         if (record.status == RecordStatus.SENT || record.status == RecordStatus.QUEUED) return
         recordDao.update(
             record.copy(
@@ -253,6 +256,7 @@ class Repository(private val db: AppDatabase) {
             ),
         )
         SendWorker.enqueue(Graph.appContext, record.id, SendWorker.KIND_PROOF)
+        if (verifyOfficial && record.courseId > 0) OfficialSync.scheduleVerify(Graph.appContext, record.courseName)
     }
 
     /**

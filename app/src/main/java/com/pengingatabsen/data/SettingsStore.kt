@@ -59,6 +59,8 @@ data class AppSettings(
     val minAttendancePercent: Int = com.pengingatabsen.logic.AttendanceRule.DEFAULT_MIN_PERCENT,
     /** Riwayat dihitung sejak tanggal ini (awal semester); null = semua riwayat. */
     val semesterStartEpochDay: Long? = null,
+    /** Persentase kehadiran resmi SiAdin terakhir per nama jadwal. */
+    val official: Map<String, com.pengingatabsen.logic.OfficialSnapshot> = emptyMap(),
 ) {
     val attendanceRule: com.pengingatabsen.logic.AttendanceRule
         get() = com.pengingatabsen.logic.AttendanceRule(meetingsPerSemester, minAttendancePercent)
@@ -118,6 +120,10 @@ class SettingsStore(private val context: Context) {
         val MEETINGS = intPreferencesKey("meetings_per_semester")
         val MIN_PERCENT = intPreferencesKey("min_attendance_percent")
         val SEMESTER_START = longPreferencesKey("semester_start_day")
+        /** Persentase resmi SiAdin per nama jadwal (JSON). */
+        val OFFICIAL = stringPreferencesKey("official_attendance")
+        /** Peringatan jatah resmi yang sudah dikirim (agar tidak berulang). */
+        val OFFICIAL_WARNED = stringSetPreferencesKey("official_warned")
         /** versionCode terbaru yang sudah diberitahukan (agar notifikasi versi baru tidak berulang). */
         val UPDATE_NOTIFIED_CODE = longPreferencesKey("update_notified_code")
     }
@@ -201,6 +207,7 @@ class SettingsStore(private val context: Context) {
         meetingsPerSemester = this[Keys.MEETINGS] ?: com.pengingatabsen.logic.AttendanceRule.DEFAULT_MEETINGS,
         minAttendancePercent = this[Keys.MIN_PERCENT] ?: com.pengingatabsen.logic.AttendanceRule.DEFAULT_MIN_PERCENT,
         semesterStartEpochDay = this[Keys.SEMESTER_START],
+        official = com.pengingatabsen.logic.OfficialAttendance.decode(this[Keys.OFFICIAL]),
     )
 
     suspend fun setReadinessCheck(enabled: Boolean) = context.dataStore.edit { it[Keys.READINESS_CHECK] = enabled }
@@ -260,6 +267,28 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit {
             if (it[Keys.LOGIN_FAILED_DAY] != today) {
                 it[Keys.LOGIN_FAILED_DAY] = today
+                claimed = true
+            }
+        }
+        return claimed
+    }
+
+    /** Gabungkan persentase resmi terbaru (yang lain tetap). */
+    suspend fun mergeOfficial(update: Map<String, com.pengingatabsen.logic.OfficialSnapshot>) = context.dataStore.edit { p ->
+        val current = com.pengingatabsen.logic.OfficialAttendance.decode(p[Keys.OFFICIAL])
+        p[Keys.OFFICIAL] = com.pengingatabsen.logic.OfficialAttendance.encode(current + update)
+    }
+
+    suspend fun officialSnapshots(): Map<String, com.pengingatabsen.logic.OfficialSnapshot> =
+        com.pengingatabsen.logic.OfficialAttendance.decode(context.dataStore.data.first()[Keys.OFFICIAL])
+
+    /** True bila peringatan [key] belum pernah dikirim (lalu menandainya sudah). Maks. 200 kunci disimpan. */
+    suspend fun claimOfficialWarning(key: String): Boolean {
+        var claimed = false
+        context.dataStore.edit { p ->
+            val set = p[Keys.OFFICIAL_WARNED] ?: emptySet()
+            if (key !in set) {
+                p[Keys.OFFICIAL_WARNED] = (set.toList().takeLast(199) + key).toSet()
                 claimed = true
             }
         }

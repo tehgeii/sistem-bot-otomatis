@@ -22,9 +22,9 @@ import com.pengingatabsen.logic.HistoryExport
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-/** Menu tab Riwayat (TopAppBar): ekspor ke CSV (Excel/Sheets) atau PDF. */
+/** Menu tab Riwayat (TopAppBar): sinkron kehadiran resmi SiAdin, ekspor ke CSV (Excel/Sheets) atau PDF. */
 @Composable
-fun HistoryMenu() {
+fun HistoryMenu(vm: com.pengingatabsen.ui.MainViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var menu by remember { mutableStateOf(false) }
@@ -50,6 +50,14 @@ fun HistoryMenu() {
     Box {
         IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Menu riwayat") }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(
+                text = { Text("Sinkronkan kehadiran resmi (SiAdin)") },
+                onClick = {
+                    menu = false
+                    Toast.makeText(context, "Membaca KRS SiAdin… (±1 menit)", Toast.LENGTH_SHORT).show()
+                    vm.syncOfficial { msg -> Toast.makeText(context, msg, Toast.LENGTH_LONG).show() }
+                },
+            )
             DropdownMenuItem(
                 text = { Text("Ekspor PDF (siap cetak/kirim)") },
                 onClick = { menu = false; pdf.launch(HistoryExport.fileName(LocalDate.now(), "pdf")) },

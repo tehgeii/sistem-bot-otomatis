@@ -43,6 +43,9 @@ import com.pengingatabsen.logic.SummaryItem
 import com.pengingatabsen.logic.WeeklyChart
 import java.time.LocalDate
 import com.pengingatabsen.logic.CourseStats
+import com.pengingatabsen.logic.OfficialAttendance
+import com.pengingatabsen.logic.OfficialStatus
+import androidx.compose.runtime.produceState
 import com.pengingatabsen.logic.Formatters
 import com.pengingatabsen.ui.MainViewModel
 
@@ -66,9 +69,18 @@ fun HistoryScreen(vm: MainViewModel, contentPadding: PaddingValues) {
     val scheduled = list.filter { it.courseId > 0 }
     val semester = scheduled.filter { Allowances.inSemester(LocalDate.ofEpochDay(it.epochDay), semesterStart) }
     val pairs = semester.map { it.courseName to it.status.toSummaryKind() }
-    val perCourse = AttendanceStats.perCourse(pairs)
+    val appStats = AttendanceStats.perCourse(pairs)
     val rule = appSettings?.attendanceRule ?: AttendanceRule()
-    val allowances = Allowances.perCourse(perCourse, rule).associateBy { it.courseName }
+    val allowances = Allowances.perCourse(appStats, rule).associateBy { it.courseName }
+    // Kehadiran resmi SiAdin (persentase kartu KRS/Presensi Online), dihitung ulang saat riwayat/pengaturan berubah.
+    val official by produceState(emptyList<OfficialStatus>(), list, appSettings) {
+        value = runCatching { com.pengingatabsen.data.OfficialSync.statuses() }.getOrDefault(emptyList())
+    }
+    val officialByName = official.associateBy { it.courseName }
+    // Matkul yang hanya punya angka resmi (belum ada catatan NgiBsen) tetap ditampilkan.
+    val statsByName = appStats.associateBy { it.courseName.orEmpty() }
+    val perCourse = (statsByName.keys + officialByName.keys).distinct().sortedBy { it.lowercase() }
+        .map { statsByName[it] ?: CourseStats(it, 0, 0, 0, 0) }
     val weeks = WeeklyChart.buckets(
         scheduled.map { SummaryItem(it.courseName, LocalDate.ofEpochDay(it.epochDay), it.status.toSummaryKind()) },
         LocalDate.now(),
@@ -84,6 +96,7 @@ fun HistoryScreen(vm: MainViewModel, contentPadding: PaddingValues) {
                 overall = AttendanceStats.overall(pairs),
                 perCourse = perCourse,
                 allowances = allowances,
+                official = officialByName,
                 since = semesterStart,
                 selected = filter,
                 onSelect = { filter = if (filter == it) null else it },
@@ -111,6 +124,7 @@ private fun StatsCard(
     overall: CourseStats,
     perCourse: List<CourseStats>,
     allowances: Map<String, Allowance>,
+    official: Map<String, OfficialStatus>,
     since: LocalDate?,
     selected: String?,
     onSelect: (String) -> Unit,
@@ -125,10 +139,20 @@ private fun StatsCard(
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                overall.percent?.let { "$it% hadir · ${overall.present} dari ${overall.counted} pertemuan" }
+                overall.percent?.let { "$it% hadir · ${overall.present} dari ${overall.counted} pertemuan (catatan NgiBsen)" }
                     ?: "Belum ada pertemuan yang dihitung",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            when {
+                official.isEmpty() -> Text(
+                    "Kehadiran resmi SiAdin belum ada: menu ⋮ → Sinkronkan kehadiran resmi (atau tunggu pengecekan kuliah berikutnya).",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                since == null -> Text(
+                    "Atur awal semester di Pengaturan → Kehadiran supaya jatah tidak hadir bisa diperkirakan dari data SiAdin.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             perCourse.forEach { s ->
                 val name = s.courseName.orEmpty()
                 Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
@@ -157,12 +181,32 @@ private fun StatsCard(
                         if (s.noSession > 0) add("${s.noSession} tidak dibuka dosen")
                     }
                     if (extra.isNotEmpty()) Text(extra.joinToString(" · "), style = MaterialTheme.typography.bodySmall)
-                    allowances[name]?.let { a ->
+                    val o = official[name]
+                    val estimate = o?.let { OfficialAttendance.estimate(it) }
+                    if (o != null) {
                         Text(
-                            Allowances.label(a),
+                            OfficialAttendance.summary(o),
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (a.level == AllowanceLevel.SAFE) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.error,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
+                        if (estimate != null) {
+                            val bad = o.reachable == false || (o.remaining ?: 99) <= 1
+                            Text(
+                                estimate,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (bad) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
+                    }
+                    // Jatah dari catatan NgiBsen hanya bila belum ada perkiraan dari data resmi.
+                    if (estimate == null) {
+                        allowances[name]?.let { a ->
+                            Text(
+                                (if (o != null) "Catatan NgiBsen · " else "") + Allowances.label(a),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (a.level == AllowanceLevel.SAFE) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                 }
             }

@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
                             actions = {
                                 when (tab) {
                                     0 -> ScheduleMenu(vm)
-                                    1 -> com.pengingatabsen.ui.history.HistoryMenu()
+                                    1 -> com.pengingatabsen.ui.history.HistoryMenu(vm)
                                 }
                             },
                         )

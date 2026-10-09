@@ -43,8 +43,21 @@ class SummaryWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         val items = Graph.db.recordDao()
             .between(weekStart.toEpochDay(), weekStart.plusDays(6).toEpochDay())
             .map { SummaryItem(it.courseName, LocalDate.ofEpochDay(it.epochDay), it.status.toSummaryKind()) }
-        val text = WeeklySummary.build(weekStart, items)
-            ?: if (manual) "📊 Belum ada jadwal minggu ini." else null
+        // Kehadiran resmi SiAdin: sinkron KRS sekali seminggu (mode pintar), lalu ditempel di bawah ringkasan.
+        if (settings.smartModeActive) {
+            runCatching { com.pengingatabsen.data.OfficialSync.syncFromKrs(applicationContext) }
+                .onFailure { com.pengingatabsen.data.DiagLog.add("ringkasan: sinkron kehadiran resmi gagal (${it.javaClass.simpleName})") }
+        }
+        val officialText = runCatching {
+            com.pengingatabsen.logic.OfficialAttendance.telegramLines(com.pengingatabsen.data.OfficialSync.statuses())
+        }.getOrNull()
+        val weekly = WeeklySummary.build(weekStart, items)
+        val text = when {
+            weekly != null && officialText != null -> "$weekly\n\n$officialText"
+            weekly != null -> weekly
+            manual -> listOfNotNull("📊 Belum ada jadwal minggu ini.", officialText).joinToString("\n\n")
+            else -> null
+        }
         if (text == null) {
             store.setSummarySentWeek(weekStart.toEpochDay())
             return Result.success()
