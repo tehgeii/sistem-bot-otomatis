@@ -45,6 +45,12 @@ class SetupViewModel : ViewModel() {
 
     private var pollJob: Job? = null
 
+    // ---------- Kehadiran (jatah tidak hadir) ----------
+
+    fun setMeetings(value: Int) = viewModelScope.launch { store.setMeetings(value) }
+    fun setMinPercent(value: Int) = viewModelScope.launch { store.setMinPercent(value) }
+    fun setSemesterStart(date: java.time.LocalDate?) = viewModelScope.launch { store.setSemesterStart(date) }
+
     // ---------- Tentang & versi baru ----------
 
     var updateStatus by mutableStateOf<String?>(null)

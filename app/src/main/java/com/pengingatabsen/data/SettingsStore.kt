@@ -55,13 +55,27 @@ data class AppSettings(
     val presensiOpenKeys: Set<String> = emptySet(),
     /** Cek sehari sekali apakah ada versi NgiBsen baru di Release (hanya memberi tahu). */
     val updateCheck: Boolean = true,
+    /** Aturan kehadiran untuk "jatah tidak hadir" (pertemuan per semester & minimal hadir %). */
+    val meetingsPerSemester: Int = com.pengingatabsen.logic.AttendanceRule.DEFAULT_MEETINGS,
+    val minAttendancePercent: Int = com.pengingatabsen.logic.AttendanceRule.DEFAULT_MIN_PERCENT,
+    /** Riwayat dihitung sejak tanggal ini (awal semester); null = semua riwayat. */
+    val semesterStartEpochDay: Long? = null,
 ) {
+    val attendanceRule: com.pengingatabsen.logic.AttendanceRule
+        get() = com.pengingatabsen.logic.AttendanceRule(meetingsPerSemester, minAttendancePercent)
+
+    val semesterStart: java.time.LocalDate?
+        get() = semesterStartEpochDay?.let(java.time.LocalDate::ofEpochDay)
+
     /** Mode pintar hanya berlaku untuk SiAdin web dengan login tersimpan. */
     val smartModeActive: Boolean
         get() = smartPresensi && hasSiadinLogin && deepLink?.startsWith(TargetApps.SIADIN_ORIGIN) == true
 
     val telegramReady: Boolean get() = hasBotToken && !chatId.isNullOrBlank()
 }
+
+/** Rentang wajar jumlah pertemuan per semester. */
+val MEETINGS_RANGE = 1..32
 
 class SettingsStore(private val context: Context) {
     private object Keys {
@@ -102,6 +116,9 @@ class SettingsStore(private val context: Context) {
         /** Hari (epoch day) peringatan "tampilan SiAdin berubah" terakhir dikirim. */
         val LAYOUT_WARNED_DAY = longPreferencesKey("layout_warned_day")
         val UPDATE_CHECK = booleanPreferencesKey("update_check")
+        val MEETINGS = intPreferencesKey("meetings_per_semester")
+        val MIN_PERCENT = intPreferencesKey("min_attendance_percent")
+        val SEMESTER_START = longPreferencesKey("semester_start_day")
         /** versionCode terbaru yang sudah diberitahukan (agar notifikasi versi baru tidak berulang). */
         val UPDATE_NOTIFIED_CODE = longPreferencesKey("update_notified_code")
     }
@@ -115,7 +132,8 @@ class SettingsStore(private val context: Context) {
         Keys.VIBRATE_ONLY, Keys.AUTO_LOGIN, Keys.SMART_PRESENSI, Keys.FULL_SCREEN_ALERT,
         Keys.WEEKLY_SUMMARY, Keys.READINESS_CHECK, Keys.UPDATE_CHECK,
     )
-    private val backupInts = listOf(Keys.REMIND_INTERVAL)
+    private val backupInts = listOf(Keys.REMIND_INTERVAL, Keys.MEETINGS, Keys.MIN_PERCENT)
+    private val backupLongs = listOf(Keys.SEMESTER_START)
     private val backupStrings = listOf(Keys.TARGET_PACKAGE, Keys.TARGET_LABEL, Keys.DEEP_LINK)
 
     /** Pengaturan yang ikut file cadangan (nama kunci DataStore → nilai). */
@@ -124,6 +142,7 @@ class SettingsStore(private val context: Context) {
         val out = LinkedHashMap<String, Any>()
         backupBooleans.forEach { k -> p[k]?.let { out[k.name] = it } }
         backupInts.forEach { k -> p[k]?.let { out[k.name] = it } }
+        backupLongs.forEach { k -> p[k]?.let { out[k.name] = it } }
         backupStrings.forEach { k -> p[k]?.let { out[k.name] = it } }
         return out
     }
@@ -135,8 +154,11 @@ class SettingsStore(private val context: Context) {
     suspend fun restorePrefs(values: Map<String, Any>) = context.dataStore.edit { p ->
         backupBooleans.forEach { k -> (values[k.name] as? Boolean)?.let { p[k] = it } }
         backupInts.forEach { k -> (values[k.name] as? Number)?.let { p[k] = it.toInt() } }
+        backupLongs.forEach { k -> (values[k.name] as? Number)?.let { p[k] = it.toLong() } }
         backupStrings.forEach { k -> (values[k.name] as? String)?.takeIf { it.isNotBlank() }?.let { p[k] = it } }
         p[Keys.REMIND_INTERVAL]?.let { p[Keys.REMIND_INTERVAL] = it.coerceIn(1, 30) }
+        p[Keys.MEETINGS]?.let { p[Keys.MEETINGS] = it.coerceIn(MEETINGS_RANGE) }
+        p[Keys.MIN_PERCENT]?.let { p[Keys.MIN_PERCENT] = it.coerceIn(0, 100) }
         p.remove(Keys.PRESENSI_OPEN)
         p.remove(Keys.ARMED)
         p.remove(Keys.MISSED_REPORTED)
@@ -170,6 +192,9 @@ class SettingsStore(private val context: Context) {
         readinessText = this[Keys.READINESS_TEXT],
         presensiOpenKeys = this[Keys.PRESENSI_OPEN] ?: emptySet(),
         updateCheck = this[Keys.UPDATE_CHECK] ?: true,
+        meetingsPerSemester = this[Keys.MEETINGS] ?: com.pengingatabsen.logic.AttendanceRule.DEFAULT_MEETINGS,
+        minAttendancePercent = this[Keys.MIN_PERCENT] ?: com.pengingatabsen.logic.AttendanceRule.DEFAULT_MIN_PERCENT,
+        semesterStartEpochDay = this[Keys.SEMESTER_START],
     )
 
     suspend fun setReadinessCheck(enabled: Boolean) = context.dataStore.edit { it[Keys.READINESS_CHECK] = enabled }
@@ -236,6 +261,15 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun setUpdateCheck(enabled: Boolean) = context.dataStore.edit { it[Keys.UPDATE_CHECK] = enabled }
+
+    suspend fun setMeetings(value: Int) = context.dataStore.edit { it[Keys.MEETINGS] = value.coerceIn(MEETINGS_RANGE) }
+
+    suspend fun setMinPercent(value: Int) = context.dataStore.edit { it[Keys.MIN_PERCENT] = value.coerceIn(0, 100) }
+
+    /** null = hitung semua riwayat. */
+    suspend fun setSemesterStart(date: java.time.LocalDate?) = context.dataStore.edit {
+        if (date == null) it.remove(Keys.SEMESTER_START) else it[Keys.SEMESTER_START] = date.toEpochDay()
+    }
 
     /** True bila versi [versionCode] belum pernah diberitahukan (lalu menandainya sudah). */
     suspend fun claimUpdateNotice(versionCode: Long): Boolean {

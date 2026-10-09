@@ -34,7 +34,14 @@ import androidx.compose.ui.unit.dp
 import com.pengingatabsen.data.AttendanceRecord
 import com.pengingatabsen.data.RecordStatus
 import com.pengingatabsen.data.toLocalDateTime
+import com.pengingatabsen.logic.Allowance
+import com.pengingatabsen.logic.AllowanceLevel
+import com.pengingatabsen.logic.Allowances
+import com.pengingatabsen.logic.AttendanceRule
 import com.pengingatabsen.logic.AttendanceStats
+import com.pengingatabsen.logic.SummaryItem
+import com.pengingatabsen.logic.WeeklyChart
+import java.time.LocalDate
 import com.pengingatabsen.logic.CourseStats
 import com.pengingatabsen.logic.Formatters
 import com.pengingatabsen.ui.MainViewModel
@@ -44,6 +51,7 @@ import com.pengingatabsen.ui.MainViewModel
 @Composable
 fun HistoryScreen(vm: MainViewModel, contentPadding: PaddingValues) {
     val history by vm.history.collectAsState()
+    val appSettings by vm.settings.collectAsState()
     val list = history ?: return
     if (list.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(contentPadding).padding(32.dp), contentAlignment = Alignment.Center) {
@@ -52,10 +60,19 @@ fun HistoryScreen(vm: MainViewModel, contentPadding: PaddingValues) {
         return
     }
     var filter by rememberSaveable { mutableStateOf<String?>(null) }
-    // Hanya kemunculan matkul terjadwal (bukan screenshot "Tanpa matkul") yang masuk statistik.
+    // Hanya kemunculan matkul terjadwal (bukan screenshot "Tanpa matkul") yang masuk statistik,
+    // dan hanya sejak awal semester bila diatur (Pengaturan → Kehadiran).
+    val semesterStart = appSettings?.semesterStart
     val scheduled = list.filter { it.courseId > 0 }
-    val pairs = scheduled.map { it.courseName to it.status.toSummaryKind() }
+    val semester = scheduled.filter { Allowances.inSemester(LocalDate.ofEpochDay(it.epochDay), semesterStart) }
+    val pairs = semester.map { it.courseName to it.status.toSummaryKind() }
     val perCourse = AttendanceStats.perCourse(pairs)
+    val rule = appSettings?.attendanceRule ?: AttendanceRule()
+    val allowances = Allowances.perCourse(perCourse, rule).associateBy { it.courseName }
+    val weeks = WeeklyChart.buckets(
+        scheduled.map { SummaryItem(it.courseName, LocalDate.ofEpochDay(it.epochDay), it.status.toSummaryKind()) },
+        LocalDate.now(),
+    )
     val shown = if (filter == null) list else list.filter { it.courseName == filter }
 
     LazyColumn(
@@ -66,10 +83,13 @@ fun HistoryScreen(vm: MainViewModel, contentPadding: PaddingValues) {
             StatsCard(
                 overall = AttendanceStats.overall(pairs),
                 perCourse = perCourse,
+                allowances = allowances,
+                since = semesterStart,
                 selected = filter,
                 onSelect = { filter = if (filter == it) null else it },
             )
         }
+        item(key = "weeks") { WeeklyChartCard(weeks) }
         item(key = "filter") {
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
@@ -90,6 +110,8 @@ fun HistoryScreen(vm: MainViewModel, contentPadding: PaddingValues) {
 private fun StatsCard(
     overall: CourseStats,
     perCourse: List<CourseStats>,
+    allowances: Map<String, Allowance>,
+    since: LocalDate?,
     selected: String?,
     onSelect: (String) -> Unit,
 ) {
@@ -98,7 +120,10 @@ private fun StatsCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Kehadiran", style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (since != null) "Kehadiran sejak ${Formatters.date(since)}" else "Kehadiran",
+                style = MaterialTheme.typography.titleMedium,
+            )
             Text(
                 overall.percent?.let { "$it% hadir · ${overall.present} dari ${overall.counted} pertemuan" }
                     ?: "Belum ada pertemuan yang dihitung",
@@ -132,6 +157,13 @@ private fun StatsCard(
                         if (s.noSession > 0) add("${s.noSession} tidak dibuka dosen")
                     }
                     if (extra.isNotEmpty()) Text(extra.joinToString(" · "), style = MaterialTheme.typography.bodySmall)
+                    allowances[name]?.let { a ->
+                        Text(
+                            Allowances.label(a),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (a.level == AllowanceLevel.SAFE) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
         }

@@ -216,6 +216,20 @@ class Repository(private val db: AppDatabase) {
         if (record.status != RecordStatus.ACTIVE) return
         recordDao.update(record.copy(status = RecordStatus.MISSED, awaitingConfirm = false))
         SendWorker.enqueue(Graph.appContext, record.id, SendWorker.KIND_MISSED)
+        warnAllowance(record.courseName)
+    }
+
+    /** Setelah terlewat: bila jatah tidak hadir matkul ini tinggal ≤ 1, beri tahu (notifikasi + Telegram). */
+    private suspend fun warnAllowance(courseName: String) {
+        val settings = Graph.settings.current()
+        val from = settings.semesterStartEpochDay ?: Long.MIN_VALUE
+        val kinds = recordDao.forCourseNameSince(courseName, from).map { it.status.toSummaryKind() }
+        val allowance = com.pengingatabsen.logic.Allowances.forCourse(courseName, kinds, settings.attendanceRule)
+        val text = com.pengingatabsen.logic.Allowances.missedWarning(allowance) ?: return
+        val context = Graph.appContext
+        com.pengingatabsen.data.DiagLog.add("jatah tidak hadir $courseName: ${allowance.missed}/${allowance.maxAbsent}")
+        Notifications.showInfo(context, 9_000 + (courseName.hashCode() and 0x3FF), "Jatah tidak hadir", text)
+        com.pengingatabsen.telegram.NoticeWorker.enqueue(context, "jatah-${courseName.hashCode()}", text)
     }
 
     /** Jendela berakhir tapi dosen tidak pernah membuka presensi: bukan salah pengguna, tanpa Telegram. */

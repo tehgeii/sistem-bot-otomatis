@@ -69,6 +69,10 @@ interface RecordDao {
     @Query("DELETE FROM records WHERE courseId = :courseId AND epochDay = :epochDay AND status = 'HOLIDAY'")
     suspend fun deleteHoliday(courseId: Long, epochDay: Long)
 
+    /** Riwayat satu matkul (menurut nama, termasuk kelas pengganti) sejak [fromEpochDay]. */
+    @Query("SELECT * FROM records WHERE courseName = :courseName AND epochDay >= :fromEpochDay")
+    suspend fun forCourseNameSince(courseName: String, fromEpochDay: Long): List<AttendanceRecord>
+
     /** Semua riwayat (untuk cadangan & ekspor), urut tanggal. */
     @Query("SELECT * FROM records ORDER BY epochDay, openAtMillis, id")
     suspend fun all(): List<AttendanceRecord>
