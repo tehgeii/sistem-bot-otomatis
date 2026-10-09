@@ -59,6 +59,9 @@ fun CourseEditorDialog(
     var close by remember(initial) { mutableStateOf(initial.closeMinute) }
     var room by remember(initial) { mutableStateOf(initial.room.orEmpty()) }
     var active by remember(initial) { mutableStateOf(initial.active) }
+    // Kelas pengganti: tanggal (bukan hari mingguan).
+    var oneOffDate by remember(initial) { mutableStateOf(initial.oneOffEpochDay?.let(java.time.LocalDate::ofEpochDay)) }
+    var pickingDate by remember(initial) { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(initial) { runCatching { focus.requestFocus() } }
 
@@ -71,7 +74,8 @@ fun CourseEditorDialog(
 
     fun build() = initial.copy(
         name = name.trim(),
-        dayOfWeek = day,
+        dayOfWeek = oneOffDate?.dayOfWeek?.value ?: day,
+        oneOffEpochDay = oneOffDate?.toEpochDay(),
         openMinute = open,
         closeMinute = close,
         room = room.trim().ifBlank { null },
@@ -80,7 +84,7 @@ fun CourseEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isNew) "Tambah matkul" else "Ubah matkul") },
+        title = { Text(if (oneOffDate != null) "Ubah kelas pengganti" else if (isNew) "Tambah matkul" else "Ubah matkul") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
@@ -92,14 +96,22 @@ fun CourseEditorDialog(
                     modifier = Modifier.fillMaxWidth().focusRequester(focus),
                 )
                 Spacer(Modifier.height(12.dp))
-                Text("Hari", style = MaterialTheme.typography.labelLarge)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (d in 1..7) {
-                        FilterChip(
-                            selected = day == d,
-                            onClick = { day = d },
-                            label = { Text(Formatters.dayName(d).take(3)) },
-                        )
+                val date = oneOffDate
+                if (date != null) {
+                    Text("Tanggal (sekali saja)", style = MaterialTheme.typography.labelLarge)
+                    OutlinedButton(onClick = { pickingDate = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(Formatters.date(date))
+                    }
+                } else {
+                    Text("Hari", style = MaterialTheme.typography.labelLarge)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        for (d in 1..7) {
+                            FilterChip(
+                                selected = day == d,
+                                onClick = { day = d },
+                                label = { Text(Formatters.dayName(d).take(3)) },
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -153,6 +165,13 @@ fun CourseEditorDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } },
     )
+
+    if (pickingDate) {
+        OneOffDatePicker(initial = oneOffDate ?: java.time.LocalDate.now(), onDismiss = { pickingDate = false }) {
+            oneOffDate = it
+            pickingDate = false
+        }
+    }
 }
 
 /** Isian awal untuk matkul berikutnya pada mode tambah beruntun: hari sama, jam lanjut. */

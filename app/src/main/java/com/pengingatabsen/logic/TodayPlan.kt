@@ -54,7 +54,7 @@ object TodayPlan {
         graceMinutes: Int = 0,
     ): TodayView {
         val today = now.toLocalDate()
-        val items = courses.filter { it.slot.dayOfWeek == today.dayOfWeek.value }
+        val items = courses.filter { ScheduleMath.isOn(it.slot, today) }
             .map { item(it, today, now, record, presensiOpen, graceMinutes) }
             .sortedBy { it.open }
         val pending = items.any { it.state in setOf(TodayState.UPCOMING, TodayState.WAITING, TodayState.OPEN) }
@@ -62,8 +62,9 @@ object TodayPlan {
             null
         } else {
             // Matkul berikutnya setelah hari ini (nextOccurrence sudah melewati tanggal libur).
-            courses.map { c ->
+            courses.mapNotNull { c ->
                 val occ = ScheduleMath.nextOccurrence(c.slot.copy(extraMinutes = graceMinutes), today.plusDays(1).atStartOfDay().minusNanos(1))
+                    ?: return@mapNotNull null
                 TodayItem(c.id, c.name, c.room, occ.date.toEpochDay(), occ.open, occ.end, TodayState.UPCOMING)
             }.minByOrNull { it.open }
         }

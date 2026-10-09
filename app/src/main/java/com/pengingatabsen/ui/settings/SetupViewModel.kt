@@ -207,7 +207,8 @@ class SetupViewModel : ViewModel() {
         val grace = if (settings.smartModeActive) com.pengingatabsen.logic.ScheduleMath.SMART_GRACE_MINUTES else 0
         val courses = Graph.repository.allCourses().filter { it.active }
         val course = courses.firstOrNull { com.pengingatabsen.logic.ScheduleMath.currentOccurrence(it.toSlot(grace), now) != null }
-            ?: courses.minByOrNull { com.pengingatabsen.logic.ScheduleMath.nextOccurrence(it.toSlot(grace), now).open }
+            ?: courses.mapNotNull { c -> com.pengingatabsen.logic.ScheduleMath.nextOccurrence(c.toSlot(grace), now)?.let { c to it.open } }
+                .minByOrNull { it.second }?.first
         if (course == null) {
             diagResult = "Belum ada jadwal aktif untuk dites."
             diagBusy = false

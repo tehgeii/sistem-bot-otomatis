@@ -45,6 +45,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import com.pengingatabsen.data.Course
+import com.pengingatabsen.data.isOneOff
+import com.pengingatabsen.data.oneOffDate
 import com.pengingatabsen.data.skipUntil
 import com.pengingatabsen.logic.Formatters
 import com.pengingatabsen.logic.ScheduleMath
@@ -182,6 +184,7 @@ fun ScheduleScreen(vm: MainViewModel, contentPadding: PaddingValues, onOpenSetti
     val courses by vm.courses.collectAsState()
     var editing by remember { mutableStateOf<Course?>(null) }
     var deleting by remember { mutableStateOf<Course?>(null) }
+    var replacing by remember { mutableStateOf<Course?>(null) }
 
     Scaffold(
         modifier = Modifier.padding(contentPadding),
@@ -208,7 +211,9 @@ fun ScheduleScreen(vm: MainViewModel, contentPadding: PaddingValues, onOpenSetti
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
             ) {
                 item(key = "today") { TodayCard(vm, onOpenSettings) }
-                val pausedUntil = ScheduleMath.allPausedUntil(list.filter { it.active }.map { it.skipUntil }, LocalDate.now())
+                val weekly = list.filter { !it.isOneOff }
+                val oneOffs = list.filter { it.isOneOff }.sortedWith(compareBy({ it.oneOffEpochDay }, { it.openMinute }))
+                val pausedUntil = ScheduleMath.allPausedUntil(weekly.filter { it.active }.map { it.skipUntil }, LocalDate.now())
                 if (pausedUntil != null) {
                     item(key = "paused") {
                         Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
@@ -221,7 +226,35 @@ fun ScheduleScreen(vm: MainViewModel, contentPadding: PaddingValues, onOpenSetti
                         }
                     }
                 }
-                list.groupBy { it.dayOfWeek }.toSortedMap().forEach { (day, dayCourses) ->
+                if (oneOffs.isNotEmpty()) {
+                    item(key = "oneoff-h") {
+                        Column(Modifier.padding(top = 16.dp, bottom = 4.dp)) {
+                            Text(
+                                "Kelas pengganti",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                "Sekali saja. Yang sudah lewat hilang sendiri setelah 7 hari (riwayatnya tetap).",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                    items(oneOffs, key = { it.id }) { course ->
+                        CourseCard(
+                            course = course,
+                            onClick = { editing = course },
+                            onToggle = { vm.setActive(course, it) },
+                            onDuplicate = null,
+                            onReplacement = null,
+                            onHolidayToday = { vm.holidayToday(course) },
+                            onSkipWeek = null,
+                            onClearSkip = { vm.clearSkip(course) },
+                            onDelete = { deleting = course },
+                        )
+                    }
+                }
+                weekly.groupBy { it.dayOfWeek }.toSortedMap().forEach { (day, dayCourses) ->
                     item(key = "h$day") {
                         Text(
                             Formatters.dayName(day),
@@ -236,6 +269,7 @@ fun ScheduleScreen(vm: MainViewModel, contentPadding: PaddingValues, onOpenSetti
                             onClick = { editing = course },
                             onToggle = { vm.setActive(course, it) },
                             onDuplicate = { editing = course.copy(id = 0, name = course.name, skipUntilEpochDay = null) },
+                            onReplacement = { replacing = course },
                             onHolidayToday = { vm.holidayToday(course) },
                             onSkipWeek = { vm.skipThisWeek(course) },
                             onClearSkip = { vm.clearSkip(course) },
@@ -258,12 +292,30 @@ fun ScheduleScreen(vm: MainViewModel, contentPadding: PaddingValues, onOpenSetti
         )
     }
 
+    replacing?.let { source ->
+        ReplacementDialog(source, onDismiss = { replacing = null }) { draft ->
+            vm.addReplacement(source, draft)
+            replacing = null
+        }
+    }
+
     deleting?.let { course ->
         AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text("Hapus ${course.name}?") },
-            text = { Text("Riwayat absen matkul ini tetap disimpan.") },
-            confirmButton = { TextButton(onClick = { vm.delete(course); deleting = null }) { Text("Hapus") } },
+            title = { Text(if (course.isOneOff) "Batalkan kelas pengganti ${course.name}?" else "Hapus ${course.name}?") },
+            text = {
+                Text(
+                    if (course.isOneOff) {
+                        "Riwayatnya tetap disimpan. Jadwal biasa yang ikut diliburkan tidak otomatis aktif lagi — " +
+                            "pakai \"Batalkan libur\" di matkulnya bila perlu."
+                    } else {
+                        "Riwayat absen matkul ini tetap disimpan."
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.delete(course); deleting = null }) { Text(if (course.isOneOff) "Ya, batalkan" else "Hapus") }
+            },
             dismissButton = { TextButton(onClick = { deleting = null }) { Text("Batal") } },
         )
     }
@@ -274,20 +326,30 @@ private fun CourseCard(
     course: Course,
     onClick: () -> Unit,
     onToggle: (Boolean) -> Unit,
-    onDuplicate: () -> Unit,
+    /** null = tidak ditampilkan (mis. untuk kelas pengganti). */
+    onDuplicate: (() -> Unit)?,
+    onReplacement: (() -> Unit)?,
     onHolidayToday: () -> Unit,
-    onSkipWeek: () -> Unit,
+    onSkipWeek: (() -> Unit)?,
     onClearSkip: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val today = LocalDate.now()
     val skipUntil = course.skipUntil?.takeIf { !it.isBefore(today) }
+    val oneOff = course.oneOffDate
     var menu by remember { mutableStateOf(false) }
 
     Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(onClick = onClick)) {
         Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(course.name, style = MaterialTheme.typography.titleMedium)
+                if (oneOff != null) {
+                    Text(
+                        "🔁 ${Formatters.date(oneOff)}" + if (oneOff.isBefore(today)) " (sudah lewat)" else "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
                 val detail = buildString {
                     append(Formatters.window(course.openMinute, course.closeMinute))
                     course.room?.let { append(" · Ruang ").append(it) }
@@ -305,15 +367,25 @@ private fun CourseCard(
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Menu") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text("Duplikat") }, onClick = { menu = false; onDuplicate() })
-                    if (course.dayOfWeek == today.dayOfWeek.value) {
+                    onReplacement?.let { act ->
+                        DropdownMenuItem(text = { Text("Kelas pengganti…") }, onClick = { menu = false; act() })
+                    }
+                    onDuplicate?.let { act ->
+                        DropdownMenuItem(text = { Text("Duplikat") }, onClick = { menu = false; act() })
+                    }
+                    if (ScheduleMath.isOn(course.toSlot(), today)) {
                         DropdownMenuItem(text = { Text("Libur hari ini") }, onClick = { menu = false; onHolidayToday() })
                     }
-                    DropdownMenuItem(text = { Text("Lewati minggu ini") }, onClick = { menu = false; onSkipWeek() })
+                    onSkipWeek?.let { act ->
+                        DropdownMenuItem(text = { Text("Lewati minggu ini") }, onClick = { menu = false; act() })
+                    }
                     if (skipUntil != null) {
                         DropdownMenuItem(text = { Text("Batalkan libur") }, onClick = { menu = false; onClearSkip() })
                     }
-                    DropdownMenuItem(text = { Text("Hapus") }, onClick = { menu = false; onDelete() })
+                    DropdownMenuItem(
+                        text = { Text(if (oneOff != null) "Batalkan kelas ini" else "Hapus") },
+                        onClick = { menu = false; onDelete() },
+                    )
                 }
             }
         }

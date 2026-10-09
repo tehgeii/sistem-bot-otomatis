@@ -29,6 +29,11 @@ data class Slot(
     val skipUntil: LocalDate? = null,
     /** Perpanjangan jendela setelah jam tutup (mode pintar: dosen sering membuka presensi terlambat). */
     val extraMinutes: Int = 0,
+    /**
+     * Kelas pengganti: hanya terjadi SEKALI pada tanggal ini (bukan mingguan). [dayOfWeek] tetap diisi
+     * sesuai hari tanggal ini.
+     */
+    val onlyDate: LocalDate? = null,
 )
 
 /** Satu kemunculan slot pada tanggal tertentu. */
@@ -94,18 +99,40 @@ object ScheduleMath {
     fun isSkipped(slot: Slot, date: LocalDate): Boolean =
         slot.skipUntil?.let { !date.isAfter(it) } ?: false
 
+    /** Apakah jadwal ini ada kuliah pada [date] (belum memperhitungkan libur): kelas pengganti hanya di tanggalnya. */
+    fun isOn(slot: Slot, date: LocalDate): Boolean =
+        slot.onlyDate?.let { it == date } ?: (date.dayOfWeek.value == slot.dayOfWeek)
+
+    /**
+     * Kelas pengganti pada [date]: kemunculan jadwal biasa ([slot]) yang paling mungkin DIGANTIKAN, yaitu yang
+     * sedang berlangsung atau berikutnya setelah [now], asalkan berjarak paling jauh 6 hari dari [date]
+     * (minggu yang sama, atau dipindah ke awal minggu depan). Null bila tidak ada yang cocok.
+     */
+    fun replacedOccurrence(slot: Slot, date: LocalDate, now: LocalDateTime): LocalDate? {
+        if (slot.onlyDate != null) return null
+        val next = currentOccurrence(slot, now) ?: nextOccurrence(slot, now) ?: return null
+        val gap = kotlin.math.abs(next.date.toEpochDay() - date.toEpochDay())
+        return next.date.takeIf { gap <= 6 }
+    }
+
     /** Kemunculan yang jendelanya sedang berlangsung pada [now], atau null. */
     fun currentOccurrence(slot: Slot, now: LocalDateTime): Occurrence? {
         val today = now.toLocalDate()
-        val back = (today.dayOfWeek.value - slot.dayOfWeek + 7) % 7
-        val date = today.minusDays(back.toLong())
+        val date = slot.onlyDate ?: today.minusDays(((today.dayOfWeek.value - slot.dayOfWeek + 7) % 7).toLong())
         val occ = occurrenceOn(slot, date)
         val inside = !now.isBefore(occ.open) && now.isBefore(occ.end)
         return if (inside && !isSkipped(slot, date)) occ else null
     }
 
-    /** Kemunculan berikutnya yang jam bukanya setelah [after], melewati tanggal libur. */
-    fun nextOccurrence(slot: Slot, after: LocalDateTime): Occurrence {
+    /**
+     * Kemunculan berikutnya yang jam bukanya setelah [after], melewati tanggal libur.
+     * Null bila tidak ada lagi (kelas pengganti yang sudah lewat, atau libur lebih dari 10 tahun).
+     */
+    fun nextOccurrence(slot: Slot, after: LocalDateTime): Occurrence? {
+        slot.onlyDate?.let { date ->
+            val occ = occurrenceOn(slot, date)
+            return if (occ.open.isAfter(after) && !isSkipped(slot, date)) occ else null
+        }
         val start = after.toLocalDate()
         var date = start.plusDays(((slot.dayOfWeek - start.dayOfWeek.value + 7) % 7).toLong())
         repeat(MAX_WEEKS) {
@@ -113,7 +140,7 @@ object ScheduleMath {
             if (occ.open.isAfter(after) && !isSkipped(slot, date)) return occ
             date = date.plusWeeks(1)
         }
-        return occurrenceOn(slot, date)
+        return null
     }
 
     /**
@@ -152,25 +179,26 @@ object ScheduleMath {
      * Alarm berikutnya untuk satu matkul.
      * Jika jendela sedang berlangsung dan belum selesai, lanjutkan pengingat;
      * jika tidak, alarm OPEN pada kemunculan berikutnya yang belum selesai.
+     * Null bila tidak ada lagi yang perlu diingatkan (mis. kelas pengganti yang sudah lewat/selesai).
      */
     fun plan(
         slot: Slot,
         now: LocalDateTime,
         intervalMinutes: Int,
         stateOf: (LocalDate) -> OccurrenceState?,
-    ): PlannedAlarm {
+    ): PlannedAlarm? {
         currentOccurrence(slot, now)?.let { occ ->
             val state = stateOf(occ.date)
             if (state?.finished != true) {
                 nextEvent(occ, intervalMinutes, state?.snoozeUntil, now)?.let { return PlannedAlarm(occ, it) }
             }
         }
-        var occ = nextOccurrence(slot, now)
+        var occ = nextOccurrence(slot, now) ?: return null
         repeat(MAX_WEEKS) {
             if (stateOf(occ.date)?.finished != true) return PlannedAlarm(occ, AlarmEvent(EventType.OPEN, occ.open))
-            occ = nextOccurrence(slot, occ.open)
+            occ = nextOccurrence(slot, occ.open) ?: return null
         }
-        return PlannedAlarm(occ, AlarmEvent(EventType.OPEN, occ.open))
+        return null
     }
 
     private const val MAX_WEEKS = 520

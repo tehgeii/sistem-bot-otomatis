@@ -51,6 +51,26 @@ class TodayPlanTest {
     }
 
     @Test
+    fun replacementClass_onlyOnItsDateAndCountsAsNext() {
+        // Kelas pengganti MPTI Jumat 9 Okt 13:00 (sekali saja).
+        val fri = wed.plusDays(2)
+        val ganti = TodayCourse(9, "MPTI 4515", "Kulino", Slot(5, 13 * 60, 15 * 60, onlyDate = fri))
+        val onFri = TodayPlan.build(all + ganti, fri.atTime(8, 0), { _, _ -> null }, { _, _ -> false })
+        assertEquals(listOf("MPTI" to TodayState.UPCOMING), states(onFri))
+        assertEquals(fri.toEpochDay(), onFri.items[0].epochDay)
+        // Jumat minggu depan: tidak muncul lagi.
+        val nextFri = TodayPlan.build(all + ganti, fri.plusWeeks(1).atTime(8, 0), { _, _ -> null }, { _, _ -> false })
+        assertEquals(emptyList<TodayItem>(), nextFri.items)
+        // Kamis sore setelah Sistem Terdistribusi selesai: berikutnya kelas pengganti Jumat (lebih awal dari Rabu depan).
+        val thu = TodayPlan.build(all + ganti, wed.plusDays(1).atTime(16, 0), { _, _ -> SummaryKind.DONE }, { _, _ -> false })
+        assertEquals(9L, thu.next?.courseId)
+        assertEquals(fri.atTime(13, 0), thu.next?.open)
+        // Setelah lewat, kelas pengganti tidak pernah jadi "berikutnya".
+        val sat = TodayPlan.build(all + ganti, fri.plusDays(1).atTime(9, 0), { _, _ -> null }, { _, _ -> false })
+        assertEquals("Pemrograman Sisi Klien 4702", sat.next?.name)
+    }
+
+    @Test
     fun dayWithoutClasses_onlyNext() {
         val v = TodayPlan.build(all, wed.minusDays(2).atTime(9, 0), { _, _ -> null }, { _, _ -> false })
         assertEquals(emptyList<TodayItem>(), v.items)

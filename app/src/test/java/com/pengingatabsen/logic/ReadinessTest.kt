@@ -36,6 +36,16 @@ class ReadinessTest {
     }
 
     @Test
+    fun preflight_includesReplacementClassOnlyOnItsDate() {
+        // Kelas pengganti Sabtu 10 Okt 08:00 → cek kesiapan Sabtu 07:30; Sabtu berikutnya tidak ada kuliah.
+        val sat = wednesday.plusDays(3)
+        val ganti = Slot(dayOfWeek = 6, openMinute = 8 * 60, closeMinute = 10 * 60, onlyDate = sat)
+        assertEquals(sat.atTime(7, 30), Readiness.nextPreflight(slots + ganti, wednesday.plusDays(2).atTime(10, 0)))
+        assertEquals(null, Readiness.firstOpenOn(slots + ganti, sat.plusWeeks(1)))
+        assertEquals(sat.atTime(8, 0), Readiness.firstOpenOn(slots + ganti, sat))
+    }
+
+    @Test
     fun missedAlarm_onlyWhenArmedAndNoTrace() {
         val day = wednesday.toEpochDay()
         val armed = listOf(ArmedOccurrence(1, day), ArmedOccurrence(2, day))

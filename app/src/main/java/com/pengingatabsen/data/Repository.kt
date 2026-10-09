@@ -36,13 +36,11 @@ class Repository(private val db: AppDatabase) {
 
     suspend fun setActive(course: Course, active: Boolean) = saveCourse(course.copy(active = active))
 
-    /** Jadwal sebagai teks untuk dibagikan/cadangan. */
-    suspend fun exportSchedule(): String =
-        ScheduleCodec.encode(
-            courseDao.getAll().map {
-                CourseData(it.name, it.dayOfWeek, it.openMinute, it.closeMinute, it.room, it.active)
-            },
-        )
+    /** Jadwal mingguan sebagai teks untuk dibagikan (kelas pengganti sekali tidak ikut). */
+    suspend fun exportSchedule(): String = ScheduleCodec.encode(currentData())
+
+    /** Jadwal mingguan saja (kelas pengganti tidak dihitung saat impor/dedupe). */
+    private suspend fun weekly(): List<Course> = courseDao.getAll().filter { !it.isOneOff }
 
     /**
      * Impor jadwal dari teks. Entri yang sama persis (nama+hari+jam buka) dengan yang sudah ada
@@ -51,7 +49,7 @@ class Repository(private val db: AppDatabase) {
     suspend fun importSchedule(text: String): Int {
         val incoming = ScheduleCodec.decode(text)
         if (incoming.isEmpty()) return 0
-        val existing = courseDao.getAll()
+        val existing = weekly()
             .map { Triple(it.name.trim().lowercase(), it.dayOfWeek, it.openMinute) }.toHashSet()
         var added = 0
         for (c in incoming) {
@@ -63,9 +61,9 @@ class Repository(private val db: AppDatabase) {
         return added
     }
 
-    /** Jadwal yang sekarang ada, dalam bentuk [CourseData]. */
+    /** Jadwal mingguan yang sekarang ada, dalam bentuk [CourseData]. */
     private suspend fun currentData(): List<CourseData> =
-        courseDao.getAll().map { CourseData(it.name, it.dayOfWeek, it.openMinute, it.closeMinute, it.room, it.active) }
+        weekly().map { CourseData(it.name, it.dayOfWeek, it.openMinute, it.closeMinute, it.room, it.active) }
 
     /** Jadwal hasil baca KRS yang BELUM ada (lihat [com.pengingatabsen.logic.KrsParser.alreadyExists]). */
     suspend fun newFromKrs(fromKrs: List<CourseData>): List<CourseData> {
@@ -74,11 +72,11 @@ class Repository(private val db: AppDatabase) {
     }
 
     /**
-     * Simpan jadwal hasil baca KRS. [replaceAll] = hapus semua jadwal lama dulu (semester baru; riwayat tetap
-     * tersimpan), selain itu hanya menambah yang belum ada. Mengembalikan jumlah jadwal yang ditambah.
+     * Simpan jadwal hasil baca KRS. [replaceAll] = hapus semua jadwal MINGGUAN lama dulu (semester baru; riwayat
+     * & kelas pengganti tetap), selain itu hanya menambah yang belum ada. Mengembalikan jumlah jadwal yang ditambah.
      */
     suspend fun importFromKrs(fromKrs: List<CourseData>, replaceAll: Boolean): Int {
-        if (replaceAll) courseDao.getAll().forEach { deleteCourse(it) }
+        if (replaceAll) weekly().forEach { deleteCourse(it) }
         val toAdd = if (replaceAll) fromKrs.distinct() else newFromKrs(fromKrs)
         toAdd.forEach {
             saveCourse(Course(name = it.name, dayOfWeek = it.dayOfWeek, openMinute = it.openMinute, closeMinute = it.closeMinute, room = it.room))
@@ -89,7 +87,7 @@ class Repository(private val db: AppDatabase) {
     /** Berapa matkul yang akan ditambah bila teks ini diimpor (untuk pratinjau). */
     suspend fun previewImport(text: String): Int {
         val incoming = ScheduleCodec.decode(text)
-        val existing = courseDao.getAll()
+        val existing = weekly()
             .map { Triple(it.name.trim().lowercase(), it.dayOfWeek, it.openMinute) }.toHashSet()
         return incoming.count { existing.add(Triple(it.name.trim().lowercase(), it.dayOfWeek, it.openMinute)) }
     }
@@ -97,7 +95,7 @@ class Repository(private val db: AppDatabase) {
     /** Liburkan kemunculan hari ini (hanya bila matkul memang ada hari ini). */
     suspend fun holidayToday(course: Course, now: LocalDateTime = LocalDateTime.now()) {
         val today = now.toLocalDate()
-        if (course.dayOfWeek != today.dayOfWeek.value) return
+        if (!ScheduleMath.isOn(course.toSlot(), today)) return
         applySkip(course, today, listOf(today))
     }
 
@@ -106,8 +104,45 @@ class Repository(private val db: AppDatabase) {
         val today = now.toLocalDate()
         val monday = today.minusDays((today.dayOfWeek.value - 1).toLong())
         val sunday = monday.plusDays(6)
-        val date = monday.plusDays((course.dayOfWeek - 1).toLong())
-        applySkip(course, sunday, if (date.isBefore(today)) emptyList() else listOf(date))
+        val date = course.oneOffDate ?: monday.plusDays((course.dayOfWeek - 1).toLong())
+        val inWeek = !date.isBefore(today) && !date.isAfter(sunday)
+        applySkip(course, sunday, if (inWeek) listOf(date) else emptyList())
+    }
+
+    /**
+     * Kelas pengganti: jadwal SEKALI pada [date] untuk matkul [source] (nama sama → kartu SiAdin tetap cocok).
+     * [skipRegularOn]: kemunculan jadwal biasa yang digantikan, diliburkan sekalian (bisa dibatalkan lewat
+     * "Batalkan libur"). Mengembalikan id kelas pengganti.
+     */
+    suspend fun addReplacement(
+        source: Course,
+        date: LocalDate,
+        openMinute: Int,
+        closeMinute: Int?,
+        room: String?,
+        skipRegularOn: LocalDate?,
+    ): Long {
+        val id = saveCourse(
+            Course(
+                name = source.name,
+                dayOfWeek = date.dayOfWeek.value,
+                openMinute = openMinute,
+                closeMinute = closeMinute,
+                room = room,
+                oneOffEpochDay = date.toEpochDay(),
+            ),
+        )
+        if (skipRegularOn != null && !source.isOneOff) {
+            val fresh = courseDao.get(source.id) ?: source
+            applySkip(fresh, skipRegularOn, listOf(skipRegularOn))
+        }
+        return id
+    }
+
+    /** Kelas pengganti yang sudah lewat lebih dari [keepDays] hari dihapus dari daftar (riwayatnya tetap). */
+    suspend fun cleanupOldOneOffs(today: LocalDate = LocalDate.now(), keepDays: Long = 7) {
+        val limit = today.minusDays(keepDays).toEpochDay()
+        courseDao.getAll().filter { (it.oneOffEpochDay ?: Long.MAX_VALUE) < limit }.forEach { deleteCourse(it) }
     }
 
     /**
@@ -119,7 +154,7 @@ class Repository(private val db: AppDatabase) {
         val today = now.toLocalDate()
         if (until.isBefore(today)) return
         for (course in courseDao.getAll()) {
-            val dates = if (course.dayOfWeek == today.dayOfWeek.value) listOf(today) else emptyList()
+            val dates = if (ScheduleMath.isOn(course.toSlot(), today)) listOf(today) else emptyList()
             applySkip(course, until, dates)
         }
     }
@@ -264,7 +299,7 @@ class Repository(private val db: AppDatabase) {
     private suspend fun nearestCourseToday(now: LocalDateTime): Course? {
         val minute = now.hour * 60 + now.minute
         return courseDao.getAll()
-            .filter { it.active && it.dayOfWeek == now.dayOfWeek.value }
+            .filter { it.active && ScheduleMath.isOn(it.toSlot(), now.toLocalDate()) }
             .minByOrNull { kotlin.math.abs(it.openMinute - minute) }
     }
 

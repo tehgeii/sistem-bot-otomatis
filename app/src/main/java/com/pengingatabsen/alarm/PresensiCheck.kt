@@ -53,7 +53,7 @@ object PresensiCheck {
         checkMissedAlarms(ctx)
         if (!settings.smartModeActive) return
         val target = Graph.repository.allCourses().filter { it.active }
-            .map { it to com.pengingatabsen.logic.ScheduleMath.nextOccurrence(it.toSlot(), now.minusMinutes(1)) }
+            .mapNotNull { c -> com.pengingatabsen.logic.ScheduleMath.nextOccurrence(c.toSlot(), now.minusMinutes(1))?.let { c to it } }
             .minByOrNull { it.second.open } ?: return
         val (course, occ) = target
         val label = "${course.name} ${Formatters.hm(occ.open)}"

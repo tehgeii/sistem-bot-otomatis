@@ -33,7 +33,7 @@ object Readiness {
 
     /** Jam buka kemunculan pertama pada [date] (null bila tidak ada kuliah hari itu). */
     fun firstOpenOn(slots: List<Slot>, date: LocalDate): LocalDateTime? =
-        slots.filter { it.dayOfWeek == date.dayOfWeek.value && !ScheduleMath.isSkipped(it, date) }
+        slots.filter { ScheduleMath.isOn(it, date) && !ScheduleMath.isSkipped(it, date) }
             .minOfOrNull { ScheduleMath.occurrenceOn(it, date).open }
 
     /**
@@ -53,7 +53,7 @@ object Readiness {
         return armed.filter { it.epochDay >= oldest }.mapNotNull { a ->
             val slot = slots[a.courseId] ?: return@mapNotNull null
             val date = LocalDate.ofEpochDay(a.epochDay)
-            if (date.dayOfWeek.value != slot.dayOfWeek || ScheduleMath.isSkipped(slot, date)) return@mapNotNull null
+            if (!ScheduleMath.isOn(slot, date) || ScheduleMath.isSkipped(slot, date)) return@mapNotNull null
             val occ = ScheduleMath.occurrenceOn(slot, date)
             val late = !occ.open.plusMinutes(MISSED_GRACE_MINUTES).isAfter(now)
             if (late && !hasRecord(a)) a to occ else null

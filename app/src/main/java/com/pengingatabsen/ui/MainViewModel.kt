@@ -81,6 +81,9 @@ class MainViewModel : ViewModel() {
     fun closeKrs() { krsImport.value = KrsImport.Idle }
 
     fun save(course: Course) = viewModelScope.launch { repo.saveCourse(course) }
+    fun addReplacement(source: Course, draft: com.pengingatabsen.ui.schedule.ReplacementDraft) = viewModelScope.launch {
+        repo.addReplacement(source, draft.date, draft.openMinute, draft.closeMinute, draft.room, draft.skipRegularOn)
+    }
     fun delete(course: Course) = viewModelScope.launch { repo.deleteCourse(course) }
     fun setActive(course: Course, active: Boolean) = viewModelScope.launch { repo.setActive(course, active) }
     fun holidayToday(course: Course) = viewModelScope.launch { repo.holidayToday(course) }

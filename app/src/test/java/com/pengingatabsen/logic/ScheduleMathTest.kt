@@ -1,7 +1,9 @@
 package com.pengingatabsen.logic
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -18,42 +20,42 @@ class ScheduleMathTest {
 
     @Test
     fun nextOccurrence_sameDayBeforeOpen() {
-        val occ = ScheduleMath.nextOccurrence(senin0700, at(monday, 6, 0))
+        val occ = ScheduleMath.nextOccurrence(senin0700, at(monday, 6, 0))!!
         assertEquals(at(monday, 7, 0), occ.open)
         assertEquals(at(monday, 7, 20), occ.end)
     }
 
     @Test
     fun nextOccurrence_afterOpenGoesToNextWeek() {
-        val occ = ScheduleMath.nextOccurrence(senin0700, at(monday, 7, 0))
+        val occ = ScheduleMath.nextOccurrence(senin0700, at(monday, 7, 0))!!
         assertEquals(at(monday.plusWeeks(1), 7, 0), occ.open)
     }
 
     @Test
     fun nextOccurrence_laterInWeek() {
         val jumat = Slot(dayOfWeek = 5, openMinute = mins(13, 0), closeMinute = null)
-        val occ = ScheduleMath.nextOccurrence(jumat, at(monday, 9, 0))
+        val occ = ScheduleMath.nextOccurrence(jumat, at(monday, 9, 0))!!
         assertEquals(at(monday.plusDays(4), 13, 0), occ.open)
     }
 
     @Test
     fun nextOccurrence_dayAlreadyPassedThisWeek() {
         // Rabu, cari Senin → Senin depan
-        val occ = ScheduleMath.nextOccurrence(senin0700, at(monday.plusDays(2), 10, 0))
+        val occ = ScheduleMath.nextOccurrence(senin0700, at(monday.plusDays(2), 10, 0))!!
         assertEquals(at(monday.plusWeeks(1), 7, 0), occ.open)
     }
 
     @Test
     fun nextOccurrence_skipsHoliday() {
         val libur = senin0700.copy(skipUntil = monday)
-        val occ = ScheduleMath.nextOccurrence(libur, at(monday, 6, 0))
+        val occ = ScheduleMath.nextOccurrence(libur, at(monday, 6, 0))!!
         assertEquals(at(monday.plusWeeks(1), 7, 0), occ.open)
     }
 
     @Test
     fun nextOccurrence_skipUntilEndOfWeek() {
         val libur = senin0700.copy(skipUntil = monday.plusDays(6))
-        val occ = ScheduleMath.nextOccurrence(libur, at(monday, 6, 0))
+        val occ = ScheduleMath.nextOccurrence(libur, at(monday, 6, 0))!!
         assertEquals(at(monday.plusWeeks(1), 7, 0), occ.open)
     }
 
@@ -177,15 +179,15 @@ class ScheduleMathTest {
     @Test
     fun plan_beforeOpenSchedulesOpen() {
         val p = ScheduleMath.plan(senin0700, at(monday, 6, 0), 3) { null }
-        assertEquals(EventType.OPEN, p.event.type)
-        assertEquals(at(monday, 7, 0), p.event.time)
+        assertEquals(EventType.OPEN, p!!.event.type)
+        assertEquals(at(monday, 7, 0), p!!.event.time)
     }
 
     @Test
     fun plan_insideWindowContinuesReminders() {
         val p = ScheduleMath.plan(senin0700, at(monday, 7, 4), 3) { OccurrenceState(finished = false) }
-        assertEquals(EventType.REMIND, p.event.type)
-        assertEquals(at(monday, 7, 6), p.event.time)
+        assertEquals(EventType.REMIND, p!!.event.type)
+        assertEquals(at(monday, 7, 6), p!!.event.time)
     }
 
     @Test
@@ -193,8 +195,8 @@ class ScheduleMathTest {
         val p = ScheduleMath.plan(senin0700, at(monday, 7, 4), 3) { d ->
             if (d == monday) OccurrenceState(finished = true) else null
         }
-        assertEquals(EventType.OPEN, p.event.type)
-        assertEquals(at(monday.plusWeeks(1), 7, 0), p.event.time)
+        assertEquals(EventType.OPEN, p!!.event.type)
+        assertEquals(at(monday.plusWeeks(1), 7, 0), p!!.event.time)
     }
 
     @Test
@@ -202,7 +204,7 @@ class ScheduleMathTest {
         val p = ScheduleMath.plan(senin0700, at(monday, 7, 1), 3) {
             OccurrenceState(finished = false, snoozeUntil = at(monday, 7, 6))
         }
-        assertEquals(at(monday, 7, 6), p.event.time)
+        assertEquals(at(monday, 7, 6), p!!.event.time)
     }
 
     @Test
@@ -211,7 +213,82 @@ class ScheduleMathTest {
         val p = ScheduleMath.plan(senin0700, at(monday, 8, 0), 3) { d ->
             if (d == nextMonday) OccurrenceState(finished = true) else null
         }
-        assertEquals(at(monday.plusWeeks(2), 7, 0), p.event.time)
+        assertEquals(at(monday.plusWeeks(2), 7, 0), p!!.event.time)
+    }
+
+    // ---------- Kelas pengganti (sekali saja) ----------
+
+    // Kamis 8 Okt 2026, 12:30–15:00.
+    private val kamis = monday.plusDays(3)
+    private val pengganti = Slot(dayOfWeek = 4, openMinute = mins(12, 30), closeMinute = mins(15, 0), onlyDate = kamis)
+
+    @Test
+    fun oneOff_onlyOnItsDate() {
+        assertTrue(ScheduleMath.isOn(pengganti, kamis))
+        assertFalse(ScheduleMath.isOn(pengganti, kamis.plusWeeks(1)))
+        assertFalse(ScheduleMath.isOn(pengganti, kamis.minusWeeks(1)))
+        assertFalse(ScheduleMath.isOn(pengganti, kamis.plusDays(1)))
+        // Jadwal mingguan tetap tiap minggu.
+        assertTrue(ScheduleMath.isOn(senin0700, monday.plusWeeks(3)))
+        assertFalse(ScheduleMath.isOn(senin0700, monday.plusDays(1)))
+    }
+
+    @Test
+    fun oneOff_nextOccurrenceOnceThenNothing() {
+        assertEquals(at(kamis, 12, 30), ScheduleMath.nextOccurrence(pengganti, at(monday, 8, 0))?.open)
+        assertEquals(at(kamis, 15, 0), ScheduleMath.nextOccurrence(pengganti, at(monday, 8, 0))?.end)
+        assertNull(ScheduleMath.nextOccurrence(pengganti, at(kamis, 12, 30)))
+        assertNull(ScheduleMath.nextOccurrence(pengganti, at(kamis.plusWeeks(1), 0, 0)))
+        // Diliburkan → tidak ada lagi.
+        assertNull(ScheduleMath.nextOccurrence(pengganti.copy(skipUntil = kamis), at(monday, 8, 0)))
+    }
+
+    @Test
+    fun oneOff_currentOnlyOnItsDate() {
+        assertEquals(at(kamis, 12, 30), ScheduleMath.currentOccurrence(pengganti, at(kamis, 13, 0))?.open)
+        assertNull(ScheduleMath.currentOccurrence(pengganti, at(kamis.plusWeeks(1), 13, 0)))
+        assertNull(ScheduleMath.currentOccurrence(pengganti, at(kamis.minusWeeks(1), 13, 0)))
+        assertNull(ScheduleMath.currentOccurrence(pengganti, at(kamis, 12, 29)))
+    }
+
+    @Test
+    fun oneOff_planStopsAfterItsWindow() {
+        val p = ScheduleMath.plan(pengganti, at(monday, 8, 0), 3) { null }
+        assertEquals(EventType.OPEN, p?.event?.type)
+        assertEquals(at(kamis, 12, 30), p?.event?.time)
+        // Sedang berlangsung → pengingat lanjut.
+        val during = ScheduleMath.plan(pengganti, at(kamis, 12, 31), 3) { null }
+        assertEquals(EventType.REMIND, during?.event?.type)
+        assertEquals(at(kamis, 12, 33), during?.event?.time)
+        // Sudah dicatat selesai, atau jendela sudah lewat → tidak ada alarm lagi.
+        assertNull(ScheduleMath.plan(pengganti, at(kamis, 12, 31), 3) { OccurrenceState(finished = true) })
+        assertNull(ScheduleMath.plan(pengganti, at(kamis, 15, 0), 3) { null })
+        assertNull(ScheduleMath.plan(pengganti, at(kamis.plusDays(1), 8, 0), 3) { null })
+    }
+
+    @Test
+    fun replacedOccurrence_nextRegularWithinSixDays() {
+        val kamisBiasa = Slot(dayOfWeek = 4, openMinute = mins(12, 30), closeMinute = mins(15, 0))
+        // Senin 5 Okt: Kamis 8 Okt dipindah ke Sabtu 10 Okt → yang digantikan Kamis 8 Okt.
+        assertEquals(kamis, ScheduleMath.replacedOccurrence(kamisBiasa, kamis.plusDays(2), at(monday, 8, 0)))
+        // Dipindah lebih awal (Selasa 6 Okt) → tetap Kamis 8 Okt.
+        assertEquals(kamis, ScheduleMath.replacedOccurrence(kamisBiasa, monday.plusDays(1), at(monday, 8, 0)))
+        // Dipindah ke Senin minggu depan (selisih 4 hari) → Kamis 8 Okt.
+        assertEquals(kamis, ScheduleMath.replacedOccurrence(kamisBiasa, monday.plusWeeks(1), at(monday, 8, 0)))
+        // Sedang berlangsung hari ini → yang hari ini.
+        assertEquals(kamis, ScheduleMath.replacedOccurrence(kamisBiasa, kamis.plusDays(1), at(kamis, 13, 0)))
+        // Pengganti 2 minggu lagi → tidak jelas mana yang digantikan.
+        assertNull(ScheduleMath.replacedOccurrence(kamisBiasa, kamis.plusWeeks(2), at(monday, 8, 0)))
+        // Kelas pengganti tidak bisa digantikan lagi.
+        assertNull(ScheduleMath.replacedOccurrence(pengganti, kamis.plusDays(1), at(monday, 8, 0)))
+    }
+
+    @Test
+    fun weeklyHolidayRecordForReplacedClass() {
+        // Kelas biasa Kamis diganti: kemunculan Kamis ini dicatat libur → alarm loncat ke minggu depan.
+        val kamisBiasa = Slot(dayOfWeek = 4, openMinute = mins(12, 30), closeMinute = mins(15, 0))
+        val p = ScheduleMath.plan(kamisBiasa, at(monday, 8, 0), 3) { d -> if (d == kamis) OccurrenceState(finished = true) else null }
+        assertEquals(at(kamis.plusWeeks(1), 12, 30), p?.event?.time)
     }
 
     // ---------- Interval pengecekan adaptif (hemat kuota) ----------

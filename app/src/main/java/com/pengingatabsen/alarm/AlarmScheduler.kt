@@ -62,6 +62,11 @@ object AlarmScheduler {
                 OccurrenceState(it.status.finished, it.snoozeUntilMillis?.toLocalDateTime())
             }
         }
+        if (planned == null) {
+            // Tidak ada lagi yang perlu diingatkan (kelas pengganti yang sudah lewat/selesai).
+            cancel(context, courseId)
+            return
+        }
         val exact = set(context, courseId, planned)
         // Ingat alarm jam buka yang sudah dipasang, untuk mendeteksi alarm yang tidak pernah berbunyi.
         if (planned.event.type == com.pengingatabsen.logic.EventType.OPEN) {
@@ -79,6 +84,7 @@ object AlarmScheduler {
     /** Dipanggil saat boot, update aplikasi, perubahan jam/zona waktu, atau aplikasi dibuka. */
     suspend fun rescheduleAll(context: Context) {
         expireStale(context)
+        Graph.repository.cleanupOldOneOffs()
         for (course in Graph.repository.allCourses()) reschedule(context, course.id)
         NextCourseWidget.updateAll(context)
         SummaryWorker.schedule(context, Graph.settings.current().weeklySummary)
