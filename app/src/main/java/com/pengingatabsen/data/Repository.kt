@@ -16,6 +16,9 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 
+/** Hasil pulihkan cadangan: jumlah riwayat yang masuk + masalah setelah data diganti (kosong = semua beres). */
+data class RestoreResult(val records: Int, val problems: List<String>)
+
 /** Satu-satunya pintu ke database untuk UI dan receiver. */
 class Repository(private val db: AppDatabase) {
     private val courseDao get() = db.courseDao()
@@ -344,7 +347,7 @@ class Repository(private val db: AppDatabase) {
      * terapkan pengaturannya, lalu pasang ulang semua alarm. Riwayat yang dulu "berlangsung" tapi jendelanya
      * sudah lewat dicatat terlewat TANPA mengirim pesan Telegram lagi. Mengembalikan jumlah riwayat yang masuk.
      */
-    suspend fun restoreBackup(backup: Backup, nowMillis: Long = System.currentTimeMillis()): Int {
+    suspend fun restoreBackup(backup: Backup, nowMillis: Long = System.currentTimeMillis()): RestoreResult {
         val context = Graph.appContext
         val oldIds = courseDao.getAll().map { it.id }
         var restored = 0
@@ -373,14 +376,31 @@ class Repository(private val db: AppDatabase) {
                 )
                 if (id > 0) restored++
             }
+            // Matkul baru nanti tidak boleh memakai id matkul lama yang sudah dihapus tapi riwayatnya masih ada
+            // (riwayat dicari lewat id). Penghitung id dinaikkan melewati id terbesar di jadwal & riwayat.
+            val maxId = maxOf(backup.courses.maxOfOrNull { it.id } ?: 0L, backup.records.maxOfOrNull { it.courseId } ?: 0L)
+            if (maxId > 0) {
+                val sql = db.openHelper.writableDatabase
+                sql.execSQL("UPDATE sqlite_sequence SET seq = ? WHERE name = 'courses' AND seq < ?", arrayOf<Any>(maxId, maxId))
+                sql.execSQL(
+                    "INSERT INTO sqlite_sequence(name, seq) SELECT 'courses', ? WHERE NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = 'courses')",
+                    arrayOf<Any>(maxId),
+                )
+            }
         }
+        // Jadwal & riwayat SUDAH diganti. Langkah berikut dicoba satu per satu; kegagalan dilaporkan apa adanya.
+        val problems = mutableListOf<String>()
         for (id in oldIds) {
-            AlarmScheduler.cancel(context, id)
-            Notifications.cancel(context, id)
+            runCatching {
+                AlarmScheduler.cancel(context, id)
+                Notifications.cancel(context, id)
+            }
         }
-        Graph.settings.restorePrefs(backup.settings)
-        AlarmScheduler.rescheduleAll(context)
-        return restored
+        runCatching { Graph.settings.restorePrefs(backup.settings) }
+            .onFailure { problems += "pengaturan tidak terpulihkan (${it.javaClass.simpleName})" }
+        runCatching { AlarmScheduler.rescheduleAll(context) }
+            .onFailure { problems += "alarm belum terpasang — buka NgiBsen sekali lagi (${it.javaClass.simpleName})" }
+        return RestoreResult(restored, problems)
     }
 
     /** Dipanggil setiap jadwal berubah. */

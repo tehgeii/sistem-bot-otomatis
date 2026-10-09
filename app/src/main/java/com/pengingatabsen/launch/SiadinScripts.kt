@@ -14,6 +14,8 @@ object SiadinScripts {
         val host = uri.host?.lowercase() ?: return false
         val targetHost = Uri.parse(targetUrl).host?.lowercase() ?: return false
         if (!uri.scheme.equals("https", ignoreCase = true)) return false
+        // NIM/password SiAdin hanya boleh diisikan di domain kampus, apa pun tautan tujuan yang diatur.
+        if (!com.pengingatabsen.logic.SiadinUrls.isCampusHost(host)) return false
         if (host == targetHost) return true
         val labels = targetHost.split('.')
         // mhs.dinus.ac.id → izinkan juga *.dinus.ac.id (mis. halaman SSO kampus).

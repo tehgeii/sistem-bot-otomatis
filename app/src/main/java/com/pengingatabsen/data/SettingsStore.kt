@@ -9,7 +9,6 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.pengingatabsen.launch.TargetApps
 import com.pengingatabsen.logic.ScheduleMath
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -69,7 +68,7 @@ data class AppSettings(
 
     /** Mode pintar hanya berlaku untuk SiAdin web dengan login tersimpan. */
     val smartModeActive: Boolean
-        get() = smartPresensi && hasSiadinLogin && deepLink?.startsWith(TargetApps.SIADIN_ORIGIN) == true
+        get() = smartPresensi && hasSiadinLogin && com.pengingatabsen.logic.SiadinUrls.isSiadinUrl(deepLink)
 
     val telegramReady: Boolean get() = hasBotToken && !chatId.isNullOrBlank()
 }
@@ -152,10 +151,17 @@ class SettingsStore(private val context: Context) {
      * sementara yang memakai id matkul lama (presensi dibuka, alarm terpasang, hitungan gagal).
      */
     suspend fun restorePrefs(values: Map<String, Any>) = context.dataStore.edit { p ->
-        backupBooleans.forEach { k -> (values[k.name] as? Boolean)?.let { p[k] = it } }
-        backupInts.forEach { k -> (values[k.name] as? Number)?.let { p[k] = it.toInt() } }
-        backupLongs.forEach { k -> (values[k.name] as? Number)?.let { p[k] = it.toLong() } }
-        backupStrings.forEach { k -> (values[k.name] as? String)?.takeIf { it.isNotBlank() }?.let { p[k] = it } }
+        // Pengaturan yang tidak ada di cadangan dikembalikan ke bawaan (isi cadangan MENGGANTI, bukan digabung).
+        backupBooleans.forEach { k -> (values[k.name] as? Boolean)?.let { p[k] = it } ?: p.remove(k) }
+        backupInts.forEach { k -> (values[k.name] as? Number)?.let { p[k] = it.toInt() } ?: p.remove(k) }
+        backupLongs.forEach { k -> (values[k.name] as? Number)?.let { p[k] = it.toLong() } ?: p.remove(k) }
+        backupStrings.forEach { k -> (values[k.name] as? String)?.takeIf { it.isNotBlank() }?.let { p[k] = it } ?: p.remove(k) }
+        // Tautan tujuan dari file: hanya SiAdin asli atau tautan aplikasi (bukan situs web lain).
+        p[Keys.DEEP_LINK]?.let { link ->
+            val web = link.startsWith("http://", ignoreCase = true) || link.startsWith("https://", ignoreCase = true)
+            if (web && !com.pengingatabsen.logic.SiadinUrls.isSiadinUrl(link)) p.remove(Keys.DEEP_LINK)
+        }
+        p[Keys.SEMESTER_START]?.let { if (it !in com.pengingatabsen.logic.BackupCodec.PLAUSIBLE_DAYS) p.remove(Keys.SEMESTER_START) }
         p[Keys.REMIND_INTERVAL]?.let { p[Keys.REMIND_INTERVAL] = it.coerceIn(1, 30) }
         p[Keys.MEETINGS]?.let { p[Keys.MEETINGS] = it.coerceIn(MEETINGS_RANGE) }
         p[Keys.MIN_PERCENT]?.let { p[Keys.MIN_PERCENT] = it.coerceIn(0, 100) }

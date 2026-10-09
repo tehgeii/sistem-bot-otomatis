@@ -63,6 +63,7 @@ object HistoryExporter {
     private const val H = 842
     private const val M = 40f
     private const val ROW = 15f
+    private const val MAX_SUMMARY = 16
 
     private fun writePdf(rows: List<ExportRow>, out: OutputStream) {
         val title = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD }
@@ -71,7 +72,10 @@ object HistoryExporter {
         val muted = Paint(text).apply { color = 0xFF555555.toInt() }
         val line = Paint().apply { color = 0xFFBBBBBB.toInt(); strokeWidth = 0.6f }
 
-        val summary = HistoryExport.summaryLines(rows)
+        // Ringkasan dibatasi supaya tabel tetap muat di halaman 1.
+        val allSummary = HistoryExport.summaryLines(rows)
+        val summary = if (allSummary.size <= MAX_SUMMARY) allSummary
+        else allSummary.take(MAX_SUMMARY - 1) + "… dan ${allSummary.size - MAX_SUMMARY + 1} matkul lainnya"
         val range = if (rows.isEmpty()) "belum ada riwayat" else "${Formatters.date(rows.first().date)} – ${Formatters.date(rows.last().date)}"
         // Tinggi kepala halaman 1: judul + keterangan + ringkasan; halaman lain hanya kepala tabel.
         val headTop = M + 20f + 14f * 2 + (if (summary.isEmpty()) 0f else 14f + summary.size * 13f) + 10f

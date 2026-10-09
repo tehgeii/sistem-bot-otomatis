@@ -87,9 +87,9 @@ class CheckerBrain(
 
     fun next(tick: Int, page: PageKind, probe: Probe): Step {
         if (tick >= deadline) {
-            // Halaman presensi sudah terbuka tapi statusnya tak pernah terbaca stabil → curiga tampilan berubah.
-            // Masih di halaman lain/memuat (internet lambat) → bukan.
-            val suspect = lastKey?.startsWith("${PageKind.TARGET}/") == true
+            // Halaman presensi sudah TERMUAT tapi statusnya tak pernah terbaca stabil → curiga tampilan berubah.
+            // Masih di halaman lain, atau halaman presensi masih "memuat" (internet lambat) → bukan.
+            val suspect = lastKey?.startsWith("${PageKind.TARGET}/") == true && lastKey != "${PageKind.TARGET}/${Probe.LOADING}"
             return Step.Finish(Outcome.UNKNOWN, "waktu habis ($deadline dtk), terakhir terbaca: $lastKey", suspect)
         }
         if (page == PageKind.UNTRUSTED) return Step.Finish(Outcome.UNKNOWN, "halaman di luar SiAdin")

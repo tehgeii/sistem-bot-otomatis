@@ -47,6 +47,12 @@ object BackupCodec {
     const val FORMAT = "NGIBSEN-CADANGAN"
     const val VERSION = 1
 
+    /**
+     * Tanggal (epoch day) yang masuk akal: tahun 2000–2100. Nilai di luar ini (file rusak/diubah) dibuang supaya
+     * tidak membuat aplikasi macet saat menghitung jadwal.
+     */
+    val PLAUSIBLE_DAYS: LongRange = java.time.LocalDate.of(2000, 1, 1).toEpochDay()..java.time.LocalDate.of(2100, 12, 31).toEpochDay()
+
     fun fileName(date: java.time.LocalDate): String = "NgiBsen-cadangan-$date.json"
 
     fun encode(backup: Backup): String {
@@ -125,16 +131,19 @@ object BackupCodec {
                 if (name.isEmpty() || day !in 1..7 || open !in 0 until 24 * 60) continue
                 val id = o.optLong("id", 0)
                 if (id > 0 && !seenIds.add(id)) continue
+                // Kelas pengganti dengan tanggal tak masuk akal dibuang; hari mengikuti tanggalnya.
+                val oneOff = o.optLongOrNull("oneOffEpochDay")
+                if (oneOff != null && oneOff !in PLAUSIBLE_DAYS) continue
                 courses += BackupCourse(
                     id = id,
                     name = name,
-                    dayOfWeek = day,
+                    dayOfWeek = oneOff?.let { java.time.LocalDate.ofEpochDay(it).dayOfWeek.value } ?: day,
                     openMinute = open,
                     closeMinute = o.optIntOrNull("closeMinute")?.takeIf { it in 0..24 * 60 },
                     room = o.optStringOrNull("room"),
                     active = o.optBoolean("active", true),
-                    skipUntilEpochDay = o.optLongOrNull("skipUntilEpochDay"),
-                    oneOffEpochDay = o.optLongOrNull("oneOffEpochDay"),
+                    skipUntilEpochDay = o.optLongOrNull("skipUntilEpochDay")?.takeIf { it in PLAUSIBLE_DAYS },
+                    oneOffEpochDay = oneOff,
                 )
             }
         }
@@ -149,6 +158,8 @@ object BackupCodec {
                 if (status.isEmpty() || name.isEmpty() || !o.has("epochDay") || !o.has("openAtMillis")) continue
                 val courseId = o.optLong("courseId", 0)
                 val epochDay = o.optLong("epochDay")
+                // Riwayat matkul harus bertanggal wajar ("Tanpa matkul", id 0, memakai nilai negatif khusus).
+                if (courseId > 0 && epochDay !in PLAUSIBLE_DAYS) continue
                 // Satu kemunculan (matkul + tanggal) hanya boleh satu baris riwayat.
                 if (!seenOccurrences.add(courseId to epochDay)) continue
                 val open = o.optLong("openAtMillis")

@@ -166,17 +166,42 @@ class SetupViewModel : ViewModel() {
         }
     }
 
-    fun confirmRestore() = viewModelScope.launch {
+    /** Salinan otomatis data HP ini sesaat sebelum memulihkan (untuk "Kembalikan data sebelum pemulihan"). */
+    private fun safetyFile(context: Context) = java.io.File(context.filesDir, "sebelum-pulihkan.json")
+
+    fun hasSafetyCopy(context: Context): Boolean = safetyFile(context).exists()
+
+    /** Tampilkan pratinjau salinan otomatis sebelum pemulihan terakhir (lalu dikonfirmasi seperti biasa). */
+    fun readSafetyCopy(context: Context) = readBackup(context, android.net.Uri.fromFile(safetyFile(context)))
+
+    fun confirmRestore(context: Context) = viewModelScope.launch {
         val preview = backupUi as? BackupUi.Preview ?: return@launch
         backupUi = BackupUi.Working("Memulihkan data…")
+        // Simpan dulu data HP ini; kalau salah pilih file, bisa dikembalikan. Gagal menyimpan = batal memulihkan.
+        val saved = runCatching {
+            val current = com.pengingatabsen.logic.BackupCodec.encode(Graph.repository.buildBackup(appVersion(context)))
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { safetyFile(context).writeText(current) }
+        }
+        if (saved.isFailure) {
+            backupUi = BackupUi.Failed("Batal: salinan data HP ini tidak bisa dibuat dulu, jadi tidak ada yang diubah.")
+            return@launch
+        }
         backupUi = runCatching {
-            val records = Graph.repository.restoreBackup(preview.backup)
-            com.pengingatabsen.data.DiagLog.add("cadangan: dipulihkan (${preview.backup.courses.size} jadwal, $records riwayat)")
-            BackupUi.Done(
-                "Data dipulihkan: ${preview.backup.courses.size} jadwal, $records riwayat. Alarm sudah dipasang ulang.\n\n" +
-                    "Langkah berikutnya: isi NIM/password di SiAdin web dan sambungkan bot Telegram lagi.",
+            val result = Graph.repository.restoreBackup(preview.backup)
+            com.pengingatabsen.data.DiagLog.add(
+                "cadangan: dipulihkan (${preview.backup.courses.size} jadwal, ${result.records} riwayat)" +
+                    if (result.problems.isEmpty()) "" else " — ${result.problems.joinToString("; ")}",
             )
-        }.getOrElse { BackupUi.Failed("Gagal memulihkan; data di HP ini tidak berubah (${it.message ?: it.javaClass.simpleName}).") }
+            val warn = if (result.problems.isEmpty()) "Alarm sudah dipasang ulang." else "⚠️ ${result.problems.joinToString("; ")}."
+            BackupUi.Done(
+                "Data dipulihkan: ${preview.backup.courses.size} jadwal, ${result.records} riwayat. $warn\n\n" +
+                    "Langkah berikutnya: isi NIM/password di SiAdin web dan sambungkan bot Telegram lagi.\n\n" +
+                    "Salah file? Pengaturan → Cadangan data → \"Kembalikan data sebelum pemulihan\".",
+            )
+        }.getOrElse {
+            // Penggantian jadwal & riwayat berjalan dalam satu transaksi: bila gagal di sini, tidak ada yang berubah.
+            BackupUi.Failed("Gagal memulihkan; jadwal & riwayat di HP ini tidak berubah (${it.message ?: it.javaClass.simpleName}).")
+        }
     }
 
     // ---------- Aplikasi tujuan ----------

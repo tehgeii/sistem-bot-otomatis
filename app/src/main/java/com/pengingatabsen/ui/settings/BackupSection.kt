@@ -17,6 +17,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -65,12 +66,18 @@ fun BackupSection(vm: SetupViewModel, restoreOnly: Boolean = false) {
                 Text("Pulihkan")
             }
         }
+        // Dibaca ulang setiap kali dialog berubah (mis. setelah pemulihan membuat salinan baru).
+        val hasSafety = remember(vm.backupUi) { vm.hasSafetyCopy(context) }
+        if (hasSafety) {
+            TextButton(onClick = { vm.readSafetyCopy(context) }) { Text("Kembalikan data sebelum pemulihan terakhir") }
+        }
     }
     BackupDialog(vm)
 }
 
 @Composable
 private fun BackupDialog(vm: SetupViewModel) {
+    val context = LocalContext.current
     when (val st = vm.backupUi) {
         SetupViewModel.BackupUi.Idle -> Unit
         is SetupViewModel.BackupUi.Working -> AlertDialog(
@@ -87,7 +94,7 @@ private fun BackupDialog(vm: SetupViewModel) {
                     Text(st.summary, style = MaterialTheme.typography.bodyMedium)
                 }
             },
-            confirmButton = { TextButton(onClick = { vm.confirmRestore() }) { Text("Ganti & pulihkan") } },
+            confirmButton = { TextButton(onClick = { vm.confirmRestore(context) }) { Text("Ganti & pulihkan") } },
             dismissButton = { TextButton(onClick = { vm.closeBackup() }) { Text("Batal") } },
         )
         is SetupViewModel.BackupUi.Done -> AlertDialog(

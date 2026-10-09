@@ -12,13 +12,13 @@ class BackupCodecTest {
         appVersion = "3.1",
         courses = listOf(
             BackupCourse(1, "Sistem Terdistribusi 4512", 4, 12 * 60 + 30, 15 * 60, "Kulino", true, null, null),
-            BackupCourse(2, "MPTI 4515", 3, 12 * 60 + 30, null, null, false, 20_380L, null),
-            // Kelas pengganti Sabtu 10 Okt 2026.
-            BackupCourse(3, "MPTI 4515", 6, 8 * 60, 10 * 60, "H.5.9", true, null, 20_371L),
+            BackupCourse(2, "MPTI 4515", 3, 12 * 60 + 30, null, null, false, 20_743L, null),
+            // Kelas pengganti Sabtu 10 Okt 2026 (epoch day 20736).
+            BackupCourse(3, "MPTI 4515", 6, 8 * 60, 10 * 60, "H.5.9", true, null, 20_736L),
         ),
         records = listOf(
-            BackupRecord(1, "Sistem Terdistribusi 4512", 20_369L, 1_760_000_000_000, 1_760_009_000_000, "SENT", 1_760_000_100_000, null),
-            BackupRecord(2, "MPTI | koma, \"kutip\"", 20_368L, 1_759_900_000_000, 1_759_909_000_000, "MISSED", null, "gagal: tidak ada koneksi"),
+            BackupRecord(1, "Sistem Terdistribusi 4512", 20_734L, 1_760_000_000_000, 1_760_009_000_000, "SENT", 1_760_000_100_000, null),
+            BackupRecord(2, "MPTI | koma, \"kutip\"", 20_733L, 1_759_900_000_000, 1_759_909_000_000, "MISSED", null, "gagal: tidak ada koneksi"),
             BackupRecord(0, "Tanpa matkul", -1_760_000_000_000, 1_760_000_000_000, 1_760_000_000_000, "QUEUED", 1_760_000_000_000, null),
         ),
         settings = mapOf("remind_interval" to 3, "vibrate_only" to true, "deep_link" to "https://mhs.dinus.ac.id/akademik/presensiOnline"),
@@ -64,10 +64,10 @@ class BackupCodecTest {
                {"id":5,"name":"D","dayOfWeek":5,"openMinute":600,"closeMinute":null,"room":null}
              ],
              "records":[
-               {"courseId":1,"courseName":"A","epochDay":10,"openAtMillis":5,"status":"SENT"},
-               {"courseId":1,"courseName":"A","epochDay":10,"openAtMillis":6,"status":"MISSED"},
-               {"courseId":1,"courseName":"A","epochDay":11,"status":"SENT"},
-               {"courseId":1,"courseName":"A","epochDay":12,"openAtMillis":7,"status":""}
+               {"courseId":1,"courseName":"A","epochDay":20733,"openAtMillis":5,"status":"SENT"},
+               {"courseId":1,"courseName":"A","epochDay":20733,"openAtMillis":6,"status":"MISSED"},
+               {"courseId":1,"courseName":"A","epochDay":20734,"status":"SENT"},
+               {"courseId":1,"courseName":"A","epochDay":20735,"openAtMillis":7,"status":""}
              ],
              "settings":{"remind_interval":5,"aneh":{"x":1},"tes":1.0E10}}
         """.trimIndent()
@@ -80,6 +80,28 @@ class BackupCodecTest {
         assertEquals(5L, b.records[0].endAtMillis)
         assertEquals(5, (b.settings["remind_interval"] as Number).toInt())
         assertFalse(b.settings.containsKey("aneh"))
+    }
+
+    @Test
+    fun dropsImplausibleDatesThatWouldCrashScheduling() {
+        val text = """
+            {"format":"NGIBSEN-CADANGAN","version":1,
+             "courses":[
+               {"id":1,"name":"A","dayOfWeek":1,"openMinute":420,"skipUntilEpochDay":999999999999},
+               {"id":2,"name":"Pengganti rusak","dayOfWeek":1,"openMinute":420,"oneOffEpochDay":-99999999999},
+               {"id":3,"name":"Pengganti","dayOfWeek":1,"openMinute":420,"oneOffEpochDay":20736}
+             ],
+             "records":[
+               {"courseId":1,"courseName":"A","epochDay":99999999999,"openAtMillis":5,"status":"SENT"},
+               {"courseId":0,"courseName":"Tanpa matkul","epochDay":-1760000000000,"openAtMillis":5,"status":"QUEUED"}
+             ]}
+        """.trimIndent()
+        val b = BackupCodec.decode(text)
+        assertEquals(listOf("A", "Pengganti"), b.courses.map { it.name })
+        assertEquals(null, b.courses[0].skipUntilEpochDay)
+        // 20736 = Sabtu 10 Okt 2026: hari mengikuti tanggal, bukan isian "dayOfWeek".
+        assertEquals(6, b.courses[1].dayOfWeek)
+        assertEquals(listOf("Tanpa matkul"), b.records.map { it.courseName })
     }
 
     @Test

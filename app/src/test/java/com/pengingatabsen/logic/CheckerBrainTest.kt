@@ -203,13 +203,23 @@ class CheckerBrainTest {
         var brain = CheckerBrain(true)
         while (step !is Step.Finish) step = brain.next(tick++, PageKind.OTHER, Probe.LOADING).let { if (it == Step.LoadTarget) Step.Wait else it }
         assertFalse((step as Step.Finish).layoutSuspect)
-        // Halaman presensi termuat tapi kosong / tak pernah selesai / data akun tak pernah tampil / dialihkan terus → curiga.
+        // Halaman presensi tak kunjung selesai "memuat" (internet lambat) → bukan.
+        step = Step.Wait
+        tick = 0
+        brain = CheckerBrain(true)
+        while (step !is Step.Finish) step = brain.next(tick++, PageKind.TARGET, Probe.LOADING)
+        assertFalse((step as Step.Finish).layoutSuspect)
+        // Halaman presensi termuat tapi kosong / status berganti-ganti terus / data akun tak pernah tampil /
+        // dialihkan terus → curiga.
         assertTrue(run(FakeSiadin(sessionValid = true, cards = Probe.NO_TEXT, placeholder = false)).suspect)
         assertTrue(run(FakeSiadin(sessionValid = true, redirectsAway = true).apply { onTarget = false }).suspect)
         step = Step.Wait
         tick = 0
         brain = CheckerBrain(true)
-        while (step !is Step.Finish) step = brain.next(tick++, PageKind.TARGET, Probe.LOADING)
+        while (step !is Step.Finish) {
+            step = brain.next(tick, PageKind.TARGET, if (tick % 2 == 0) Probe.BUTTON else Probe.WAITING)
+            tick++
+        }
         assertTrue((step as Step.Finish).layoutSuspect)
         step = Step.Wait
         tick = 0

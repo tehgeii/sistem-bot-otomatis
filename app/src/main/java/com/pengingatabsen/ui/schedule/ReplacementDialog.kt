@@ -62,10 +62,13 @@ fun ReplacementDialog(source: Course, onDismiss: () -> Unit, onSave: (Replacemen
     var open by remember { mutableIntStateOf(source.openMinute) }
     var close by remember { mutableStateOf(source.closeMinute) }
     var room by remember { mutableStateOf(source.room.orEmpty()) }
-    var skipRegular by remember { mutableStateOf(true) }
     var pickingDate by remember { mutableStateOf(false) }
 
     val replaced = ScheduleMath.replacedOccurrence(source.toSlot(), date, now)
+    // Kelas yang sedang berlangsung hari ini tidak dicentang otomatis (meliburkannya menghentikan pengingat
+    // yang sedang berjalan); pengguna mencentang sendiri bila memang kelas hari ini yang dipindah.
+    val ongoing = replaced != null && ScheduleMath.currentOccurrence(source.toSlot(), now)?.date == replaced
+    var skipRegular by remember(replaced) { mutableStateOf(!ongoing) }
     val closeInvalid = close != null && close!! <= open
     val end = ScheduleMath.occurrenceOn(com.pengingatabsen.logic.Slot(date.dayOfWeek.value, open, close), date).end
     val alreadyOver = !end.isAfter(LocalDateTime.now())
@@ -123,7 +126,8 @@ fun ReplacementDialog(source: Course, onDismiss: () -> Unit, onSave: (Replacemen
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
                         Checkbox(checked = skipRegular, onCheckedChange = { skipRegular = it })
                         Text(
-                            "Liburkan jadwal biasa ${Formatters.date(replaced)} (yang digantikan)",
+                            "Liburkan jadwal biasa ${Formatters.date(replaced)}" +
+                                if (ongoing) " (hari ini, sedang berlangsung)" else " (yang digantikan)",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
