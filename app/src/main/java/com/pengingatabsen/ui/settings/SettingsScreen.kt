@@ -54,7 +54,10 @@ fun SettingsScreen(vm: SetupViewModel, contentPadding: PaddingValues) {
         HorizontalDivider(Modifier.padding(top = 8.dp))
         SectionTitle("Izin HP")
         PermissionsSection()
-        HorizontalDivider()
+        HorizontalDivider(Modifier.padding(top = 8.dp))
+        SectionTitle("Cadangan data")
+        BackupSection(vm)
+        HorizontalDivider(Modifier.padding(top = 8.dp))
         var advanced by rememberSaveable { mutableStateOf(false) }
         TextButton(onClick = { advanced = !advanced }, modifier = Modifier.padding(top = 8.dp)) {
             Text(if (advanced) "▲ Sembunyikan lanjutan" else "▼ Lanjutan: diagnosis & aplikasi tujuan")

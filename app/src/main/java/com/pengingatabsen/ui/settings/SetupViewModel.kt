@@ -23,6 +23,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 
+/** Batas wajar ukuran file cadangan (riwayat bertahun-tahun pun jauh di bawah ini). */
+private const val MAX_BACKUP_BYTES = 20 * 1024 * 1024
+
 /** State untuk wizard & layar Pengaturan (aplikasi tujuan, Telegram, interval). */
 class SetupViewModel : ViewModel() {
     private val store = Graph.settings
@@ -41,6 +44,94 @@ class SetupViewModel : ViewModel() {
         private set
 
     private var pollJob: Job? = null
+
+    // ---------- Cadangan & pulihkan (pindah HP) ----------
+
+    sealed class BackupUi {
+        data object Idle : BackupUi()
+        data class Working(val message: String) : BackupUi()
+        /** File cadangan terbaca; menunggu konfirmasi karena SEMUA data di HP ini akan diganti. */
+        data class Preview(val backup: com.pengingatabsen.logic.Backup, val summary: String) : BackupUi()
+        data class Done(val message: String) : BackupUi()
+        data class Failed(val message: String) : BackupUi()
+    }
+
+    var backupUi by mutableStateOf<BackupUi>(BackupUi.Idle)
+        private set
+
+    fun closeBackup() { backupUi = BackupUi.Idle }
+
+    private fun appVersion(context: Context): String =
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "?"
+
+    /** Tulis cadangan ke file yang dipilih pengguna (Storage Access Framework). */
+    fun exportBackup(context: Context, uri: android.net.Uri) = viewModelScope.launch {
+        backupUi = BackupUi.Working("Menyimpan cadangan…")
+        backupUi = runCatching {
+            val backup = Graph.repository.buildBackup(appVersion(context))
+            val bytes = com.pengingatabsen.logic.BackupCodec.encode(backup).toByteArray(Charsets.UTF_8)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val resolver = context.contentResolver
+                val out = runCatching { resolver.openOutputStream(uri, "wt") }.getOrNull() ?: resolver.openOutputStream(uri)
+                checkNotNull(out) { "file tidak bisa ditulis" }.use { it.write(bytes) }
+            }
+            com.pengingatabsen.data.DiagLog.add("cadangan: disimpan (${backup.courses.size} jadwal, ${backup.records.size} riwayat)")
+            BackupUi.Done(
+                "Cadangan tersimpan: ${backup.courses.size} jadwal, ${backup.records.size} riwayat, dan pengaturan.\n\n" +
+                    "Simpan file ini di tempat aman (mis. Google Drive). NIM/password SiAdin dan bot Telegram " +
+                    "sengaja tidak ikut; isi ulang di HP baru.",
+            )
+        }.getOrElse { BackupUi.Failed("Gagal menyimpan cadangan (${it.message ?: it.javaClass.simpleName}).") }
+    }
+
+    /** Baca file cadangan lalu tampilkan ringkasan untuk dikonfirmasi. */
+    fun readBackup(context: Context, uri: android.net.Uri) = viewModelScope.launch {
+        backupUi = BackupUi.Working("Membaca file cadangan…")
+        backupUi = runCatching {
+            val text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                checkNotNull(context.contentResolver.openInputStream(uri)) { "file tidak bisa dibuka" }.use { input ->
+                    // Dibaca bertahap dengan batas ukuran: file salah pilih (video, dsb.) tidak membuat aplikasi kehabisan memori.
+                    val out = java.io.ByteArrayOutputStream()
+                    val chunk = ByteArray(64 * 1024)
+                    while (true) {
+                        val n = input.read(chunk)
+                        if (n < 0) break
+                        out.write(chunk, 0, n)
+                        require(out.size() <= MAX_BACKUP_BYTES) { "File terlalu besar, ini bukan cadangan NgiBsen." }
+                    }
+                    out.toString("UTF-8")
+                }
+            }
+            val backup = com.pengingatabsen.logic.BackupCodec.decode(text)
+            val created = runCatching { Formatters.dateTime(LocalDateTime.parse(backup.createdAt)) }.getOrDefault(backup.createdAt)
+            val oneOffs = backup.courses.count { it.oneOffEpochDay != null }
+            BackupUi.Preview(
+                backup,
+                "Cadangan dibuat $created (NgiBsen ${backup.appVersion.ifBlank { "?" }}):\n" +
+                    "• ${backup.courses.size} jadwal" + (if (oneOffs > 0) " (termasuk $oneOffs kelas pengganti)" else "") + "\n" +
+                    "• ${backup.records.size} riwayat\n" +
+                    "• ${backup.settings.size} pengaturan\n\n" +
+                    "SEMUA jadwal & riwayat di HP ini akan DIGANTI isi cadangan. Foto bukti, NIM/password SiAdin, " +
+                    "dan bot Telegram tidak ikut — isi ulang setelah ini.",
+            )
+        }.getOrElse {
+            val msg = (it as? IllegalArgumentException)?.message ?: "File tidak bisa dibaca (${it.message ?: it.javaClass.simpleName})."
+            BackupUi.Failed(msg)
+        }
+    }
+
+    fun confirmRestore() = viewModelScope.launch {
+        val preview = backupUi as? BackupUi.Preview ?: return@launch
+        backupUi = BackupUi.Working("Memulihkan data…")
+        backupUi = runCatching {
+            val records = Graph.repository.restoreBackup(preview.backup)
+            com.pengingatabsen.data.DiagLog.add("cadangan: dipulihkan (${preview.backup.courses.size} jadwal, $records riwayat)")
+            BackupUi.Done(
+                "Data dipulihkan: ${preview.backup.courses.size} jadwal, $records riwayat. Alarm sudah dipasang ulang.\n\n" +
+                    "Langkah berikutnya: isi NIM/password di SiAdin web dan sambungkan bot Telegram lagi.",
+            )
+        }.getOrElse { BackupUi.Failed("Gagal memulihkan; data di HP ini tidak berubah (${it.message ?: it.javaClass.simpleName}).") }
+    }
 
     // ---------- Aplikasi tujuan ----------
 

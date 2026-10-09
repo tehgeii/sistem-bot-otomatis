@@ -28,6 +28,10 @@ interface CourseDao {
 
     @Delete
     suspend fun delete(course: Course)
+
+    /** Hanya untuk pulihkan cadangan (di dalam transaksi). */
+    @Query("DELETE FROM courses")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -64,4 +68,12 @@ interface RecordDao {
 
     @Query("DELETE FROM records WHERE courseId = :courseId AND epochDay = :epochDay AND status = 'HOLIDAY'")
     suspend fun deleteHoliday(courseId: Long, epochDay: Long)
+
+    /** Semua riwayat (untuk cadangan & ekspor), urut tanggal. */
+    @Query("SELECT * FROM records ORDER BY epochDay, openAtMillis, id")
+    suspend fun all(): List<AttendanceRecord>
+
+    /** Hanya untuk pulihkan cadangan (di dalam transaksi). */
+    @Query("DELETE FROM records")
+    suspend fun deleteAll()
 }

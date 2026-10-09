@@ -99,6 +99,42 @@ class SettingsStore(private val context: Context) {
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
 
+    // ---------- Cadangan (pindah HP) ----------
+    // Hanya pengaturan yang AMAN dipindah. NIM/password/bot token TIDAK ikut (terenkripsi kunci HP lama), begitu
+    // juga status sementara & onboarding (wizard di HP baru tetap jalan supaya izin & login diisi ulang).
+    private val backupBooleans = listOf(
+        Keys.VIBRATE_ONLY, Keys.AUTO_LOGIN, Keys.SMART_PRESENSI, Keys.FULL_SCREEN_ALERT,
+        Keys.WEEKLY_SUMMARY, Keys.READINESS_CHECK,
+    )
+    private val backupInts = listOf(Keys.REMIND_INTERVAL)
+    private val backupStrings = listOf(Keys.TARGET_PACKAGE, Keys.TARGET_LABEL, Keys.DEEP_LINK)
+
+    /** Pengaturan yang ikut file cadangan (nama kunci DataStore → nilai). */
+    suspend fun backupPrefs(): Map<String, Any> {
+        val p = context.dataStore.data.first()
+        val out = LinkedHashMap<String, Any>()
+        backupBooleans.forEach { k -> p[k]?.let { out[k.name] = it } }
+        backupInts.forEach { k -> p[k]?.let { out[k.name] = it } }
+        backupStrings.forEach { k -> p[k]?.let { out[k.name] = it } }
+        return out
+    }
+
+    /**
+     * Terapkan pengaturan dari cadangan (hanya kunci yang dikenal & tipenya cocok), lalu bersihkan status
+     * sementara yang memakai id matkul lama (presensi dibuka, alarm terpasang, hitungan gagal).
+     */
+    suspend fun restorePrefs(values: Map<String, Any>) = context.dataStore.edit { p ->
+        backupBooleans.forEach { k -> (values[k.name] as? Boolean)?.let { p[k] = it } }
+        backupInts.forEach { k -> (values[k.name] as? Number)?.let { p[k] = it.toInt() } }
+        backupStrings.forEach { k -> (values[k.name] as? String)?.takeIf { it.isNotBlank() }?.let { p[k] = it } }
+        p[Keys.REMIND_INTERVAL]?.let { p[Keys.REMIND_INTERVAL] = it.coerceIn(1, 30) }
+        p.remove(Keys.PRESENSI_OPEN)
+        p.remove(Keys.ARMED)
+        p.remove(Keys.MISSED_REPORTED)
+        p.asMap().keys.map { it.name }.filter { it.startsWith("presensi_unknown_") }
+            .forEach { p.remove(intPreferencesKey(it)) }
+    }
+
     suspend fun current(): AppSettings = settings.first()
 
     private fun Preferences.toSettings() = AppSettings(

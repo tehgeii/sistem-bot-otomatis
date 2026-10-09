@@ -3,6 +3,10 @@ package com.pengingatabsen.data
 import com.pengingatabsen.Graph
 import com.pengingatabsen.alarm.AlarmScheduler
 import com.pengingatabsen.alarm.Notifications
+import androidx.room.withTransaction
+import com.pengingatabsen.logic.Backup
+import com.pengingatabsen.logic.BackupCourse
+import com.pengingatabsen.logic.BackupRecord
 import com.pengingatabsen.logic.CourseData
 import com.pengingatabsen.logic.ScheduleCodec
 import com.pengingatabsen.logic.ScheduleMath
@@ -301,6 +305,68 @@ class Repository(private val db: AppDatabase) {
         return courseDao.getAll()
             .filter { it.active && ScheduleMath.isOn(it.toSlot(), now.toLocalDate()) }
             .minByOrNull { kotlin.math.abs(it.openMinute - minute) }
+    }
+
+    // ---------- Cadangan (pindah HP / instal ulang) ----------
+
+    /** Semua jadwal, riwayat, dan pengaturan aman untuk file cadangan. */
+    suspend fun buildBackup(appVersion: String, now: LocalDateTime = LocalDateTime.now()): Backup = Backup(
+        createdAt = now.withNano(0).toString(),
+        appVersion = appVersion,
+        courses = courseDao.getAll().map {
+            BackupCourse(
+                it.id, it.name, it.dayOfWeek, it.openMinute, it.closeMinute, it.room, it.active,
+                it.skipUntilEpochDay, it.oneOffEpochDay,
+            )
+        },
+        records = recordDao.all().map {
+            BackupRecord(it.courseId, it.courseName, it.epochDay, it.openAtMillis, it.endAtMillis, it.status.name, it.doneAtMillis, it.error)
+        },
+        settings = Graph.settings.backupPrefs(),
+    )
+
+    /**
+     * Ganti SEMUA jadwal & riwayat di HP ini dengan isi [backup] (satu transaksi: gagal = tidak ada yang berubah),
+     * terapkan pengaturannya, lalu pasang ulang semua alarm. Riwayat yang dulu "berlangsung" tapi jendelanya
+     * sudah lewat dicatat terlewat TANPA mengirim pesan Telegram lagi. Mengembalikan jumlah riwayat yang masuk.
+     */
+    suspend fun restoreBackup(backup: Backup, nowMillis: Long = System.currentTimeMillis()): Int {
+        val context = Graph.appContext
+        val oldIds = courseDao.getAll().map { it.id }
+        var restored = 0
+        db.withTransaction {
+            recordDao.deleteAll()
+            courseDao.deleteAll()
+            // Id asli dipertahankan (riwayat menunjuk ke id ini); yang tanpa id dimasukkan terakhir.
+            backup.courses.sortedBy { if (it.id > 0) 0 else 1 }.forEach { c ->
+                courseDao.insert(
+                    Course(
+                        id = c.id.coerceAtLeast(0), name = c.name, dayOfWeek = c.dayOfWeek, openMinute = c.openMinute,
+                        closeMinute = c.closeMinute, room = c.room, active = c.active,
+                        skipUntilEpochDay = c.skipUntilEpochDay, oneOffEpochDay = c.oneOffEpochDay,
+                    ),
+                )
+            }
+            for (r in backup.records) {
+                val status = runCatching { RecordStatus.valueOf(r.status) }.getOrNull() ?: continue
+                val fixed = if (status == RecordStatus.ACTIVE && r.endAtMillis <= nowMillis) RecordStatus.MISSED else status
+                val id = recordDao.insert(
+                    AttendanceRecord(
+                        courseId = r.courseId, courseName = r.courseName, epochDay = r.epochDay,
+                        openAtMillis = r.openAtMillis, endAtMillis = r.endAtMillis, status = fixed,
+                        doneAtMillis = r.doneAtMillis, error = r.error,
+                    ),
+                )
+                if (id > 0) restored++
+            }
+        }
+        for (id in oldIds) {
+            AlarmScheduler.cancel(context, id)
+            Notifications.cancel(context, id)
+        }
+        Graph.settings.restorePrefs(backup.settings)
+        AlarmScheduler.rescheduleAll(context)
+        return restored
     }
 
     /** Dipanggil setiap jadwal berubah. */

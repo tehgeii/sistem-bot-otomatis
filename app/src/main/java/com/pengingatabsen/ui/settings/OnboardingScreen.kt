@@ -40,6 +40,7 @@ fun OnboardingScreen(vm: SetupViewModel, modifier: Modifier = Modifier) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             when (step) {
                 0 -> {
+                    BackupSection(vm, restoreOnly = true)
                     Text("Supaya pengingat muncul tepat waktu walau HP sedang tidur.")
                     PermissionsSection(autoRequest = true)
                 }
