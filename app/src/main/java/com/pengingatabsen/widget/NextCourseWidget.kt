@@ -29,6 +29,8 @@ class NextCourseWidget : AppWidgetProvider() {
 
     /** Yang ditampilkan widget. [countdownTo] diisi bila hitung mundur ke jam buka perlu tampil. */
     private data class Display(
+        /** Judul kecil di atas: "NgiBsen · Hari ini" / "NgiBsen · Berikutnya" (kuliah di hari lain). */
+        val header: String,
         val title: String,
         val detail: String,
         val countdownTo: LocalDateTime?,
@@ -39,6 +41,9 @@ class NextCourseWidget : AppWidgetProvider() {
     companion object {
         /** Hitung mundur hanya ditampilkan bila jam buka kurang dari sehari lagi (format jam:menit:detik). */
         private val COUNTDOWN_MAX: Duration = Duration.ofHours(24)
+        private const val HEADER_TODAY = "NgiBsen · Hari ini"
+        private const val HEADER_NEXT = "NgiBsen · Berikutnya"
+        private const val HEADER_PLAIN = "NgiBsen"
 
         suspend fun updateAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -47,6 +52,7 @@ class NextCourseWidget : AppWidgetProvider() {
             val now = LocalDateTime.now()
             val d = describe(now)
             val views = RemoteViews(context.packageName, R.layout.widget_next).apply {
+                setTextViewText(R.id.widget_label, d.header)
                 setTextViewText(R.id.widget_title, d.title)
                 setTextViewText(R.id.widget_detail, d.detail)
                 val until = d.countdownTo?.let { Duration.between(now, it) }
@@ -69,7 +75,7 @@ class NextCourseWidget : AppWidgetProvider() {
         }
 
         private suspend fun describe(now: LocalDateTime): Display {
-            val loaded = TodayData.load(now) ?: return Display("Belum ada jadwal", "Tap untuk membuka NgiBsen", null, 0L, 0L)
+            val loaded = TodayData.load(now) ?: return Display(HEADER_PLAIN, "Belum ada jadwal", "Tap untuk membuka NgiBsen", null, 0L, 0L)
             val view = loaded.view
             // Fokus: yang sedang dibuka > menunggu > berikutnya hari ini > matkul hari lain > yang terakhir hari ini.
             loaded.focus?.let { return display(it, now, loaded.smart) }
@@ -79,10 +85,12 @@ class NextCourseWidget : AppWidgetProvider() {
                 val doneToday = view.items.count { it.state == TodayState.DONE }
                 val prefix = if (doneToday > 0) "✅ Hari ini $doneToday presensi beres · " else ""
                 // Matkul hari lain: tap cukup membuka halaman presensi (tanpa mencatat apa pun).
-                return Display(next.name, "$prefix$day ${Formatters.hm(next.open)}$room", next.open, 0L, 0L)
+                // Kuliah di hari lain: judulnya "Berikutnya" supaya tidak terbaca seperti jadwal hari ini.
+                val header = if (next.open.toLocalDate() == now.toLocalDate()) HEADER_TODAY else HEADER_NEXT
+                return Display(header, next.name, "$prefix$day ${Formatters.hm(next.open)}$room", next.open, 0L, 0L)
             }
             return view.items.lastOrNull()?.let { display(it, now, loaded.smart) }
-                ?: Display("NgiBsen", "Tap untuk membuka", null, 0L, 0L)
+                ?: Display(HEADER_PLAIN, "Tidak ada kuliah terjadwal", "Tap untuk membuka NgiBsen", null, 0L, 0L)
         }
 
         private fun display(item: TodayItem, now: LocalDateTime, smart: Boolean): Display {
@@ -100,7 +108,7 @@ class NextCourseWidget : AppWidgetProvider() {
             }
             val countdown = if (item.state == TodayState.UPCOMING) item.open else null
             val (courseId, epochDay) = TodayData.launchTarget(item)
-            return Display(item.name, detail, countdown, courseId, epochDay)
+            return Display(HEADER_TODAY, item.name, detail, countdown, courseId, epochDay)
         }
     }
 }

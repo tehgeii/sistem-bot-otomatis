@@ -1,6 +1,6 @@
 # NgiBsen UDINUS
 
-**Versi 3.3.2** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
+**Versi 3.3.3** · **NgiBsen** = pe**Ngi**ngat a**Bsen** — pengingat absen kuliah untuk mahasiswa UDINUS.
 
 Aplikasi Android untuk mengingatkan absen kuliah **UDINUS** — lewat **Presensi Online SiAdin web**
 (disarankan, dengan login otomatis) atau aplikasi **Dinusverse (SiAdin Mobile)**.
@@ -336,7 +336,8 @@ ulang sendiri lewat halaman depan; bila masih gagal, sesi lama dihapus lalu logi
 
 Tambahkan widget **NgiBsen** di layar utama (bisa diubah ukurannya): matkul hari ini atau berikutnya,
 status presensi (🕒 dibuka jam berapa · ⏳ menunggu · 🔵 DIBUKA — tap! · ✅ sudah presensi), dan **hitung mundur
-langsung** ke jam buka (berjalan sendiri, < 24 jam). Tap widget = buka halaman presensi matkul itu.
+langsung** ke jam buka (berjalan sendiri, < 24 jam). Judul kecilnya **Hari ini** untuk kuliah hari ini dan
+**Berikutnya** untuk kuliah di hari lain. Tap widget = buka halaman presensi matkul itu.
 
 ## Riwayat
 
