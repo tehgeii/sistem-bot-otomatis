@@ -69,7 +69,12 @@ class MainActivity : ComponentActivity() {
                     topBar = {
                         TopAppBar(
                             title = { Text(if (tab == 0) "NgiBsen UDINUS" else titles[tab]) },
-                            actions = { if (tab == 0) ScheduleMenu(vm) },
+                            actions = {
+                                when (tab) {
+                                    0 -> ScheduleMenu(vm)
+                                    1 -> com.pengingatabsen.ui.history.HistoryMenu()
+                                }
+                            },
                         )
                     },
                     bottomBar = {
