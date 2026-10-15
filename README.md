@@ -552,6 +552,12 @@ Log build juga mencetak **sidik jari SHA-256 sertifikat**; angka ini harus selal
 - Pemberitahuan versi baru hanya membaca `versi.json` publik di Release repo (tanpa data apa pun dari HP);
   pembaruan sekali tap hanya mengunduh APK dari Release repo yang sama dan tidak mengirim apa pun.
 
+## Lisensi
+
+© 2026-present **tehgeii**. Hak cipta dilindungi — lihat [LICENSE](LICENSE). Kode boleh dilihat, dan APK resmi
+dari Releases boleh dipakai serta dibagikan gratis (tanpa diubah) untuk pemakaian pribadi. Menyalin, mengubah,
+mengunggah ulang, atau menjual kode/aplikasi ini butuh izin tertulis dari pemiliknya.
+
 ## Kontributor
 
 - [@tehgeii](https://github.com/tehgeii) — ide, kebutuhan, dan arah desain aplikasi
