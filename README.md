@@ -556,8 +556,9 @@ Log build juga mencetak **sidik jari SHA-256 sertifikat**; angka ini harus selal
 
 © 2026-present **tehgeii**. Hak cipta dilindungi — lihat [LICENSE](LICENSE). Kode boleh dilihat, dan APK resmi
 dari Releases boleh dipakai serta dibagikan gratis (tanpa diubah) untuk pemakaian pribadi. Menyalin, mengubah,
-mengunggah ulang, atau menjual kode/aplikasi ini butuh izin tertulis dari pemiliknya.
+mengunggah ulang, atau menjual kode/aplikasi ini, juga memakai nama & ikon "NgiBsen", butuh izin tertulis dari
+pemiliknya. NgiBsen UDINUS adalah proyek pribadi dan bukan aplikasi resmi Universitas Dian Nuswantoro.
 
-## Kontributor
+## Pembuat
 
-- [@tehgeii](https://github.com/tehgeii) — ide, kebutuhan, dan arah desain aplikasi
+Dibuat dan dikelola oleh **[@tehgeii](https://github.com/tehgeii)**.

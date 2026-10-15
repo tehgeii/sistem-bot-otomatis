@@ -1,54 +1,112 @@
-NgiBsen UDINUS
+NgiBsen UDINUS - Proprietary License
+Copyright (c) 2026-present tehgeii (https://github.com/tehgeii). All rights reserved.
+
+1. DEFINITIONS
+   "Author" means tehgeii, the creator and sole copyright holder of NgiBsen UDINUS.
+   "Software" means everything in this repository and its history - source code, scripts, tests,
+   build configuration, documentation, text, design, the "NgiBsen" name and icon - and every
+   compiled application (APK) built from it.
+   "Official APK" means an unmodified APK published by the Author in this repository's Releases and
+   signed with the Author's release certificate, SHA-256 fingerprint:
+   6db7e5f48092aa56d8ba187744725b9370aa46de851429c406f93bcb4e244aab
+
+2. OWNERSHIP
+   All rights, title and interest in the Software are and remain with the Author. No rights are
+   granted except those expressly stated in Section 3.
+
+3. PERMITTED USE (no further permission needed)
+   a. Viewing the source code in this repository.
+   b. Downloading the Official APK and installing it on your own device for personal,
+      non-commercial use.
+   c. Sharing the link to this repository or its Releases, or the Official APK file, with other
+      people free of charge, for their own personal, non-commercial use.
+
+4. RESTRICTIONS - NOT permitted without prior written permission from the Author:
+   a. copying, reproducing, or reusing any part of the source code, in whole or in part, in any
+      other project, product, or publication;
+   b. modifying the Software, creating derivative works, or distributing modified versions or
+      APKs that are not the Official APK;
+   c. republishing, re-uploading, sublicensing, selling, renting, or otherwise commercializing the
+      Software, or offering it or any part of it as a paid or free service;
+   d. using the "NgiBsen" name or icon for any other app, project, or service;
+   e. using the Software, or any part of it, to submit attendance automatically on behalf of
+      anyone, or to circumvent the rules or systems of any university;
+   f. removing, hiding, or altering this copyright notice or this License.
+   Forking or viewing this repository on GitHub, as allowed by GitHub's Terms of Service, does not
+   grant any rights beyond Section 3.
+
+5. THIRD-PARTY COMPONENTS
+   The Software uses open-source libraries (such as Kotlin, AndroidX, Jetpack Compose, Room,
+   WorkManager, and OkHttp). Those libraries remain under their own licenses (mostly the Apache
+   License 2.0); this License does not limit any rights those licenses grant for those libraries.
+
+6. FEEDBACK
+   Suggestions, issues, or pull requests sent to the Author may be used by the Author freely and
+   without obligation. Sending them does not grant the sender any rights in the Software.
+
+7. TERMINATION
+   Any breach of this License automatically ends the permissions in Section 3. After that, you
+   must stop using the Software and delete every copy you have.
+
+8. NO AFFILIATION
+   NgiBsen UDINUS is an independent personal project. It is not affiliated with, endorsed by, or
+   an official product of Universitas Dian Nuswantoro (UDINUS), SiAdin, or Dinusverse.
+
+9. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+   BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT.
+
+10. LIMITATION OF LIABILITY
+   IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+   OR THE USE OR OTHER DEALINGS IN THE SOFTWARE, INCLUDING MISSED ATTENDANCE OR ACADEMIC
+   CONSEQUENCES. Each user remains responsible for their own attendance and for following the
+   rules of their university.
+
+11. GOVERNING LAW
+   This License is governed by the laws of the Republic of Indonesia, including Law No. 28 of 2014
+   on Copyright (Undang-Undang Nomor 28 Tahun 2014 tentang Hak Cipta).
+
+12. CONTACT
+   Permission requests: https://github.com/tehgeii
+
 Copyright (c) 2026-present tehgeii. All rights reserved.
 
-This repository and everything in it - source code, scripts, tests, documentation, design,
-icons, and the compiled application (APK) - is owned by tehgeii and protected by copyright law.
+====================================================================================================
+RINGKASAN (Bahasa Indonesia; bila berbeda, teks bahasa Inggris di atas yang berlaku)
 
-PERMITTED (no further permission needed):
-1. Viewing the source code in this repository.
-2. Downloading the official, unmodified APK from this repository's Releases and installing it
-   on your own device for personal, non-commercial use.
-3. Sharing the link to this repository's Releases, or the official unmodified APK file, with
-   other people free of charge, for their own personal, non-commercial use.
+NgiBsen UDINUS - Lisensi Hak Cipta
+Hak cipta (c) 2026-sekarang tehgeii (https://github.com/tehgeii). Semua hak dilindungi.
 
-NOT PERMITTED without prior written permission from tehgeii:
-- copying, reproducing, or reusing any part of the source code, in whole or in part, in any
-  other project or product;
-- modifying the source code or the application, or distributing modified versions;
-- republishing, re-uploading, sublicensing, selling, renting, or otherwise commercializing the
-  source code, the application, or any service based on them;
-- removing or altering this copyright notice.
+Pemilik: tehgeii, pembuat dan satu-satunya pemegang hak cipta NgiBsen UDINUS - kode, dokumentasi,
+desain, nama & ikon "NgiBsen", serta setiap APK yang dibangun darinya.
+APK resmi: APK dari Releases repositori ini yang tidak diubah dan ditandatangani sertifikat dengan
+sidik jari SHA-256 di atas.
 
-Forking or viewing this repository on GitHub, as allowed by GitHub's Terms of Service, does not
-grant any rights beyond those listed above.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
-BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. Each user remains
-responsible for their own attendance and for following the rules of their university.
-
-Permission requests: contact tehgeii via https://github.com/tehgeii
-
---------------------------------------------------------------------------------------------
-Ringkasan (Bahasa Indonesia; bila berbeda, teks bahasa Inggris di atas yang berlaku)
-
-Hak cipta (c) 2026-sekarang tehgeii. Semua hak dilindungi.
-
-Boleh:
-1. Melihat kode sumber di repositori ini.
-2. Mengunduh APK resmi (tanpa diubah) dari Releases repositori ini dan memasangnya di HP sendiri
-   untuk pemakaian pribadi, non-komersial.
-3. Membagikan link Releases atau file APK resmi (tanpa diubah) kepada orang lain secara gratis,
-   untuk pemakaian pribadi mereka.
+Boleh (tanpa izin):
+  a. Melihat kode sumber di repositori ini.
+  b. Mengunduh APK resmi dan memasangnya di HP sendiri untuk pemakaian pribadi, non-komersial.
+  c. Membagikan link repositori/Releases atau file APK resmi kepada orang lain secara gratis, untuk
+     pemakaian pribadi mereka.
 
 Tidak boleh tanpa izin tertulis dari tehgeii:
-- menyalin atau memakai ulang sebagian atau seluruh kode sumber di proyek/produk lain;
-- mengubah kode atau aplikasi, atau menyebarkan versi yang diubah;
-- mengunggah ulang, menjual, menyewakan, atau mengomersialkan kode, aplikasi, atau layanan
-  berbasis keduanya;
-- menghapus atau mengubah pemberitahuan hak cipta ini.
+  a. menyalin atau memakai ulang sebagian atau seluruh kode di proyek, produk, atau publikasi lain;
+  b. mengubah aplikasi, membuat turunannya, atau menyebarkan versi/APK yang bukan APK resmi;
+  c. mengunggah ulang, menjual, menyewakan, mengomersialkan, atau menjadikannya layanan;
+  d. memakai nama atau ikon "NgiBsen" untuk aplikasi, proyek, atau layanan lain;
+  e. memakai aplikasi atau bagiannya untuk mengirim presensi otomatis atas nama siapa pun, atau
+     untuk mengakali aturan/sistem kampus mana pun;
+  f. menghapus, menyembunyikan, atau mengubah pemberitahuan hak cipta dan lisensi ini.
 
-Aplikasi diberikan "apa adanya", tanpa jaminan apa pun. Setiap pengguna tetap bertanggung jawab
-atas presensinya sendiri dan atas aturan kampusnya.
+Pustaka open-source yang dipakai (Kotlin, AndroidX, Jetpack Compose, Room, WorkManager, OkHttp, dll.)
+tetap mengikuti lisensinya masing-masing. Saran, issue, atau pull request boleh dipakai pemilik
+tanpa kewajiban apa pun. Pelanggaran membuat izin di atas otomatis berakhir.
+
+NgiBsen UDINUS adalah proyek pribadi yang independen, tidak berafiliasi dengan dan bukan produk
+resmi Universitas Dian Nuswantoro (UDINUS), SiAdin, atau Dinusverse. Aplikasi diberikan "apa
+adanya", tanpa jaminan apa pun; setiap pengguna tetap bertanggung jawab atas presensinya sendiri
+dan atas aturan kampusnya. Lisensi ini tunduk pada hukum Republik Indonesia, termasuk UU No. 28
+Tahun 2014 tentang Hak Cipta.
+
+Hak cipta (c) 2026-sekarang tehgeii. Semua hak dilindungi.
